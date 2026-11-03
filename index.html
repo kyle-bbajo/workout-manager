@@ -268,6 +268,11 @@ input.nm{font:inherit;font-weight:800;font-size:16px;border:none;border-bottom:1
 .camph{min-height:260px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#CBD5E1;text-align:center;padding:20px;background:radial-gradient(circle at 50% 40%,#1E293B,#0B1220)}
 .camph svg{width:34px;height:34px;opacity:.8}.camph b{color:#fff;font-size:15px}.camph span{font-size:12.5px}
 .hud .flipbtn{margin-left:auto;color:#fff;border:none;cursor:pointer}
+.secttl{font-size:12.5px;font-weight:800;color:var(--blue);margin:6px 0 8px;letter-spacing:.02em}
+.sigpad{position:relative;height:170px;border:1.5px dashed #9CA3AF;border-radius:14px;background:#fff;touch-action:none}
+.sigpad canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;border-radius:14px}
+.sighint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:14px;pointer-events:none}
+.sigclear{position:absolute;right:8px;bottom:8px;padding:4px 10px}
 
 .realbtn{display:flex;align-items:center;justify-content:center;gap:8px}
 </style>
@@ -1223,7 +1228,7 @@ function tScheduleDemo(){
   ${days.map(([d,items])=>`<div class="card"><h3>${d}</h3>${items.concat(d.startsWith('11/5')&&S.scheduleReqAccepted?[['20:00','서연','4회차']]:[]).map(([t,n,s])=>`<div class="row" style="padding:6px 0"><b style="width:52px">${t}</b><div class="av" style="width:30px;height:30px;font-size:13px">${n[0]}</div><span class="sp">${n} · ${s}</span><span class="muted">60분</span></div>`).join('')}</div>`).join('')}
   <div class="card"><h3>수업 가능 시간</h3><div class="muted">평일 09:00–21:00 · 토 10:00–14:00 · 회원은 이 시간 안에서만 예약 요청할 수 있습니다.</div></div>`;
 }
-function tMembers(){
+function tMembersDemo(){
   renderTop('회원',false);
   return `<div class="card">${members.map(m=>`<button class="list-item" data-act="memberDetail" data-id="${m.id}"><div class="av">${m.name[0]}</div><div class="sp"><b>${m.name}</b><div class="muted">수강권 ${m.done}/${m.total}회 · 최근 기록 ${m.last}</div></div>${m.flag==='re'?'<span class="pill p-orange">재등록 시기</span>':m.flag==='idle'?'<span class="pill p-red">기록 없음 7일</span>':'<span class="pill p-green">정상</span>'}${m.id==='hw'&&needMedical()?'<span class="pill p-red">의료 확인</span>':''}</button>`).join('')}</div>
   <button class="btn ghost full">${I.plus} 회원 초대 (초대 코드 · QR)</button>`;
@@ -1242,7 +1247,8 @@ function sparkline(){
 function tMemberDetail(id){
   const m=members.find(x=>x.id===id)||members[0];
   renderTop(m.name+' 회원',true);
-  if(m.id!=='hw'){
+  if(m.id!=='hw') return memberCard(m);
+  if(false){
     return `<div class="card"><h3>${m.name}</h3><div class="kv"><span class="k">수강권</span><span class="v">${m.done}/${m.total}회</span><span class="k">최근 기록</span><span class="v">${m.last}</span></div></div><div class="alert b"><div>시연에서는 <b>혜원</b> 회원의 상세 화면을 준비했습니다.</div><button class="btn sm sec" data-act="memberDetail" data-id="hw" style="margin-left:auto;align-self:center">이동</button></div>`;
   }
   const meal=[...S.meals].reverse().find(m=>m.own)||S.meals.find(x=>x.id==='m2')||{id:'m2',time:'점심',name:'김치볶음밥 1인분',ai:720,tr:null};
@@ -1346,7 +1352,7 @@ function tReview(){
     <div class="row" style="margin-top:10px" id="confirmRow"><button class="btn sm" data-act="conf" data-v="in">자세 주의로 표시</button><button class="btn sm sec" data-act="conf" data-v="out">기록에서 제외</button></div>
   </div>
   <div class="card"><h3>숙제</h3><div><span class="kw">#맨몸 스쿼트 15×3</span><span class="kw">#깊이 수평 아래</span><span class="kw">#힙힌지 벽 터치 10×3</span></div>
-  ${nextLessonBar()}
+  ${signCard('hw')}${nextLessonBar()}
   <button class="btn full" data-act="toKakao">회원에게 보낼 메시지 보기</button>
   <p class="foot" id="reviewTimer"></p>`;
 }
@@ -1726,6 +1732,7 @@ function realReview(){
       ${lm?`<button class="btn ${saved?'sec':''} full" data-act="saveRef" data-seg="${i}" style="margin-top:10px">${saved?'기준 동작 다시 저장':'좋은 반복을 회원 기준 동작으로 저장'}</button>`:''}
     </div>`;}).join('')+
   `<div class="card"><h3>전체 영상 <span class="r muted">얼굴 모자이크</span></h3>${R.videoURL?`<video src="${R.videoURL}" controls playsinline preload="metadata" style="width:100%;border-radius:12px;background:#000">${R.vttURL?`<track kind="captions" srclang="ko" label="자막" src="${R.vttURL}" default>`:''}</video>`:''}${dl}</div>
+  ${signCard('hw')}
   ${nextLessonBar()}
   <button class="btn full" data-act="realShare">카카오톡으로 보낼 요약 복사</button><button class="btn sec full" data-act="realAgain" style="margin-top:8px">새 수업 촬영</button>
   <div class="row" style="margin-top:8px">${R.videoURL?'<button class="btn sm sec" data-act="sessVidDel" style="flex:1">영상만 지우기</button>':''}<button class="btn sm sec" data-act="sessDelCur" style="flex:1;color:var(--red)">이 수업 기록 삭제</button></div>`;
@@ -2119,13 +2126,112 @@ async function processSession(R){
 }
 // 시험판 초대 링크: 주소 끝 #k=키 로 열면 이 기기에 키를 저장하고 주소에서 지움
 // (# 뒤 내용은 서버로 전송되지 않고, 키는 저장소에 들어가지 않음)
-(function(){ try{ const h=new URLSearchParams(location.hash.slice(1)); const k=h.get('k'); if(!k) return;
+function handleKeyHash(){ try{ const h=new URLSearchParams(location.hash.slice(1)); const k=h.get('k'); if(!k) return;
   LS.set('aiwm_ai',{model:h.get('m')||'gemini-flash-latest',key:k.trim()});
   history.replaceState(null,'',location.pathname+location.search);
   setTimeout(()=>toast('시험판 AI가 연결됐어요 · 이제 키 없이 쓰면 됩니다'),800);
-}catch(e){} })();
+}catch(e){} }
+handleKeyHash(); window.addEventListener('hashchange',()=>{ if(/(^|[#&])k=/.test(location.hash)){ handleKeyHash(); render(); } });
 
 if(window.APP_BUILD){ S.meals=loadMeals(); const _ib=LS.get('aiwm_inbody',null); if(_ib) S.inbody=_ib; const _g=LS.get('aiwm_goal',null); if(_g) Object.assign(S.goal,_g); }
+// ---------- 회원 추가 · 수정 (이 기기에 저장) ----------
+(function(){ const L=LS.get('aiwm_members',[]); L.forEach(m=>{ const ex=members.find(x=>x.id===m.id); if(ex) Object.assign(ex,m); else members.push(Object.assign({left:0,flag:null,last:'기록 없음',custom:true},m)); }); })();
+const PAYS=['카드','계좌이체','현금','기타'];
+function contractTotal(m){ return (m.contracts||[]).reduce((a,c)=>a+(+c.count||0),0); }
+function syncTotal(m){ if(m.contracts&&m.contracts.length) m.total=contractTotal(m); }
+function won(n){ return (Math.round(+n||0)).toLocaleString('ko-KR')+'원'; }
+function ageOf(y){ y=+y; return y>1900?(new Date().getFullYear()-y)+'세':''; }
+function saveMembers(){ LS.set('aiwm_members',members.filter(m=>m.custom).map(m=>({id:m.id,name:m.name,phone:m.phone||'',gender:m.gender||'',birth:m.birth||'',height:m.height||'',total:m.total,done:m.done,note:m.note||'',goal:m.goal||'',start:m.start||'',contracts:m.contracts||[],custom:true}))); }
+function ensureNext(m){ try{ if(typeof nextOf==='function') Object.defineProperty(m,'next',{get(){ return nextOf(m.id); },configurable:true}); }catch(e){} }
+function memberSheet(m){
+  const f=m||{name:'',phone:'',gender:'',birth:'',height:'',done:0,goal:'',note:''};
+  const today=ymd(new Date());
+  return `<div class="modal" id="memModal"><div class="sheet" role="dialog" aria-label="${m?'회원 정보 수정':'회원 추가'}">
+    <h2>${m?'회원 정보 수정':'회원 추가'}</h2><p class="muted" style="margin:0 0 12px">${m?'계약은 회원 화면의 ‘계약 추가’에서 관리해요.':'이름과 계약 횟수만 넣어도 추가돼요.'}</p>
+    <div class="secttl">신상 정보</div>
+    <label class="field"><span>이름</span><input type="text" id="mfName" value="${esc(f.name)}" placeholder="예: 김지훈" autocomplete="off"></label>
+    <div class="grid2"><label class="field"><span>성별</span><select id="mfGender">${['','여','남'].map(g=>`<option value="${g}" ${f.gender===g?'selected':''}>${g||'선택 안 함'}</option>`).join('')}</select></label>
+      <label class="field"><span>출생 연도</span><input type="number" id="mfBirth" inputmode="numeric" value="${esc(f.birth||'')}" placeholder="예: 1992"></label></div>
+    <div class="grid2"><label class="field"><span>연락처</span><input type="tel" id="mfPhone" value="${esc(f.phone||'')}" placeholder="010-0000-0000"></label>
+      <label class="field"><span>키 (cm)</span><input type="number" id="mfHeight" inputmode="decimal" value="${esc(f.height||'')}" placeholder="선택"></label></div>
+    ${m?'':`<div class="secttl">계약</div>
+    <div class="grid2"><label class="field"><span>계약 횟수 (회)</span><input type="number" id="cfCount" inputmode="numeric" min="1" value="10"></label>
+      <label class="field"><span>계약 금액 (원)</span><input type="number" id="cfAmount" inputmode="numeric" min="0" step="10000" placeholder="예: 700000"></label></div>
+    <div class="grid2"><label class="field"><span>계약일</span><input type="date" id="cfDate" value="${today}"></label>
+      <label class="field"><span>결제 방법</span><select id="cfPay">${PAYS.map(p=>`<option>${p}</option>`).join('')}</select></label></div>
+    <p class="muted" id="cfUnit" style="margin:-2px 0 10px;font-size:12.5px">회당 단가는 금액을 넣으면 계산돼요</p>
+    <label class="field"><span>이미 한 수업 (회)</span><input type="number" id="mfDone" inputmode="numeric" min="0" value="${f.done||0}"></label>`}
+    <div class="secttl">운동</div>
+    <label class="field"><span>목표 (선택)</span><input type="text" id="mfGoal" value="${esc(f.goal||'')}" placeholder="예: 체지방 5kg 감량 · 스쿼트 자세"></label>
+    <label class="field"><span>메모 (선택)</span><input type="text" id="mfNote" value="${esc(f.note||'')}" placeholder="예: 허리 통증 이력 · 평일 저녁 가능"></label>
+    <div class="row"><button class="btn" data-act="memSave" data-id="${m?m.id:''}" style="flex:1">${m?'저장':'추가'}</button><button class="btn sec" data-act="memClose">닫기</button></div>
+  </div></div>`;
+}
+function contractSheet(m){
+  const today=ymd(new Date()), last=(m.contracts||[]).slice(-1)[0];
+  return `<div class="modal" id="memModal"><div class="sheet" role="dialog" aria-label="계약 추가">
+    <h2>계약 추가 (재등록)</h2><p class="muted" style="margin:0 0 12px">${esc(m.name)} · 지금 수강권 ${m.done}/${m.total}회</p>
+    <div class="grid2"><label class="field"><span>계약 횟수 (회)</span><input type="number" id="cfCount" inputmode="numeric" min="1" value="${last?last.count:10}"></label>
+      <label class="field"><span>계약 금액 (원)</span><input type="number" id="cfAmount" inputmode="numeric" min="0" step="10000" value="${last?last.amount:''}"></label></div>
+    <div class="grid2"><label class="field"><span>계약일</span><input type="date" id="cfDate" value="${today}"></label>
+      <label class="field"><span>결제 방법</span><select id="cfPay">${PAYS.map(p=>`<option ${last&&last.pay===p?'selected':''}>${p}</option>`).join('')}</select></label></div>
+    <p class="muted" id="cfUnit" style="margin:-2px 0 10px;font-size:12.5px"></p>
+    <div class="row"><button class="btn" data-act="cfSave" data-id="${m.id}" style="flex:1">계약 추가</button><button class="btn sec" data-act="memClose">닫기</button></div>
+  </div></div>`;
+}
+function bindContractUnit(){ const c=$('#cfCount'), a=$('#cfAmount'), u=$('#cfUnit'); if(!c||!a||!u) return; const f=()=>{ const n=+c.value, w=+a.value; u.textContent=n>0&&w>0?`회당 단가 ${won(w/n)}`:'회당 단가는 금액을 넣으면 계산돼요'; }; c.addEventListener('input',f); a.addEventListener('input',f); f(); }
+function readContract(){ const count=Math.max(1,parseInt($('#cfCount').value,10)||0), amount=Math.max(0,parseInt($('#cfAmount').value,10)||0); return {id:'c'+Date.now().toString(36),date:$('#cfDate').value||ymd(new Date()),count,amount,pay:$('#cfPay').value}; }
+function memberCard(m){
+  const today=ymd(new Date()), up=sched().filter(x=>x.mid===m.id&&x.date>=today).slice(0,5), left=Math.max(0,m.total-m.done);
+  return `<div class="card"><div class="row"><div class="av">${esc(m.name[0]||'?')}</div><div class="sp"><b>${esc(m.name)}</b><div class="muted">수강권 ${m.done}/${m.total}회 · 다음 수업 ${m.next}</div></div><span class="pill ${left<=3?'p-orange':'p-green'}">남은 ${left}회</span></div>
+    ${m.custom?`<div class="kv" style="margin-top:10px"><span class="k">성별 · 나이</span><span class="v">${[m.gender,m.birth?ageOf(m.birth)+' ('+m.birth+')':''].filter(Boolean).join(' · ')||'-'}</span><span class="k">연락처</span><span class="v">${m.phone?`<a href="tel:${esc(m.phone)}">${esc(m.phone)}</a>`:'-'}</span>${m.height?`<span class="k">키</span><span class="v">${esc(m.height)}cm</span>`:''}${m.goal?`<span class="k">목표</span><span class="v">${esc(m.goal)}</span>`:''}${m.note?`<span class="k">메모</span><span class="v">${esc(m.note)}</span>`:''}</div>`:''}
+    <div class="row" style="margin-top:12px"><button class="btn sm" data-act="schedNew" data-m="${m.id}">수업 잡기</button><button class="btn sm sec" data-act="startClass" data-id="${m.id}">수업 시작</button>${m.custom?`<button class="btn sm sec" data-act="memEdit" data-id="${m.id}">정보 수정</button>`:''}</div></div>
+  <div class="card"><h3>수강권 · 계약</h3><div class="row" style="align-items:center"><span class="sp">한 수업 <b>${m.done}</b> / 계약 ${m.total}회</span><button class="btn sm sec" data-act="memDone" data-id="${m.id}" data-v="-1" aria-label="한 수업 1회 빼기">−1</button><button class="btn sm" data-act="memDone" data-id="${m.id}" data-v="1" aria-label="한 수업 1회 더하기">+1</button></div>
+    ${(m.contracts||[]).length?`<table class="t" style="margin-top:10px"><tr><th>계약일</th><th>횟수</th><th>금액</th><th>회당</th><th></th></tr>${m.contracts.map(c=>`<tr><td>${c.date.slice(2).replace(/-/g,'.')}</td><td>${c.count}회</td><td>${c.amount?won(c.amount):'-'}</td><td>${c.amount?won(c.amount/c.count):'-'}</td><td><button class="btn sm sec" data-act="cfDel" data-id="${m.id}" data-c="${c.id}" aria-label="이 계약 삭제" style="padding:2px 8px">×</button></td></tr>`).join('')}</table>
+    <div class="kv" style="margin-top:8px"><span class="k">총 계약</span><span class="v">${contractTotal(m)}회 · ${won(m.contracts.reduce((x,c)=>x+(+c.amount||0),0))}</span><span class="k">결제</span><span class="v">${[...new Set(m.contracts.map(c=>c.pay))].join(', ')}</span></div>`:'<p class="muted" style="margin:8px 0 0">계약 기록이 없어요.</p>'}
+    <button class="btn sm ${left<=3?'':'sec'} full" data-act="cfNew" data-id="${m.id}" style="margin-top:10px">${I.plus} 계약 추가 (재등록)</button></div>
+  <div class="card"><h3>예정된 수업<span class="r">${up.length}개</span></h3>${up.length?up.map(x=>`<button class="list-item" data-act="schedEdit" data-id="${x.id}"><b style="width:96px">${mdLabel(x.date)}</b><span class="sp">${x.time} · ${x.dur}분${x.note?' · '+esc(x.note):''}</span><span class="muted">›</span></button>`).join(''):'<p class="muted" style="margin:0">예정된 수업이 없어요.</p>'}</div>
+  ${signCard(m.id)}${signHistory(m.id)}
+  ${m.custom?`<button class="btn ghost full" data-act="memDel" data-id="${m.id}" style="color:var(--red)">회원 삭제</button>`:'<p class="foot">예시 회원입니다 · 혜원 회원에서 전체 상세 화면을 볼 수 있어요</p>'}`;
+}
+function tMembers(){
+  renderTop('회원',false);
+  const q=(S.memQ||'').trim();
+  const list=members.filter(m=>!q||m.name.includes(q));
+  return `<button class="btn full" data-act="memNew" style="margin-bottom:12px">${I.plus} 회원 추가</button>
+  ${members.length>5?`<label class="field"><input type="search" id="memQ" value="${esc(q)}" placeholder="회원 이름 검색"></label>`:''}
+  <div class="card">${list.map(m=>{ const left=Math.max(0,m.total-m.done); return `<button class="list-item" data-act="memberDetail" data-id="${m.id}"><div class="av">${esc(m.name[0]||'?')}</div><div class="sp"><b>${esc(m.name)}</b><div class="muted">수강권 ${m.done}/${m.total}회 · 다음 ${m.next}</div></div>${m.custom?(left<=3?'<span class="pill p-orange">재등록 시기</span>':'<span class="pill p-green">남은 '+left+'회</span>'):m.flag==='re'?'<span class="pill p-orange">재등록 시기</span>':m.flag==='idle'?'<span class="pill p-red">기록 없음 7일</span>':'<span class="pill p-green">정상</span>'}${m.id==='hw'&&needMedical()?'<span class="pill p-red">의료 확인</span>':''}</button>`; }).join('')||'<p class="muted" style="margin:0">찾는 회원이 없어요.</p>'}</div>
+  <p class="foot">회원 정보는 이 휴대폰에 저장됩니다 · 회원 앱 초대는 서버를 붙인 뒤 제공</p>`;
+}
+function memAct(act,a){
+  const find=id=>members.find(m=>m.id===id);
+  switch(act){
+    case 'memNew': $('#modalRoot').innerHTML=memberSheet(null); bindContractUnit(); setTimeout(()=>{ const e=$('#mfName'); e&&e.focus(); },50); return true;
+    case 'memEdit': { const m=find(a.dataset.id); if(m) $('#modalRoot').innerHTML=memberSheet(m); return true; }
+    case 'cfNew': { const m=find(a.dataset.id); if(!m) return true; if(!m.custom){ m.custom=true; m.contracts=m.contracts||[{id:'c0',date:ymd(new Date()),count:m.total,amount:0,pay:'기타'}]; } $('#modalRoot').innerHTML=contractSheet(m); bindContractUnit(); return true; }
+    case 'cfSave': { const m=find(a.dataset.id); if(!m) return true; const c=readContract(); m.contracts=(m.contracts||[]).concat(c); syncTotal(m); saveMembers(); $('#modalRoot').innerHTML=''; keepScroll(render); toast(`${c.count}회 계약 추가 · 수강권 ${m.total}회`); return true; }
+    case 'cfDel': { const m=find(a.dataset.id); if(!m) return true; if(!confirm('이 계약 기록을 지울까요?')) return true; m.contracts=(m.contracts||[]).filter(c=>c.id!==a.dataset.c); syncTotal(m); if(!m.contracts.length) m.total=Math.max(m.done,1); m.done=Math.min(m.done,m.total); saveMembers(); keepScroll(render); return true; }
+    case 'memClose': $('#modalRoot').innerHTML=''; return true;
+    case 'memSave': { const name=($('#mfName').value||'').trim(); if(!name){ toast('이름을 넣어 주세요'); return true; }
+      const val=id=>{ const e=$('#'+id); return e?(e.value||'').trim():''; };
+      const v={name,phone:val('mfPhone'),gender:val('mfGender'),birth:val('mfBirth'),height:val('mfHeight'),goal:val('mfGoal'),note:val('mfNote')};
+      let m=a.dataset.id&&find(a.dataset.id);
+      if(m){ Object.assign(m,v); sched().forEach(x=>{ if(x.mid===m.id) x.name=m.name; }); saveSched(); }
+      else { const c=readContract(); m=Object.assign({id:'u'+Date.now().toString(36),left:0,flag:null,last:'기록 없음',custom:true,start:c.date,contracts:[c],total:c.count,done:Math.min(c.count,Math.max(0,parseInt(val('mfDone'),10)||0))},v); members.push(m); ensureNext(m); }
+      saveMembers(); $('#modalRoot').innerHTML='';
+      if(a.dataset.id){ keepScroll(render); toast('회원 정보를 저장했어요'); } else { S.tab='members'; go('member',m.id); toast(`${m.name} 회원을 추가했어요 · 첫 수업을 잡아 보세요`); }
+      return true; }
+    case 'memDel': { const m=find(a.dataset.id); if(!m||!m.custom) return true;
+      const n=sched().filter(x=>x.mid===m.id&&x.date>=ymd(new Date())).length;
+      if(!confirm(`${m.name} 회원을 삭제할까요?${n?` 예정된 수업 ${n}개도 함께 취소돼요.`:''}`)) return true;
+      members.splice(members.indexOf(m),1); SCHED=sched().filter(x=>!(x.mid===m.id&&x.date>=ymd(new Date()))); saveSched(); saveMembers();
+      S.tab='members'; go(null); toast('회원을 삭제했어요'); return true; }
+    case 'memDone': { const m=find(a.dataset.id); if(!m) return true; m.done=Math.max(0,Math.min(m.total,m.done+(+a.dataset.v))); if(m.custom) saveMembers(); keepScroll(render); return true; }
+  }
+  return false;
+}
+function bindMemberSearch(){ const q=$('#memQ'); if(q) q.addEventListener('input',()=>{ S.memQ=q.value; const pos=q.selectionStart; keepScroll(render); const n=$('#memQ'); if(n){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} } }); }
+
 // ---------- 트레이너 스케줄 (주간 · 월간 드롭다운 · 수업 중 예약) ----------
 const DOW='일월화수목금토';
 const pad2=n=>String(n).padStart(2,'0');
@@ -2267,17 +2373,109 @@ function bindWeekGrid(){
   });
 }
 
+// ---------- 수업 완료 서명 (트레이너 휴대폰에서 바로 / 회원 휴대폰으로 링크) ----------
+// 서버 없이: 서명 요청 링크(#sign=) → 회원이 서명 → 확인 링크(#signed=)를 트레이너에게 보내면 기록됨
+function b64u(str){ return btoa(unescape(encodeURIComponent(str))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function unb64u(s){ s=s.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='='; return decodeURIComponent(escape(atob(s))); }
+// 서명 선 → 짧은 문자열 (0~99 좌표, 획은 | 로 구분)
+function encSig(strokes){ return strokes.filter(s=>s.length>1).map(s=>s.map(([x,y])=>pad2(Math.round(x*99))+pad2(Math.round(y*99))).join('')).join('|'); }
+function decSig(t){ return String(t||'').split('|').filter(Boolean).map(s=>{ const out=[]; for(let i=0;i+3<s.length;i+=4) out.push([+s.slice(i,i+2)/99,+s.slice(i+2,i+4)/99]); return out; }); }
+function sigSVG(code,h){ const st=decSig(code); return `<svg viewBox="0 0 200 80" style="width:100%;height:${h||60}px;background:#fff;border:1px solid var(--line);border-radius:10px" role="img" aria-label="서명">${st.map(s=>`<polyline points="${s.map(([x,y])=>(x*196+2).toFixed(1)+','+(y*76+2).toFixed(1)).join(' ')}" fill="none" stroke="#111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`).join('')}</svg>`; }
+function signs(){ return LS.get('aiwm_signs',[]); }
+function addSign(r){ const L=signs().filter(x=>x.id!==r.id); L.unshift(r); LS.set('aiwm_signs',L.slice(0,500)); }
+function sigPadHTML(){ return `<div class="sigpad"><canvas id="sigCanvas" aria-label="서명하는 곳"></canvas><span class="sighint" id="sigHint">여기에 서명해 주세요</span><button class="btn sm sec sigclear" data-act="sigClear">지우기</button></div>`; }
+let SIGPAD=null;
+function bindSigPad(){
+  const c=$('#sigCanvas'); if(!c) return; const r=c.getBoundingClientRect(), dpr=window.devicePixelRatio||1;
+  c.width=r.width*dpr; c.height=r.height*dpr; const ctx=c.getContext('2d'); ctx.scale(dpr,dpr); ctx.lineWidth=2.6; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle='#111827';
+  SIGPAD={strokes:[],cur:null};
+  const pt=e=>{ const b=c.getBoundingClientRect(); return [Math.max(0,Math.min(1,(e.clientX-b.left)/b.width)),Math.max(0,Math.min(1,(e.clientY-b.top)/b.height))]; };
+  c.addEventListener('pointerdown',e=>{ e.preventDefault(); c.setPointerCapture(e.pointerId); SIGPAD.cur=[pt(e)]; SIGPAD.strokes.push(SIGPAD.cur); const h=$('#sigHint'); if(h) h.style.display='none'; });
+  c.addEventListener('pointermove',e=>{ if(!SIGPAD.cur) return; e.preventDefault(); const p=pt(e), q=SIGPAD.cur[SIGPAD.cur.length-1]; if(Math.hypot(p[0]-q[0],p[1]-q[1])<0.006) return; SIGPAD.cur.push(p); ctx.beginPath(); ctx.moveTo(q[0]*r.width,q[1]*r.height); ctx.lineTo(p[0]*r.width,p[1]*r.height); ctx.stroke(); });
+  const up=()=>{ SIGPAD.cur=null; }; c.addEventListener('pointerup',up); c.addEventListener('pointercancel',up);
+}
+function sigEmpty(){ return !SIGPAD||!SIGPAD.strokes.some(s=>s.length>2); }
+function lessonInfo(mid){ const m=members.find(x=>x.id===mid)||members[0]; return {mid:m.id,name:m.name,n:m.done+1,total:m.total,d:ymd(new Date()),t:min2hm(new Date().getHours()*60+new Date().getMinutes())}; }
+function signCard(mid){
+  const today=ymd(new Date()), done=signs().find(x=>x.mid===mid&&x.d===today);
+  const info=lessonInfo(mid);
+  if(done) return `<div class="card"><h3>수업 완료 서명 <span class="pill p-green" style="margin-left:auto">서명 완료</span></h3>${sigSVG(done.sig,56)}<p class="muted" style="margin:6px 0 0;font-size:12.5px">${done.name} · ${done.n}회차 · ${mdLabel(done.d)} ${done.t} · ${done.via==='member'?'회원 휴대폰에서 서명':'트레이너 휴대폰에서 서명'}</p></div>`;
+  return `<div class="card"><h3>수업 완료 서명</h3><p class="muted" style="margin:-4px 0 10px">${info.name} · ${info.n}회차 (${info.n}/${info.total}) · 서명하면 수강권이 1회 차감돼요</p>
+    <div class="row"><button class="btn sm" data-act="signHere" data-m="${mid}" style="flex:1">이 휴대폰에서 서명받기</button><button class="btn sm sec" data-act="signLink" data-m="${mid}" style="flex:1">회원 휴대폰으로 요청</button></div></div>`;
+}
+function signSheet(info){
+  return `<div class="modal" id="signModal"><div class="sheet" role="dialog" aria-label="수업 완료 서명">
+    <h2>수업 완료 서명</h2><p class="muted" style="margin:0 0 10px">${esc(info.name)} 회원 · ${info.n}회차 · ${mdLabel(info.d)} ${info.t}<br>수업을 받았음을 확인합니다.</p>
+    ${sigPadHTML()}
+    <div class="row" style="margin-top:12px"><button class="btn" data-act="signOk" style="flex:1">서명 완료</button><button class="btn sec" data-act="signClose">닫기</button></div></div></div>`;
+}
+// 회원 휴대폰에서 링크를 열었을 때 보이는 화면
+function signScreen(){
+  const q=S.signReq; renderTop('수업 완료 서명',false);
+  if(q.doneLink) return `<div class="alert g"><div><b>서명했어요</b><br>아래 버튼으로 트레이너에게 보내면 수업 완료로 기록돼요.</div></div>
+    <div class="card">${sigSVG(q.sig,70)}<p class="muted" style="margin:8px 0 0">${esc(q.name)} · ${q.n}회차 · ${mdLabel(q.d)} ${q.t}</p></div>
+    <button class="btn full" data-act="signSend">트레이너에게 보내기 (카카오톡 등)</button><button class="btn sec full" data-act="signCopy" style="margin-top:8px">링크 복사</button>
+    <button class="btn ghost full" data-act="signExit" style="margin-top:8px">앱으로 돌아가기</button>`;
+  return `<div class="card"><h3>${esc(q.tr||'트레이너')} 수업 완료 확인</h3><div class="kv"><span class="k">회원</span><span class="v">${esc(q.name)}</span><span class="k">회차</span><span class="v">${q.n}회차 (${q.n}/${q.total})</span><span class="k">일시</span><span class="v">${mdLabel(q.d)} ${q.t}</span></div></div>
+    <div class="card"><h3>서명</h3>${sigPadHTML()}<p class="muted" style="margin:8px 0 0;font-size:12.5px">수업을 받았음을 확인합니다. 서명은 이 수업 기록과 정산 확인에만 쓰여요.</p></div>
+    <button class="btn full" data-act="signMemberOk">서명 완료</button><button class="btn ghost full" data-act="signExit" style="margin-top:8px">취소</button>`;
+}
+function linkBase(){ return location.origin+location.pathname; }
+function shareOrCopy(text,url,okMsg){ if(navigator.share){ navigator.share({text,url}).catch(()=>{}); } else { try{ navigator.clipboard.writeText(text+'\n'+url).then(()=>toast(okMsg||'링크를 복사했어요'),()=>toast('복사가 막혀 있어요')); }catch(e){ toast('복사가 막혀 있어요'); } } }
+function recordSign(r){
+  addSign(r);
+  const m=members.find(x=>x.id===r.mid);
+  if(m){ m.done=Math.min(m.total,Math.max(m.done,r.n)); if(m.custom) saveMembers(); else { m.custom=true; m.contracts=m.contracts||[{id:'c0',date:m.start||ymd(new Date()),count:m.total,amount:0,pay:'기타'}]; saveMembers(); } }
+  const pend=LS.get('aiwm_signpend',{}); delete pend[r.id]; LS.set('aiwm_signpend',pend);
+}
+function signAct(act,a){
+  switch(act){
+    case 'sigClear': { const c=$('#sigCanvas'); if(c){ c.getContext('2d').clearRect(0,0,c.width,c.height); } if(SIGPAD) SIGPAD.strokes=[]; const h=$('#sigHint'); if(h) h.style.display=''; return true; }
+    case 'signHere': { const info=lessonInfo(a.dataset.m); S.signInfo=info; $('#modalRoot').innerHTML=signSheet(info); setTimeout(bindSigPad,30); return true; }
+    case 'signClose': $('#modalRoot').innerHTML=''; return true;
+    case 'signOk': { if(sigEmpty()){ toast('서명을 해 주세요'); return true; } const i=S.signInfo; recordSign({id:'g'+Date.now().toString(36),mid:i.mid,name:i.name,n:i.n,d:i.d,t:i.t,sig:encSig(SIGPAD.strokes),via:'trainer',ts:Date.now()});
+      $('#modalRoot').innerHTML=''; toast(`${i.name} ${i.n}회차 서명 완료 · 수강권 차감`); if(S.sub==='live') return true; keepScroll(render); return true; }
+    case 'signLink': { const i=lessonInfo(a.dataset.m), id='q'+Date.now().toString(36); const pend=LS.get('aiwm_signpend',{}); pend[id]=Object.assign({id},i); LS.set('aiwm_signpend',pend);
+      const url=linkBase()+'#sign='+b64u(JSON.stringify({id,mid:i.mid,name:i.name,n:i.n,total:i.total,d:i.d,t:i.t,tr:'트레이너'}));
+      shareOrCopy(`[수업 완료 서명 요청] ${i.name}님 ${i.n}회차 수업 확인 서명을 부탁드려요.`,url,'서명 요청 링크를 복사했어요 · 회원에게 보내 주세요'); return true; }
+    case 'signMemberOk': { if(sigEmpty()){ toast('서명을 해 주세요'); return true; } const q=S.signReq; q.sig=encSig(SIGPAD.strokes);
+      const mine=LS.get('aiwm_mysigns',[]); mine.unshift({id:q.id,n:q.n,d:q.d,t:q.t,sig:q.sig}); LS.set('aiwm_mysigns',mine.slice(0,200));
+      q.doneLink=linkBase()+'#signed='+b64u(JSON.stringify({id:q.id,mid:q.mid,name:q.name,n:q.n,d:q.d,t:q.t,sig:q.sig})); render(); return true; }
+    case 'signSend': { const q=S.signReq; shareOrCopy(`[서명 완료] ${q.name} ${q.n}회차 수업 확인했습니다.`,q.doneLink,'확인 링크를 복사했어요 · 트레이너에게 보내 주세요'); return true; }
+    case 'signCopy': { const q=S.signReq; try{ navigator.clipboard.writeText(q.doneLink).then(()=>toast('링크를 복사했어요'),()=>toast('복사가 막혀 있어요')); }catch(e){ toast('복사가 막혀 있어요'); } return true; }
+    case 'signExit': S.signReq=null; render(); return true;
+  }
+  return false;
+}
+// 링크로 열었을 때 처리 (앱이 이미 열려 있어도 동작하도록 주소 변경도 감시)
+function handleSignHash(){
+  try{
+    const h=new URLSearchParams(location.hash.slice(1));
+    const sg=h.get('sign'), sd=h.get('signed');
+    if(sg){ S.signReq=JSON.parse(unb64u(sg)); history.replaceState(null,'',location.pathname+location.search); }
+    else if(sd){ const r=JSON.parse(unb64u(sd)); history.replaceState(null,'',location.pathname+location.search);
+      const known=LS.get('aiwm_signpend',{})[r.id]; const dup=signs().find(x=>x.id===r.id);
+      if(dup) setTimeout(()=>toast('이미 기록된 서명이에요'),600);
+      else { recordSign(Object.assign(r,{via:'member',ts:Date.now()})); S.role='trainer'; S.tab='members'; S.sub='member'; S.subArg=r.mid; setTimeout(()=>toast(`${r.name} ${r.n}회차 회원 서명이 기록됐어요${known?'':' (이 휴대폰에서 보낸 요청이 아님)'}`),600); }
+    }
+  }catch(e){ setTimeout(()=>toast('서명 링크를 읽지 못했어요'),600); }
+}
+handleSignHash();
+window.addEventListener('hashchange',()=>{ if(/(^|[#&])(sign|signed)=/.test(location.hash)){ handleSignHash(); render(); } });
+function signHistory(mid){ const L=signs().filter(x=>x.mid===mid); if(!L.length) return ''; return `<div class="card"><h3>서명 기록<span class="r">${L.length}건</span></h3>${L.slice(0,6).map(x=>`<div class="row" style="align-items:center;border-bottom:1px solid var(--line);padding:6px 0"><div style="width:110px">${sigSVG(x.sig,40)}</div><div class="sp"><b style="font-size:13.5px">${x.n}회차</b><div class="muted">${mdLabel(x.d)} ${x.t} · ${x.via==='member'?'회원 휴대폰':'트레이너 휴대폰'}</div></div></div>`).join('')}</div>`; }
+
 // ---------- render ----------
 let modal=null;
 function render(){
   let html='';
-  if(!S.role){html=welcome();}
+  if(S.signReq){html=signScreen();}
+  else if(!S.role){html=welcome();}
   else if(S.role==='trainer'){
     if(S.sub==='live') html=S.realOn?realLive():tLive();
     else if(S.sub==='realReview') html=realReview();
     else if(S.sub==='review') html=tReview();
     else if(S.sub==='kakao') html=tKakao();
-    else if(S.sub==='member') html=tMemberDetail(S.subArg);
+    else if(S.sub==='member') html=tMemberDetail(S.subArg)+(S.subArg==='hw'?signCard('hw')+signHistory('hw'):'');
     else html={home:tHome,schedule:tSchedule,members:tMembers,session:tSession,settle:tSettle}[S.tab]();
   } else {
     if(S.sub==='solo') html=(S.soloReal&&!S.ptEnded&&!needMedical())?(renderTop('혼자 연습 · '+S.subArg,true),soloRealView(S.subArg)):mSolo(S.subArg);
@@ -2294,7 +2492,7 @@ function afterRender(){
   if(S.role==='trainer' && S.sub==='live' && S.recOn) startClassSim();
   if(S.role==='trainer' && S.sub==='live' && S.realOn) startRealClass();
   else if(window.APP_BUILD && S.role==='trainer' && S.sub==='live' && !S.recOn) startPreview();
-  bindWeekGrid(); updateStoreUse();
+  bindWeekGrid(); updateStoreUse(); bindMemberSearch(); if(S.signReq&&!S.signReq.doneLink) setTimeout(bindSigPad,30);
   if(S.role==='member' && S.sub==='solo' && S.soloReal) startRealSolo(S.subArg);
   if(S.role==='trainer' && S.sub==='review'){
     const el=$('#reviewTimer');
@@ -2331,6 +2529,8 @@ document.addEventListener('click',e=>{
   if(realAct(act,a)) return;
   if(aiAct(act,a)) return;
   if(schedAct(act,a)) return;
+  if(memAct(act,a)) return;
+  if(signAct(act,a)) return;
   switch(act){
     case 'back':
       if(S.role==='trainer'){ if(S.sub==='kakao') go('review'); else if(S.sub==='review') go(null); else go(null);} else go(null); break;

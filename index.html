@@ -305,6 +305,11 @@ input.nm{font:inherit;font-weight:800;font-size:16px;border:none;border-bottom:1
 .wkb.ns{background:#FEE2E2!important;border-color:#DC2626!important;color:#991B1B!important;text-decoration:line-through}
 .setupbox{background:#F8FAFC;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:10px}
 .setupitem{border-bottom:1px solid var(--line);padding:8px 0}.setupitem summary{display:flex;justify-content:space-between;align-items:center;cursor:pointer;list-style:none}
+.upwrap{background:#0B1220;border-radius:12px;overflow:hidden}.upwrap canvas{width:100%;display:block}
+.upbar{height:6px;background:var(--line);border-radius:3px;margin-top:8px;overflow:hidden}.upbar i{display:block;height:100%;background:var(--blue);transition:width .2s}
+.fblist{display:flex;flex-direction:column;gap:8px}
+.fbi{display:flex;gap:10px;align-items:flex-start;background:#FFF7ED;border-radius:12px;padding:10px 12px}
+.fbi .n{width:22px;height:22px;border-radius:50%;background:var(--orange);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
 
 .realbtn{display:flex;align-items:center;justify-content:center;gap:8px}
 </style>
@@ -417,6 +422,26 @@ function metrics(lm, W, H){
     trunk: trunkSigned,
     thigh: Math.atan2(kn.y - hip.y, Math.abs(kn.x - hip.x) || 1e-6) * D, // + : hip above knee
     vis: vis(s) / 4,
+  };
+}
+
+// 옆모습 기준 관절 각도 (가장 깊이 앉은 순간 비교용)
+//  ankle: 정강이가 앞으로 기운 각도(발목 굽힘) · knee: 무릎 굽힘 · hip: 고관절 굽힘 · trunk: 상체가 앞으로 숙여진 각도
+//  hipBack: 엉덩이가 발목보다 얼마나 뒤에 있는지 (다리 길이 대비) · thigh: 허벅지가 수평보다 위(+)/아래(-)
+function jointAngles(lm, W, H){
+  const P = i => ({ x: lm[i].x * W, y: lm[i].y * H });
+  const vis = s => [s.sh, s.hip, s.kn, s.an].reduce((a, i) => a + (lm[i].visibility ?? 1), 0);
+  const s = vis(SIDES.L) >= vis(SIDES.R) ? SIDES.L : SIDES.R;
+  const sh = P(s.sh), hip = P(s.hip), kn = P(s.kn), an = P(s.an), heel = P(s.heel), toe = P(s.toe);
+  const f = Math.sign((toe.x - heel.x) || 1);
+  const leg = Math.hypot(kn.x - an.x, kn.y - an.y) + Math.hypot(hip.x - kn.x, hip.y - kn.y) || 1;
+  return {
+    ankle: Math.atan2((kn.x - an.x) * f, an.y - kn.y) * D,
+    knee: 180 - ang(hip, kn, an),
+    hip: 180 - ang(sh, hip, kn),
+    trunk: Math.atan2((sh.x - hip.x) * f, hip.y - sh.y) * D,
+    hipBack: (an.x - hip.x) * f / leg,
+    thigh: Math.atan2(kn.y - hip.y, Math.abs(kn.x - hip.x) || 1e-6) * D,
   };
 }
 
@@ -590,6 +615,45 @@ const LiveCam = {
     S.t0 = performance.now(); this._record(); this._voice();
     return true;
   },
+  // 회원이 올린 영상을 한 프레임씩 분석 → 반복마다 가장 깊은 순간의 관절 각도
+  async analyzeVideo(file, o = {}){
+    await loadModel(o.onStatus);
+    const video = document.createElement('video'); video.muted = true; video.playsInline = true; video.setAttribute('playsinline', ''); video.preload = 'auto';
+    const url = URL.createObjectURL(file); video.src = url;
+    await new Promise((res, rej) => { video.onloadeddata = res; video.onerror = () => rej(new Error('영상을 열 수 없어요 (mp4·mov 권장)')); });
+    const W = video.videoWidth, H = video.videoHeight, dur = video.duration;
+    if (!W || !isFinite(dur)) throw new Error('영상 길이를 읽지 못했어요');
+    if (dur > 180) throw new Error('3분 이하 영상만 분석할 수 있어요');
+    const cv = o.canvas, ctx = cv && cv.getContext('2d'); if (cv){ const sc = Math.min(1, 720 / Math.max(W, H)); cv.width = Math.round(W * sc); cv.height = Math.round(H * sc); }
+    const smooth = makeSmoother(), det = { hip: makeDetector(30), elbow: makeDetector(40) }, base = performance.now() + 1000;
+    const reps = []; let cur = null, lastRepT = -1e9, seen = 0, frames = 0;
+    const seek = t => new Promise(res => { const on = () => { video.removeEventListener('seeked', on); res(); }; video.addEventListener('seeked', on); video.currentTime = t; });
+    const step = 1 / (o.fps || 15);
+    for (let t = 0; t < dur; t += step){
+      await seek(Math.min(t, dur - 0.01)); frames++;
+      const ts = base + t * 1000; let res; try { res = landmarker.detectForVideo(video, ts); } catch (e) { continue; }
+      const poses = (res && res.landmarks) || [];
+      if (cv){ ctx.drawImage(video, 0, 0, cv.width, cv.height); }
+      o.onProgress && o.onProgress(Math.min(1, t / dur));
+      if (!poses.length) continue;
+      const size = lm => Math.hypot((lm[11].x + lm[12].x - lm[23].x - lm[24].x) / 2, (lm[11].y + lm[12].y - lm[23].y - lm[24].y) / 2);
+      const lm = smooth(poses.reduce((a, b) => size(b) > size(a) ? b : a), ts); seen++;
+      if (cv) drawSkeleton(ctx, lm, cv.width, cv.height, false);
+      const m = metrics(lm, W, H); if (m.vis < 0.4) continue;
+      const wasHigh = det.hip.state === 'high' || det.elbow.state === 'high';
+      const dh = det.hip.push(m.hip, ts), de = det.elbow.push(m.elbow, ts);
+      const isHigh = det.hip.state === 'high' || det.elbow.state === 'high';
+      if (!wasHigh && isHigh) cur = { hipPk: -1, kneePk: 0, t0: t };
+      if (cur){ cur.kneePk = Math.max(cur.kneePk, m.knee); if (m.hip > cur.hipPk){ cur.hipPk = m.hip; cur.lm = lm.map(p => ({ x: p.x, y: p.y, visibility: p.visibility })); cur.t = t; } }
+      if ((dh || de) && cur && cur.lm && ts - lastRepT > 600){
+        const r = { t: cur.t, t0: cur.t0, t1: t, lm: cur.lm, ang: jointAngles(cur.lm, W, H), hipPk: cur.hipPk, kneePk: cur.kneePk, trig: dh ? 'hip' : 'elbow' };
+        r.cls = r.trig === 'hip' ? (r.kneePk > 60 && r.hipPk > 55 ? 'squat' : r.hipPk > 40 && r.kneePk < 50 ? 'hinge' : 'other') : 'upper';
+        reps.push(r); lastRepT = ts; cur = null; o.onRep && o.onRep(r, reps.length);
+      }
+    }
+    URL.revokeObjectURL(url);
+    return { reps, aspect: W / H, duration: dur, seenRatio: frames ? seen / frames : 0 };
+  },
   isPreview(){ return !!(this.s && this.s.running && this.s.o.mode === 'preview'); },
   _frame(){
     const S = this.s, v = S.video, ctx = S.ctx, W = S.canvas.width, H = S.canvas.height;
@@ -754,7 +818,7 @@ const LiveCam = {
     const lastSeg = S.segs[S.segs.length - 1];
     if (lastSeg) (S.pending || []).forEach(p => this._applyVoice(lastSeg, p));
     if (S.segs.length) S.segs[S.segs.length - 1].end = Math.max(S.segs[S.segs.length - 1].end, dur);
-    return { segs: S.segs, reps: S.reps, transcript: S.transcript, videoURL: url, videoBlob, audioBlob, mime: S.mime, crit: S.crit, duration: dur };
+    return { segs: S.segs, reps: S.reps, transcript: S.transcript, videoURL: url, videoBlob, audioBlob, mime: S.mime, crit: S.crit, duration: dur, aspect: S.canvas && S.canvas.height ? S.canvas.width / S.canvas.height : 4 / 3 };
   },
   _emit(type, data){ const S = this.s; S && S.o.on && S.o.on(type, data); },
 };
@@ -763,6 +827,7 @@ window.LiveCam = LiveCam;
 window.LiveCamNames = CLASS_NAME;
 window.LiveCamCue = CUE;
 window.LiveCamDetectName = detectName;
+window.LiveCamAngles = (lm, aspect) => jointAngles(lm, aspect || 4 / 3, 1);
 window.dispatchEvent(new Event('livecam-ready'));
 
 </script>
@@ -1480,6 +1545,7 @@ function mSolo(name){
   <div class="cue"><b>트레이너 음성 클립 · 11/3 수업에서 녹음</b><span class="kw">“${cfg.clip}”</span><div class="muted" style="font-size:12px">수업 때 동작과 다르면 트레이너 목소리로 재생됩니다</div></div>
   ${r?`<div class="alert g" style="margin-top:12px"><div><b>세트 완료 · 평균 일치도 ${r.avg}%</b><br>${r.n}회 중 ${r.ok}회가 수업 동작과 비슷했어요. 기록과 클립이 트레이너에게 전달됐어요.</div></div>`:''}
   ${window.APP_BUILD?`<button class="btn full" data-act="soloReal" style="margin-top:12px">${r?'한 세트 더':'카메라로 시작'}</button><button class="btn ghost full" data-act="soloGo" data-k="${key}" style="margin-top:6px">카메라 없이 시연 보기</button>`:`<button class="btn full" data-act="soloGo" data-k="${key}" style="margin-top:12px">${r?'한 세트 더':'시작'}</button><button class="btn sec full" data-act="soloReal" style="margin-top:6px">실제 카메라로 연습 (휴대폰 웹앱)</button>`}
+  ${uploadCard(name)}
   <p class="foot">시연에서는 합성음으로 대체 · 수업 동작과 비교한 안내이며 의학적 판단이 아닙니다</p>`;
 }
 function rollCakeSVG(frac){
@@ -1791,7 +1857,7 @@ const IDB={ open(){ return this.p||(this.p=new Promise((res,rej)=>{ const q=inde
   async del(k){ const db=await this.open(); return new Promise(res=>{ const t=db.transaction('videos','readwrite'); t.objectStore('videos').delete(k); t.oncomplete=res; t.onerror=res; }); } };
 function saveSession(R){
   if(!R.id) R.id='s'+Date.now();
-  const rec={id:R.id,ts:R.ts||Date.now(),date:R.date,duration:R.duration,mime:R.mime,crit:R.crit,captions:R.captions||[],transcript:R.transcript||[],
+  const rec={id:R.id,ts:R.ts||Date.now(),date:R.date,duration:R.duration,aspect:R.aspect,mime:R.mime,crit:R.crit,captions:R.captions||[],transcript:R.transcript||[],
     segs:R.segs.map(g=>{ const b=bestRep(g); return {cls:g.cls,name:g.name,label:g.label,title:g.title,type:g.type,setup:g.setup,speech:g.speech,sets:g.sets,w:g.w,kws:g.kws,aiKws:g.aiKws,lines:g.lines,judged:g.judged,start:g.start,end:g.end,best:g.best||(b&&b.lm)||null,
       reps:g.reps.map(r=>({set:r.set,ok:r.ok,txt:r.txt,hipPk:r.hipPk}))}; })};
   let list=LS.get('aiwm_sessions',[]).filter(x=>x.id!==R.id); list.unshift(rec);
@@ -1884,7 +1950,7 @@ function realAct(act,a){
       const PRI={squat:/더\s?앉/,hinge:/무릎|힙\s?힌지/,pull:/반동/,press:/허리/}, L=g.lines||[];
       const pick=L.find(t=>PRI[g.cls]&&PRI[g.cls].test(t))||L.find(t=>/더\s?앉|무릎|반동|허리|힙|가슴|엉덩이/.test(t));
       const cueLine=pick?pick.replace(/\d+(\.\d+)?\s*(킬로|키로|kg|KG|㎏)\s*/,'').trim():null;
-      const refs=LS.get('aiwm_refs',{}); refs[g.cls]={name:segTitle(g), lm, crit:R.crit, cue:cueLine, date:R.date||'오늘'};
+      const refs=LS.get('aiwm_refs',{}); refs[g.cls]={name:segTitle(g), lm, aspect:R.aspect||4/3, ang:(window.LiveCamAngles?window.LiveCamAngles(lm,R.aspect||4/3):null), crit:R.crit, cue:cueLine, date:R.date||'오늘'};
       if(LS.set('aiwm_refs',refs)) toast('기준 동작 저장 · 회원 혼자 연습에서 이 동작과 비교해요'); else toast('이 브라우저에서는 저장이 막혀 있어요');
       keepScroll(render); return true; }
     case 'realShare': { const t=realSummary(); if(navigator.share){ navigator.share({text:t}).catch(()=>{}); } else { try{navigator.clipboard.writeText(t).then(()=>toast('복사했어요 · 카카오톡에 붙여 넣으세요'),()=>toast('복사가 막혀 있어요'));}catch(e){toast('복사가 막혀 있어요');} } return true; }
@@ -2911,6 +2977,84 @@ function tSettle(){
   <p class="foot">계산과 내역 관리만 합니다 · 실제 지급은 센터에서</p>`;
 }
 
+// ---------- 회원 영상 업로드 → 수업 때 기준 동작과 관절별 비교 → 피드백 ----------
+// 프리웨이트(스쿼트·힙힌지 등)는 옆모습 기준 발목·무릎·고관절·상체·엉덩이 위치를 비교
+const DEFAULT_REF={squat:{ankle:30,knee:105,hip:100,trunk:40,hipBack:0.32,thigh:-2},hinge:{ankle:8,knee:20,hip:85,trunk:72,hipBack:0.36,thigh:40}};
+const JOINT_LABEL=[['ankle','발목 (정강이 기울기)','°'],['knee','무릎 굽힘','°'],['hip','고관절 굽힘','°'],['trunk','상체 숙임','°'],['hipBack','엉덩이 뒤로 뺀 정도','%']];
+function refFor(cls){
+  const r=LS.get('aiwm_refs',{})[cls];
+  if(r&&r.lm){ const a=r.ang||(window.LiveCamAngles?window.LiveCamAngles(r.lm,r.aspect||4/3):null); if(a) return {ang:a,lm:r.lm,src:`${r.date||''} 수업 · 트레이너가 저장한 기준`,trainer:true}; }
+  return DEFAULT_REF[cls]?{ang:DEFAULT_REF[cls],lm:null,src:'트레이너 기준이 없어 일반 기준으로 비교',trainer:false}:null;
+}
+function feedbackFor(cls,me,ref){
+  const out=[], d=k=>me[k]-ref[k], deg=x=>Math.round(Math.abs(x));
+  if(cls==='squat'){
+    if(d('thigh')>8) out.push({k:'depth',t:'조금 더 앉으세요',s:'수업 때보다 얕게 앉았어요'});
+    if(d('trunk')>8) out.push({k:'trunk',t:`상체가 약 ${deg(d('trunk'))}° 더 숙여졌어요`,s:'가슴을 더 세우세요'});
+    if(d('trunk')<-8) out.push({k:'trunk',t:`상체를 약 ${deg(d('trunk'))}° 더 숙이세요`,s:'엉덩이를 뒤로 빼면서 같이 숙여요'});
+    if(d('hipBack')<-0.06) out.push({k:'hip',t:'엉덩이를 더 뒤로 빼세요',s:'의자에 앉듯이 뒤로'});
+    if(d('hipBack')>0.09) out.push({k:'hip',t:'엉덩이가 너무 뒤로 빠졌어요',s:'무릎도 발끝 쪽으로 같이 보내요'});
+    if(d('ankle')>8) out.push({k:'ankle',t:`발목 각도가 약 ${deg(d('ankle'))}° 더 나왔어요`,s:'무릎이 앞으로 많이 나가요 · 엉덩이를 먼저 빼며 앉으세요'});
+    if(d('ankle')<-8) out.push({k:'ankle',t:`발목을 약 ${deg(d('ankle'))}° 더 굽혀도 돼요`,s:'무릎을 발끝 방향으로 조금 더 보내세요'});
+  } else if(cls==='hinge'){
+    if(d('knee')>10) out.push({k:'knee',t:`무릎이 약 ${deg(d('knee'))}° 더 굽었어요`,s:'무릎은 살짝만 굽히고 엉덩이로 접으세요'});
+    if(d('hipBack')<-0.06) out.push({k:'hip',t:'엉덩이를 더 뒤로 빼세요',s:'벽을 엉덩이로 민다는 느낌'});
+    if(d('trunk')<-12) out.push({k:'trunk',t:`상체를 약 ${deg(d('trunk'))}° 더 숙이세요`,s:'허벅지 뒤가 당길 때까지'});
+    if(d('trunk')>12) out.push({k:'trunk',t:`상체가 약 ${deg(d('trunk'))}° 더 숙여졌어요`,s:'허벅지 뒤가 당기는 지점까지만'});
+  }
+  return out;
+}
+function avgAng(list){ const o={}; JOINT_LABEL.forEach(([k])=>{ o[k]=list.reduce((a,x)=>a+x[k],0)/list.length; }); o.thigh=list.reduce((a,x)=>a+x.thigh,0)/list.length; return o; }
+function fmtJ(k,v){ return k==='hipBack'?Math.round(v*100)+'%':Math.round(v)+'°'; }
+function uploadCard(name){
+  const key=N2K[name]||'squat', cls=K2C[key], U=S.up&&S.up.name===name?S.up:null;
+  if(cls!=='squat'&&cls!=='hinge') return `<div class="card"><h3>내 영상 분석</h3><p class="muted" style="margin:0">영상 업로드 분석은 지금 스쿼트·힙힌지 동작부터 지원해요. 이 운동은 위 ‘카메라로 시작’으로 수업 동작과 비교해 보세요.</p></div>`;
+  const ref=refFor(cls);
+  let body='';
+  if(!U) body=`<p class="muted" style="margin:-4px 0 10px;font-size:13px">혼자 연습한 영상을 올리면 수업 때 배운 동작과 발목·무릎·고관절·상체 각도를 비교해 알려 드려요. <b>옆에서 전신이 보이게</b> 찍어 주세요.</p>
+    <div class="row"><label class="btn sm" style="flex:1;text-align:center">지금 찍어서 올리기<input type="file" accept="video/*" capture="environment" class="upFile" data-n="${name}" hidden></label><label class="btn sm sec" style="flex:1;text-align:center">앨범에서 고르기<input type="file" accept="video/*" class="upFile" data-n="${name}" hidden></label></div>
+    <p class="muted" style="margin:8px 0 0;font-size:12px">비교 기준: ${ref.src}</p>`;
+  else if(U.status==='run') body=`<div class="upwrap"><canvas id="upCanvas"></canvas></div><div class="upbar"><i id="upBar" style="width:${Math.round((U.pct||0)*100)}%"></i></div><p class="muted" id="upMsg" style="margin:6px 0 0;font-size:12.5px">${esc(U.msg||'분석 준비 중…')}</p>`;
+  else if(U.status==='error') body=`<div class="feedback warn">${esc(U.err)}</div><button class="btn sm sec full" data-act="upReset" style="margin-top:8px">다시 올리기</button>`;
+  else body=uploadResultHTML(U.res,cls,ref);
+  return `<div class="card" id="upCard"><h3>내 영상 올려서 분석<span class="r">${cls==='squat'?'옆모습 · 스쿼트':'옆모습 · 힙힌지'}</span></h3>${body}</div>`;
+}
+function uploadResultHTML(res,cls,ref){
+  const reps=res.reps.filter(r=>r.cls===cls||cls==='hinge'&&r.cls==='squat'||cls==='squat'&&r.cls==='hinge');
+  if(!reps.length) return `<div class="feedback warn">${res.reps.length?'수업 때 배운 동작과 다른 동작으로 보여요.':'반복을 찾지 못했어요.'}</div><p class="muted" style="font-size:12.5px;margin:8px 0">옆에서 머리부터 발까지 보이게, 2~3m 떨어져 찍어 주세요. 반복은 끝까지 앉았다 일어나야 1회로 셉니다.${res.seenRatio<0.5?' (사람이 잘 보이지 않는 장면이 많았어요)':''}</p><button class="btn sm sec full" data-act="upReset">다시 올리기</button>`;
+  const me=avgAng(reps.map(r=>r.ang)), R=ref.ang, fb=feedbackFor(cls,me,R);
+  const perRep=reps.map(r=>feedbackFor(cls,r.ang,R)), good=perRep.filter(f=>!f.length).length;
+  const best=reps.slice().sort((a,b)=>feedbackFor(cls,a.ang,R).length-feedbackFor(cls,b.ang,R).length)[0];
+  return `<div class="alert ${fb.length?'o':'g'}" style="margin:0 0 10px"><div><b>${reps.length}회 중 ${good}회가 수업 동작과 비슷해요</b><br>${fb.length?'아래 순서대로 고쳐 보세요':'수업 때 배운 대로 잘 하고 있어요'}</div></div>
+    ${fb.length?`<div class="fblist">${fb.map((f,i)=>`<div class="fbi"><span class="n">${i+1}</span><div><b>${f.t}</b><div class="muted" style="font-size:12.5px">${f.s}</div></div></div>`).join('')}</div>`:''}
+    <div class="anal" style="margin-top:10px"><div class="clip" style="aspect-ratio:auto">${lmSVG(best.lm, ref.lm)}<span>${ref.lm?'점선: 수업 때 기준':'가장 깊이 앉은 순간'}</span></div>
+    <div><table class="t" style="font-size:12.5px"><tr><th>관절</th><th>수업</th><th>나</th></tr>${JOINT_LABEL.map(([k,l])=>{ const df=me[k]-R[k], big=k==='hipBack'?Math.abs(df)>0.06:Math.abs(df)>8; return `<tr><td>${l.split(' ')[0]}</td><td>${fmtJ(k,R[k])}</td><td><b style="color:${big?'var(--orange)':'var(--green)'}">${fmtJ(k,me[k])}</b></td></tr>`; }).join('')}</table></div></div>
+    <div class="muted" style="font-size:12px;margin:8px 0 4px">반복별</div><div>${perRep.map((f,i)=>`<span class="kw" style="${f.length?'background:var(--orange-soft);color:var(--orange)':''}">${i+1}회 ${f.length?f.map(x=>({depth:'더 앉기',trunk:'상체',hip:'엉덩이',ankle:'발목',knee:'무릎'})[x.k]).join('·'):'좋음'}</span>`).join('')}</div>
+    <p class="muted" style="font-size:12px;margin:8px 0">비교 기준: ${ref.src} · 수업 때 동작과 비교한 안내이며 의학적 판단이 아니에요</p>
+    <div class="row"><button class="btn sm sec" data-act="upReset" style="flex:1">다른 영상 올리기</button><button class="btn sm sec" data-act="upShare" style="flex:1">트레이너에게 보내기</button></div>`;
+}
+async function runUpload(file,name){
+  const key=N2K[name]||'squat', cls=K2C[key];
+  if(!window.LiveCam||!window.LiveCam.analyzeVideo){ S.up={name,status:'error',err:'분석 모듈을 불러오는 중이에요. 잠시 뒤 다시 올려 주세요'}; keepScroll(render); return; }
+  S.up={name,status:'run',pct:0,msg:'골격 모델 준비 중…'}; keepScroll(render);
+  const set=(pct,msg)=>{ const b=$('#upBar'), m=$('#upMsg'); if(b) b.style.width=Math.round(pct*100)+'%'; if(m&&msg) m.textContent=msg; };
+  try{
+    const res=await window.LiveCam.analyzeVideo(file,{canvas:$('#upCanvas'),fps:15,onStatus:t=>set(0,t),onProgress:p=>set(p,`영상 분석 중… ${Math.round(p*100)}%`),onRep:(r,n)=>set(null,`반복 ${n}회 찾음`)});
+    S.up={name,status:'done',res};
+    const log=LS.get('aiwm_uploads',[]); const me=res.reps.length?avgAng(res.reps.map(r=>r.ang)):null, ref=refFor(cls);
+    log.unshift({name,cls,date:ymd(new Date()),t:min2hm(new Date().getHours()*60+new Date().getMinutes()),reps:res.reps.length,fb:me&&ref?feedbackFor(cls,me,ref.ang).map(f=>f.t):[],me}); LS.set('aiwm_uploads',log.slice(0,100));
+  }catch(e){ S.up={name,status:'error',err:e.message||'분석하지 못했어요'}; }
+  if(S.sub==='solo') keepScroll(render);
+}
+function uploadAct(act,a){
+  switch(act){
+    case 'upReset': S.up=null; keepScroll(render); return true;
+    case 'upShare': { const L=LS.get('aiwm_uploads',[])[0]; if(!L) return true; const t=`[혼자 연습 영상 분석] ${L.name} ${L.reps}회\n${L.fb.length?L.fb.map((f,i)=>`${i+1}. ${f}`).join('\n'):'수업 때 동작과 비슷하게 했어요'}`; shareOrCopy(t,linkBase(),'분석 결과를 복사했어요 · 트레이너에게 보내 주세요'); return true; }
+  }
+  return false;
+}
+function bindUpload(){ document.querySelectorAll('.upFile').forEach(inp=>inp.addEventListener('change',e=>{ const f=e.target.files[0]; if(f) runUpload(f,inp.dataset.n); })); }
+
 // ---------- render ----------
 let modal=null;
 function render(){
@@ -2939,7 +3083,7 @@ function afterRender(){
   if(S.role==='trainer' && S.sub==='live' && S.recOn) startClassSim();
   if(S.role==='trainer' && S.sub==='live' && S.realOn) startRealClass();
   else if(window.APP_BUILD && S.role==='trainer' && S.sub==='live' && !S.recOn) startPreview();
-  bindWeekGrid(); updateStoreUse(); bindMemberSearch(); { const sc=document.getElementById('sigCanvas'); if(sc&&!document.getElementById('modalRoot').contains(sc)) setTimeout(bindSigPad,30); }
+  bindWeekGrid(); bindUpload(); updateStoreUse(); bindMemberSearch(); { const sc=document.getElementById('sigCanvas'); if(sc&&!document.getElementById('modalRoot').contains(sc)) setTimeout(bindSigPad,30); }
   if(S.role==='member' && S.sub==='solo' && S.soloReal) startRealSolo(S.subArg);
   if(S.role==='trainer' && S.sub==='review'){
     const el=$('#reviewTimer');
@@ -2982,6 +3126,7 @@ document.addEventListener('click',e=>{
   if(focusAct(act,a)) return;
   if(parqAct(act,a)) return;
   if(tileAct(act,a)) return;
+  if(uploadAct(act,a)) return;
   switch(act){
     case 'back':
       if(S.role==='trainer'){ if(S.sub==='kakao') go('review'); else if(S.sub==='review') go(null); else go(null);} else go(null); break;

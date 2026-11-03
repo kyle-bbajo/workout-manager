@@ -1283,7 +1283,8 @@ function tMemberDetail(id){
   return `
   <div class="card"><div class="row"><div class="av">혜</div><div class="sp"><b>혜원</b><div class="muted">수강권 17/20회 · 다음 수업 오늘 10:00</div></div><span class="pill p-orange">남은 3회</span></div>
     <div class="row" style="margin-top:12px"><button class="btn sm" data-act="reReport">재등록 리포트</button><button class="btn sm sec" data-act="startClass" data-id="hw">수업 시작</button></div></div>
-  <div class="card"><h3>PAR-Q+ · 건강 확인</h3>${needMedical()?'<span class="pill p-red">의료 확인 필요</span><p class="muted" style="margin:8px 0 0">추가 문항 ‘예’. 혼자 연습·루틴 추천 잠김. 의사 소견서를 올리면 풀립니다.</p>':parqYes()&&!S.parqFollow?'<span class="pill p-orange">추가 문항 확인 중</span>':'<span class="pill p-green">통과 · 10월 1일 작성</span>'}</div>
+  ${parqTrainerCard('hw')}
+  <div class="card" style="display:none"><h3>PAR-Q+ · 건강 확인</h3>${needMedical()?'<span class="pill p-red">의료 확인 필요</span><p class="muted" style="margin:8px 0 0">추가 문항 ‘예’. 혼자 연습·루틴 추천 잠김. 의사 소견서를 올리면 풀립니다.</p>':parqYes()&&!S.parqFollow?'<span class="pill p-orange">추가 문항 확인 중</span>':'<span class="pill p-green">통과 · 10월 1일 작성</span>'}</div>
   <div class="card"><h3>스쿼트 · 회원 기준<span class="r">측면 촬영</span></h3>
     <table class="t"><tr><th>항목</th><th>기준</th><th>최근</th></tr>
       <tr><td>깊이 (허벅지 각도)</td><td>수평 +${S.criteria.depth}° 이하</td><td><b>−2°</b> <span class="pill p-green">충족</span></td></tr>
@@ -1586,7 +1587,8 @@ function mParq(){
   </div>
   ${parqYes()?`<div class="card"><h3>2~3쪽 · 추가 문항</h3><p class="muted" style="margin:0 0 10px">‘예’가 있어 해당 질환 추가 문항으로 넘어갑니다.</p>
     <div class="row"><span class="sp" style="font-size:13.5px">추가 문항에도 ‘예’가 있나요? (시연)</span><div class="seg" style="width:116px"><button class="${!S.parqFollow?'on':''}" data-act="parqF" data-v="0">아니요</button><button class="${S.parqFollow?'on':''}" data-act="parqF" data-v="1">예</button></div></div></div>`:''}
-  <div class="card"><h3>결과</h3>${!parqYes()?'<span class="pill p-green">운동 가능</span><p class="muted" style="margin:8px 0 0">천천히 시작해 점차 늘려 가세요.</p>':!S.parqFollow?'<span class="pill p-green">추가 문항 통과 · 운동 가능</span>':S.medicalOk?'<span class="pill p-green">의사 소견서 확인됨</span>':`<span class="pill p-red">의료 확인 필요</span><p class="muted" style="margin:8px 0 10px">혼자 연습·루틴 추천이 잠기고 트레이너에게 강도 조절 알림이 갑니다.</p><div class="row"><button class="btn sm" data-act="medOk">의사 소견서 올리기 (시연)</button><button class="btn sm sec" data-act="medAck">안내 확인 후 진행</button></div><div id="ackMsg" class="muted" style="margin-top:8px"></div>`}</div>`;
+  <div class="card"><h3>결과</h3>${!parqYes()?'<span class="pill p-green">운동 가능</span><p class="muted" style="margin:8px 0 0">천천히 시작해 점차 늘려 가세요.</p>':!S.parqFollow?'<span class="pill p-green">추가 문항 통과 · 운동 가능</span>':S.medicalOk?'<span class="pill p-green">의사 소견서 확인됨</span>':`<span class="pill p-red">의료 확인 필요</span><p class="muted" style="margin:8px 0 10px">혼자 연습·루틴 추천이 잠기고 트레이너에게 강도 조절 알림이 갑니다.</p><div class="row"><button class="btn sm" data-act="medOk">의사 소견서 올리기 (시연)</button><button class="btn sm sec" data-act="medAck">안내 확인 후 진행</button></div><div id="ackMsg" class="muted" style="margin-top:8px"></div>`}</div>
+  ${parqSignCard()}`;
 }
 function addExModal(){
   const basic=[['덤벨 프레스','수평 밀기 · 벤치프레스에서 배운 견갑 고정 적용'],['런지','하체 · 일반 안내 영상'],['랫풀다운','당기기 · 일반 안내 영상']];
@@ -2219,6 +2221,7 @@ function memberCard(m){
     <div class="kv" style="margin-top:8px"><span class="k">총 계약</span><span class="v">${contractTotal(m)}회 · ${won(m.contracts.reduce((x,c)=>x+(+c.amount||0),0))}</span><span class="k">결제</span><span class="v">${[...new Set(m.contracts.map(c=>c.pay))].join(', ')}</span></div>`:'<p class="muted" style="margin:8px 0 0">계약 기록이 없어요.</p>'}
     <button class="btn sm ${left<=3?'':'sec'} full" data-act="cfNew" data-id="${m.id}" style="margin-top:10px">${I.plus} 계약 추가 (재등록)</button></div>
   <div class="card"><h3>예정된 수업<span class="r">${up.length}개</span></h3>${up.length?up.map(x=>`<button class="list-item" data-act="schedEdit" data-id="${x.id}"><b style="width:96px">${mdLabel(x.date)}</b><span class="sp">${x.time} · ${x.dur}분${x.note?' · '+esc(x.note):''}</span><span class="muted">›</span></button>`).join(''):'<p class="muted" style="margin:0">예정된 수업이 없어요.</p>'}</div>
+  ${parqTrainerCard(m.id)}
   ${focusCard(m.id)}<button class="btn sec full" data-act="reReport" data-m="${m.id}" style="margin-bottom:12px">재등록 리포트 보기·고치기</button>
   ${signCard(m.id)}${signHistory(m.id)}
   ${m.custom?`<button class="btn ghost full" data-act="memDel" data-id="${m.id}" style="color:var(--red)">회원 삭제</button>`:'<p class="foot">예시 회원입니다 · 혜원 회원에서 전체 상세 화면을 볼 수 있어요</p>'}`;
@@ -2711,6 +2714,57 @@ function focusAct(act,a){
   return false;
 }
 function memberFocusView(mid){ const L=focusOf(mid); if(!L.length) return ''; return `<div class="muted" style="font-size:12px;margin:4px 0 6px">수업 핵심 포인트</div><div class="timeline">${L.map(x=>`<div class="it"><b>${x.n}회차 · ${esc(x.focus)}</b><span class="row" style="align-items:center;gap:8px">${dots(x.level)}<span class="muted" style="font-size:12px">${LEVELS[x.level]||''}</span></span></div>`).join('')}</div>`; }
+// ---------- PAR-Q+ 건강 확인: 회원 작성 + 마지막 서명 → 트레이너가 작성 내용 확인 ----------
+const PARQ_TOPICS=['심장 질환 또는 고혈압 진단','안정 시·운동 중 가슴 통증','어지럼증으로 균형을 잃거나 의식 잃음','다른 만성 질환 진단','만성 질환 약 복용','운동으로 악화될 수 있는 뼈·관절·연부조직 문제','의사가 감독 하의 운동만 하라고 함'];
+function parqAll(){ return LS.get('aiwm_parq',{})||{}; }
+function parqRec(mid){ return parqAll()[mid]||null; }
+function parqResult(r){ if(!r) return {pill:'p-gray',t:'아직 작성 안 함'}; const yes=r.answers.some(Boolean);
+  if(!yes) return {pill:'p-green',t:'통과 · 운동 가능'}; if(!r.follow) return {pill:'p-green',t:'추가 문항 통과 · 운동 가능'}; return r.medicalOk?{pill:'p-green',t:'의사 소견서 확인됨'}:{pill:'p-red',t:'의료 확인 필요'}; }
+function parqSignCard(){
+  const r=parqRec(ME_MID);
+  if(r&&!S.parqRedo) return `<div class="card"><h3>제출 완료<span class="pill p-green" style="margin-left:auto">${mdLabel(r.date)} ${r.t}</span></h3>${sigSVG(r.sig,56)}<p class="muted" style="margin:6px 0 10px;font-size:12.5px">트레이너가 작성 내용을 확인할 수 있어요. 건강 상태가 바뀌면 다시 작성해 주세요.</p>
+    <div class="row"><button class="btn sm sec" data-act="parqSend" style="flex:1">트레이너에게 보내기</button><button class="btn sm sec" data-act="parqRedo" style="flex:1">다시 작성</button></div></div>`;
+  return `<div class="card"><h3>확인 및 서명</h3><label class="row" style="align-items:flex-start;gap:8px;font-size:13.5px;margin-bottom:10px"><input type="checkbox" id="parqAgree" style="width:18px;height:18px;margin-top:2px"><span>위 내용은 사실이며, 건강 상태가 바뀌면 트레이너에게 알리겠습니다.</span></label>
+    ${sigPadHTML()}<button class="btn full" data-act="parqSubmit" style="margin-top:12px">서명하고 제출</button></div>`;
+}
+function parqTrainerCard(mid){
+  const r=parqRec(mid), res=parqResult(r);
+  return `<div class="card"><h3>PAR-Q+ · 건강 확인<span class="pill ${res.pill}" style="margin-left:auto">${res.t}</span></h3>
+    ${r?`<p class="muted" style="margin:-2px 0 10px;font-size:12.5px">${mdLabel(r.date)} ${r.t} 회원 서명 제출${r.answers.some(Boolean)?` · ‘예’ ${r.answers.filter(Boolean).length}개`:''}</p><button class="btn sm sec full" data-act="parqView" data-m="${mid}">작성 내용 보기</button>`
+      :`<p class="muted" style="margin:-2px 0 10px;font-size:12.5px">회원이 작성하고 서명하면 여기에서 내용을 볼 수 있어요.</p><button class="btn sm sec full" data-act="parqAsk" data-m="${mid}">회원에게 작성 요청</button>`}</div>`;
+}
+function parqViewSheet(mid){
+  const r=parqRec(mid), m=members.find(x=>x.id===mid)||{name:''}, res=parqResult(r);
+  return `<div class="modal"><div class="sheet" role="dialog" aria-label="PAR-Q+ 작성 내용">
+    <h2>${esc(m.name)} · PAR-Q+ 작성 내용</h2><p class="muted" style="margin:0 0 10px">${mdLabel(r.date)} ${r.t} 제출 · <span class="pill ${res.pill}">${res.t}</span></p>
+    <table class="t"><tr><th>질문</th><th style="width:64px">답</th></tr>${PARQ_TOPICS.map((q,i)=>`<tr><td style="font-size:13px">${i+1}. ${q}</td><td>${r.answers[i]?'<b style="color:var(--red)">예</b>':'아니요'}</td></tr>`).join('')}
+      ${r.answers.some(Boolean)?`<tr><td style="font-size:13px">추가 문항(2~3쪽)에 ‘예’</td><td>${r.follow?'<b style="color:var(--red)">예</b>':'아니요'}</td></tr>`:''}</table>
+    ${r.follow?`<div class="alert ${r.medicalOk?'g':'o'}" style="margin-top:10px"><div><b>${r.medicalOk?'의사 소견서 확인됨':'의사 확인 전'}</b><br>${r.medicalOk?'소견 범위 안에서 진행하세요.':'혼자 연습·루틴 추천이 잠겨 있어요. 강도를 낮춰 진행하고 의사 확인을 권해 주세요.'}</div></div>`:''}
+    <div class="secttl" style="margin-top:12px">회원 서명</div>${sigSVG(r.sig,70)}
+    <p class="muted" style="font-size:12px;margin:8px 0 12px">건강 정보는 별도 동의를 받은 민감정보예요. 수업 강도 조절에만 쓰세요.</p>
+    <button class="btn sec full" data-act="parqClose">닫기</button></div></div>`;
+}
+function parqAct(act,a){
+  switch(act){
+    case 'parqSubmit': { if(!($('#parqAgree')||{}).checked){ toast('확인란에 체크해 주세요'); return true; } if(sigEmpty()){ toast('서명을 해 주세요'); return true; }
+      const now=new Date(), r={answers:S.parq.slice(),follow:!!S.parqFollow,medicalOk:!!S.medicalOk,date:ymd(now),t:min2hm(now.getHours()*60+now.getMinutes()),sig:encSig(SIGPAD.strokes)};
+      const all=parqAll(); all[ME_MID]=r; LS.set('aiwm_parq',all); S.parqRedo=false; keepScroll(render); toast('제출했어요 · 같은 휴대폰이면 트레이너 화면에 바로 보여요'); return true; }
+    case 'parqRedo': S.parqRedo=true; keepScroll(render); return true;
+    case 'parqSend': { const r=parqRec(ME_MID); if(!r) return true; shareOrCopy('[PAR-Q+ 건강 확인 제출]',linkBase()+'#parq='+b64u(JSON.stringify(Object.assign({mid:ME_MID},r))),'링크를 복사했어요 · 트레이너에게 보내 주세요'); return true; }
+    case 'parqAsk': shareOrCopy('[PAR-Q+ 건강 확인 요청] 첫 수업 전에 건강 확인 문항을 작성하고 서명해 주세요.',linkBase()+'#go=parq','작성 요청 링크를 복사했어요 · 회원에게 보내 주세요'); return true;
+    case 'parqView': $('#modalRoot').innerHTML=parqViewSheet(a.dataset.m); return true;
+    case 'parqClose': $('#modalRoot').innerHTML=''; return true;
+  }
+  return false;
+}
+function handleParqHash(){
+  try{ const h=new URLSearchParams(location.hash.slice(1)), pq=h.get('parq'), go=h.get('go'); if(!pq&&go!=='parq') return false;
+    history.replaceState(null,'',location.pathname+location.search);
+    if(pq){ const r=JSON.parse(unb64u(pq)), all=parqAll(); all[r.mid]=r; LS.set('aiwm_parq',all); S.role='trainer'; S.tab='members'; S.sub='member'; S.subArg=r.mid; setTimeout(()=>toast('회원 PAR-Q+ 작성 내용이 들어왔어요'),600); }
+    else { S.role='member'; S.tab='me'; S.sub='parq'; }
+    return true; }catch(e){ return false; }
+}
+handleParqHash(); window.addEventListener('hashchange',()=>{ if(handleParqHash()) render(); });
 
 // ---------- render ----------
 let modal=null;
@@ -2740,7 +2794,7 @@ function afterRender(){
   if(S.role==='trainer' && S.sub==='live' && S.recOn) startClassSim();
   if(S.role==='trainer' && S.sub==='live' && S.realOn) startRealClass();
   else if(window.APP_BUILD && S.role==='trainer' && S.sub==='live' && !S.recOn) startPreview();
-  bindWeekGrid(); updateStoreUse(); bindMemberSearch(); if(S.signReq&&!S.signReq.doneLink) setTimeout(bindSigPad,30);
+  bindWeekGrid(); updateStoreUse(); bindMemberSearch(); { const sc=document.getElementById('sigCanvas'); if(sc&&!document.getElementById('modalRoot').contains(sc)) setTimeout(bindSigPad,30); }
   if(S.role==='member' && S.sub==='solo' && S.soloReal) startRealSolo(S.subArg);
   if(S.role==='trainer' && S.sub==='review'){
     const el=$('#reviewTimer');
@@ -2781,6 +2835,7 @@ document.addEventListener('click',e=>{
   if(signAct(act,a)) return;
   if(reqAct(act,a)) return;
   if(focusAct(act,a)) return;
+  if(parqAct(act,a)) return;
   switch(act){
     case 'back':
       if(S.role==='trainer'){ if(S.sub==='kakao') go('review'); else if(S.sub==='review') go(null); else go(null);} else go(null); break;

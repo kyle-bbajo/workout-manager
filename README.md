@@ -49,7 +49,7 @@
 | 녹화·올린 영상 분석 (자세 점수) | **RTMPose-m (Halpe26, 256×192)** + ONNX Runtime Web | 더 정확. MediaPipe로 사람 위치를 잡고 그 영역을 RTMPose로 다시 찾음. 처음 한 번 모델 약 56MB + 실행 파일 11~21MB를 받아 기기에 보관. WebGPU가 되면 GPU, 아니면 CPU. 분석은 초당 12프레임 |
 
 - 켜기/끄기: 촬영 화면·개발자 탭의 **정밀 분석 (RTMPose)**. 받을 수 없거나 오류가 나면 자동으로 MediaPipe로 분석합니다.
-- 모델 주소는 `config.js`의 `rtmModel`로 바꿀 수 있습니다(직접 올린 파일 사용 등). 기본은 Hugging Face `pocketpose/onnx-models`의 RTMPose(Apache 2.0).
+- 모델 파일은 저장소 `models/`에 들어 있습니다(OpenMMLab 공식 배포 ONNX, Apache 2.0). GitHub Actions `fetch-pose-model`이 `models/MODELS.txt`의 주소에서 받아 넣습니다. 실행 파일(ONNX Runtime Web)도 `vendor/ort/`에 함께 있어, 앱과 같은 주소에서 받으므로 외부 서버가 막혀도 동작합니다. 다른 파일을 쓰려면 `config.js`의 `rtmModel`.
 - 결과 화면에 어떤 골격 모델로 분석했는지 표시됩니다.
 
 ## 촬영 팁 (자세 평가 정확도)

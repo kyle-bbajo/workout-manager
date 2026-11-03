@@ -1609,7 +1609,6 @@ function mDietDemo(){
 function mMe(){
   renderTop('내 정보',false);
   return `<div class="card"><h3>수강권</h3><div class="kv"><span class="k">PT 20회</span><span class="v">17회 완료 · 남은 3회</span><span class="k">수업 완료 확인</span><span class="v">17/17</span></div></div>
-  ${aiSettingsCard(false)}
   <button class="card list-item" data-act="goGoal" style="border:1px solid var(--line);padding:14px"><div class="sp"><b>인바디 · 목표</b><div class="muted">${S.inbody.date} · 체지방률 ${S.inbody.pbf}% · 목표 ${S.goal.target}%</div></div><span class="muted">›</span></button>
   <button class="card list-item" data-act="goParq" style="border:1px solid var(--line);padding:14px"><div class="sp"><b>PAR-Q+ 건강 확인</b><div class="muted">${needMedical()?'의료 확인 필요':parqYes()?'추가 문항 확인 중':'통과 · 10월 1일'}</div></div><span class="muted">›</span></button>
   <div class="card"><h3>내 운동 영상 보관</h3>
@@ -1992,8 +1991,9 @@ function poseSettingHTML(){ let k='full'; try{ k=localStorage.getItem('aiwm_pose
 // 사용자가 넣은 API 키로 브라우저에서 바로 호출 (키는 이 기기 브라우저에만 저장)
 const AI_MODELS=[['gemini-flash-latest','Gemini Flash · 무료 사용량 있음'],['claude-sonnet-5-5','Claude Sonnet 5.5 · 정확'],['claude-haiku-5-5','Claude Haiku 5.5 · 빠름']];
 // 시험판 공용 AI: config.js의 aiProxy(키를 숨긴 중계 서버)를 쓰고, 내 키를 넣으면 내 키가 우선
-function sharedAI(){ const C=window.APP_CONFIG||{}; return C.aiProxy?{proxy:String(C.aiProxy).replace(/\/$/,''),model:C.aiModel||'gemini-flash-latest'}:null; }
-function aiCfg(){ const c=Object.assign({model:'gemini-flash-latest',key:''}, LS.get('aiwm_ai',{})); if(!c.key){ const sh=sharedAI(); if(sh){ c.proxy=sh.proxy; c.model=sh.model; c.shared=true; } } return c; }
+// 앱에 들어 있는 AI (config.js): 중계 서버(aiProxy) 또는 앱 공용 키(aiKey). 회원은 아무 설정 없이 씀
+function sharedAI(){ const C=window.APP_CONFIG||{}; if(C.aiProxy) return {proxy:String(C.aiProxy).replace(/\/$/,''),model:C.aiModel||'gemini-flash-latest'}; const k=C.aiKey?(C.aiKeyEnc?atob(C.aiKey).split('').reverse().join(''):C.aiKey):''; return k?{key:k,model:C.aiModel||'gemini-flash-latest'}:null; }
+function aiCfg(){ const c=Object.assign({model:'gemini-flash-latest',key:''}, LS.get('aiwm_ai',{})); if(c.key) c.own=true; if(!c.key){ const sh=sharedAI(); if(sh){ if(sh.proxy) c.proxy=sh.proxy; if(sh.key) c.key=sh.key; c.model=sh.model; c.shared=true; } } return c; }
 function aiReady(){ const c=aiCfg(); return !!(c.key||c.proxy); }
 function todayKey(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function todayLabel(){ const d=new Date(); return (d.getMonth()+1)+'월 '+d.getDate()+'일'; }
@@ -2051,7 +2051,8 @@ const INBODY_PROMPT=`인바디(InBody) 결과지 사진이나 인바디 앱 화�
 {"model":"기종(예: InBody 570) 또는 빈 문자열","date":"YYYY-MM-DD 또는 빈 문자열","time":"HH:MM 또는 빈 문자열","weight_kg":숫자|null,"smm_kg":숫자|null,"fat_mass_kg":숫자|null,"pbf_pct":숫자|null,"bmr_kcal":숫자|null}`;
 function aiSettingsCard(compact){
   const c=aiCfg();
-  if(c.shared&&compact) return '';
+  if(compact){ if(aiReady()) return ''; return `<div class="alert o"><div><b>AI 인식을 준비하고 있어요</b><br>음식·인바디 자동 인식은 곧 열려요. 지금은 칼로리를 직접 고쳐 넣을 수 있어요.</div></div>`; }
+  if(c.shared&&!c.own) return `<div class="card" id="aiCard"><h3>AI 기능<span class="r"><span class="pill p-green">앱에 포함</span></span></h3><p class="muted" style="margin:0;font-size:12.5px">음식·인바디·자막 인식이 앱에 들어 있어 따로 설정할 게 없어요.</p></div>`;
   return `<div class="card" id="aiCard"><h3>AI 연결 <span class="r">${c.key?'<span class="pill p-green">내 키 연결됨</span>':c.shared?'<span class="pill p-green">시험판 AI 연결됨</span>':'<span class="pill p-orange">필요</span>'}</span></h3>
     ${c.shared&&!c.key?'<p class="muted" style="margin:-4px 0 10px">시험판에서는 따로 키를 넣지 않아도 음식·인바디·자막 인식이 됩니다. 내 키를 넣으면 내 키로 바뀝니다.</p>':''}
     ${compact?'<p class="muted" style="margin:-4px 0 10px">음식 사진 인식에 AI가 필요해요. API 키를 한 번만 넣어 주세요.</p>':''}
@@ -2108,7 +2109,7 @@ function mDiet(){
     const slot=rec.slot||slotNow(), left=Math.max(0,budget(slot)-eatenOf(slot));
     const slotSeg=`<div class="seg" role="group" aria-label="끼니" style="margin:10px 0">${Object.keys(share).map(k=>`<button class="${slot===k?'on':''}" data-act="dietSlot" data-v="${k}">${k}</button>`).join('')}</div>`;
     if(rec.status==='loading') recBlock=`<div class="card"><h3>음식 분석 중…</h3><img class="preview-img" src="${rec.img}" alt="올린 음식 사진"><div class="feedback idle">AI가 음식과 양을 보고 있어요 (5~15초)</div></div>`;
-    else if(rec.status==='nokey') recBlock=`<div class="card"><h3>사진을 받았어요</h3><img class="preview-img" src="${rec.img}" alt="올린 음식 사진"><p class="muted" style="margin:0">AI를 연결하면 바로 분석해요. 아래에서 키를 넣고 ‘다시 분석’을 눌러 주세요.</p><div class="row" style="margin-top:10px"><button class="btn sm" data-act="dietRetry">다시 분석</button><button class="btn sm sec" data-act="dietCancel">취소</button></div></div>${aiSettingsCard(true)}`;
+    else if(rec.status==='nokey') recBlock=`<div class="card"><h3>사진을 받았어요</h3><img class="preview-img" src="${rec.img}" alt="올린 음식 사진"><p class="muted" style="margin:0">AI 인식이 아직 준비되지 않았어요. 잠시 뒤 ‘다시 분석’을 눌러 주세요.</p><div class="row" style="margin-top:10px"><button class="btn sm" data-act="dietRetry">다시 분석</button><button class="btn sm sec" data-act="dietCancel">취소</button></div></div>${aiSettingsCard(true)}`;
     else if(rec.status==='error'||rec.status==='notfood') recBlock=`<div class="card"><h3>${rec.status==='error'?'분석하지 못했어요':'음식을 찾지 못했어요'}</h3><img class="preview-img" src="${rec.img}" alt="올린 음식 사진"><div class="feedback warn">${rec.status==='error'?rec.err:(rec.note||'음식이 잘 보이게 다시 찍어 주세요')}</div><div class="row" style="margin-top:10px"><button class="btn sm" data-act="dietRetry">다시 분석</button><button class="btn sm sec" data-act="dietCancel">취소</button></div></div>`;
     else {
       const total=Math.max(1,rec.total), frac=Math.max(0.05,Math.min(1,left/total)), part=Math.round(total*frac);
@@ -2987,7 +2988,8 @@ function tSettle(){
     <div class="row" style="align-items:center;margin-top:8px"><span class="sp" style="font-size:14px">노쇼도 정산(수당)에 포함</span><button class="toggle ${P.nsPay?'on':''}" data-act="nsPolicy" data-k="nsPay" aria-pressed="${P.nsPay}" aria-label="노쇼 정산 포함"></button></div>
     <p class="muted" style="margin:8px 0 0;font-size:12px">센터 규정에 맞춰 정하세요. 노쇼는 스케줄의 수업이나 ‘오늘 수업’에서 처리해요.</p></div>
   <button class="btn sec full" data-act="copySettle2">센터 제출용 내역 복사</button>
-  <p class="foot">계산과 내역 관리만 합니다 · 실제 지급은 센터에서</p>`;
+  <p class="foot">계산과 내역 관리만 합니다 · 실제 지급은 센터에서</p>
+  ${aiSettingsCard(false)}`;
 }
 
 // ---------- 회원 영상 업로드 → 수업 때 기준 동작과 관절별 비교 → 피드백 ----------

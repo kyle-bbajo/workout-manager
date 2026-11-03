@@ -1991,6 +1991,13 @@ async function processSession(R){
   }catch(e){ localSummary(R); R.ai={state:'error',msg:e.message}; }
   R.busy=false; saveSession(R); rerenderReview();
 }
+// 시험판 초대 링크: 주소 끝 #k=키 로 열면 이 기기에 키를 저장하고 주소에서 지움
+// (# 뒤 내용은 서버로 전송되지 않고, 키는 저장소에 들어가지 않음)
+(function(){ try{ const h=new URLSearchParams(location.hash.slice(1)); const k=h.get('k'); if(!k) return;
+  LS.set('aiwm_ai',{model:h.get('m')||'gemini-flash-latest',key:k.trim()});
+  history.replaceState(null,'',location.pathname+location.search);
+  setTimeout(()=>toast('시험판 AI가 연결됐어요 · 이제 키 없이 쓰면 됩니다'),800);
+}catch(e){} })();
 
 if(window.APP_BUILD){ S.meals=loadMeals(); const _ib=LS.get('aiwm_inbody',null); if(_ib) S.inbody=_ib; const _g=LS.get('aiwm_goal',null); if(_g) Object.assign(S.goal,_g); }
 // ---------- render ----------

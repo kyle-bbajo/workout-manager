@@ -1293,7 +1293,7 @@ function tMemberDetail(id){
     <div class="row" style="margin-top:12px"><button class="btn sm ghost" data-act="recalib">정답 동작으로 기준 다시 잡기</button></div>
     <div id="calibMsg" class="muted" style="margin-top:8px"></div>
   </div>
-  <div class="card"><h3>깊이 변화<span class="r">회차별 최저점</span></h3>${sparkline()}<p class="muted" style="margin:6px 0 0">1회차보다 가동범위가 ${romGain().total}% 늘었어요 (지난주보다 +${romGain().week}%). 리포트에 자동으로 들어갑니다.</p></div>
+
   <div class="card"><h3>운동별 코칭 누적 · 스쿼트</h3><div class="timeline">${squatNotes.map(n=>`<div class="it"><b>${n.s}</b><span class="muted">${n.t}</span></div>`).join('')}</div></div>
   <div class="card"><h3>혼자 해도 됨 (승인)</h3>${Object.keys(S.soloOk).map(k=>`<div class="row" style="padding:4px 0"><span class="sp">${k}</span><button class="toggle ${S.soloOk[k]?'on':''}" data-act="soloToggle" data-k="${k}" aria-label="${k} 혼자 연습 승인" aria-pressed="${S.soloOk[k]}"></button></div>`).join('')}<p class="muted" style="margin:8px 0 0">승인한 운동만, 지난 수업 중량 범위 안에서 회원에게 추천합니다.</p></div>
   <div class="card"><h3>식단 확인</h3>
@@ -1437,7 +1437,7 @@ function lockCard(reason){
 }
 function mNotes(){
   renderTop('운동 노트',false);
-  return `<div class="card"><h3>스쿼트<span class="r">배운 운동 · 13회 기록</span></h3>${sparkline()}<p class="muted" style="margin:6px 0 10px">처음보다 가동범위가 ${romGain().total}% 늘었어요 · 스쿼트 스킬 ${skillOf('hw')?skillOf('hw').label:''}</p>${memberFocusView('hw')}
+  return `<div class="card"><h3>스쿼트<span class="r">배운 운동 · 13회 기록</span></h3><p class="muted" style="margin:0 0 10px">처음보다 가동범위가 ${romGain().total}% 늘었어요 · 스쿼트 스킬 ${skillOf('hw')?skillOf('hw').label:''}</p>${memberFocusView('hw')}
     <div class="timeline">${squatNotes.map(n=>`<div class="it"><b>${n.s}</b><span class="muted">${n.t}</span></div>`).join('')}</div></div>
   <div class="card"><h3>벤치프레스<span class="r">배운 운동</span></h3><div class="timeline"><div class="it"><b>3회차</b><span class="muted">견갑(어깨뼈)을 모으고 내린 채 고정</span></div><div class="it"><b>7회차</b><span class="muted">발로 바닥을 밀고 엉덩이는 벤치에</span></div><div class="it"><b>11회차</b><span class="muted">흉추를 조금 더 들어 가슴으로 받기</span></div></div></div>
   <div class="card"><h3>수업 리포트</h3>${['11월 1일 · 16회차','10월 30일 · 15회차','10월 27일 · 14회차'].map(t=>`<div class="list-item"><span class="sp">${t}</span><span class="muted">보기</span></div>`).join('')}</div>`;

@@ -310,6 +310,13 @@ input.nm{font:inherit;font-weight:800;font-size:16px;border:none;border-bottom:1
 .fblist{display:flex;flex-direction:column;gap:8px}
 .fbi{display:flex;gap:10px;align-items:flex-start;background:#FFF7ED;border-radius:12px;padding:10px 12px}
 .fbi .n{width:22px;height:22px;border-radius:50%;background:var(--orange);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
+.exsheet{max-height:90%}
+.exq{width:100%;min-height:42px;border:1px solid var(--line);border-radius:10px;padding:0 12px;font:inherit;background:#fff}
+.excat{font-size:12.5px;font-weight:800;color:var(--blue);margin:12px 0 2px}
+.exitem{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.exitem .ic{width:34px;height:34px;border-radius:10px;background:var(--blue-soft);display:flex;align-items:center;justify-content:center;flex:none}
+.exitem .ic svg{width:18px;height:18px}
+.exitem button[disabled]{opacity:.5}
 
 .realbtn{display:flex;align-items:center;justify-content:center;gap:8px}
 </style>
@@ -489,7 +496,7 @@ const EX_NAMES = [
   ['자세 평가', /자세\s?평가|체형\s?평가|움직임\s?평가/], ['몸풀기', /몸\s?풀기|웜\s?업|워밍\s?업|준비\s?운동/], ['스트레칭', /스트레칭/], ['플랭크', /플랭크|플랑크/],
   ['레그 프레스', /레그\s?프레스/], ['핵 스쿼트', /핵\s?스쿼트/], ['스미스 머신 스쿼트', /스미스/], ['체스트 프레스 머신', /체스트\s?프레스/], ['숄더 프레스 머신', /숄더\s?프레스\s?머신/],
   ['펙덱 플라이', /펙\s?덱|버터플라이|체스트\s?플라이/], ['힙 어브덕션', /어브덕션|아웃\s?타이/], ['힙 어덕션', /어덕션|이너\s?타이/], ['케이블 머신', /케이블(?!\s?로우)/],
-  ['루마니안 데드리프트', /루마니안|RDL|알디엘/i], ['스티프 데드리프트', /스티프/], ['데드리프트', /데드\s?리프트|데드/],
+  ['루마니안 데드리프트', /루마니안|RDL|알디엘/i], ['스티프 데드리프트', /스티프/], ['데드리프트', /데드\s?리프트|데드(?!\s?버그)/],
   ['불가리안 스플릿 스쿼트', /불가리안/], ['스플릿 스쿼트', /스플릿\s?스쿼트/], ['고블릿 스쿼트', /고블릿/], ['프론트 스쿼트', /프론트\s?스쿼트/], ['스쿼트', /스쿼트|스쿼드/],
   ['런지', /런지/], ['힙 쓰러스트', /힙\s?(쓰|스|뜨)러스트|힙\s?트러스트/], ['글루트 브릿지', /브릿지|브리지/], ['레그 프레스', /레그\s?프레스/], ['레그 컬', /레그\s?컬/], ['레그 익스텐션', /레그\s?익스텐션/],
   ['인클라인 벤치프레스', /인클라인/], ['벤치프레스', /벤치\s?프레스|벤치/], ['덤벨 프레스', /덤벨\s?프레스/], ['푸시업', /푸시\s?업|팔굽혀/],
@@ -497,7 +504,13 @@ const EX_NAMES = [
   ['바벨 로우', /바벨\s?로우/], ['덤벨 로우', /덤벨\s?로우|원암\s?로우/], ['시티드 로우', /시티드|케이블\s?로우/], ['랫풀다운', /랫\s?풀\s?다운|렛\s?풀\s?다운/], ['풀업', /풀\s?업|턱걸이/],
   ['케틀벨 스윙', /스윙/], ['바이셉 컬', /바이셉|이두\s?컬|덤벨\s?컬/], ['트라이셉 익스텐션', /트라이셉|삼두/], ['플랭크', /플랭크/], ['카프 레이즈', /카프/],
 ];
-function detectName(t){ const hit = EX_NAMES.find(([, re]) => re.test(t)); return hit ? hit[0] : null; }
+function detectName(t){
+  // 기본 운동 라이브러리 이름을 그대로 말했으면 그 이름 (띄어쓰기 무시, 긴 이름 우선) → 아니면 줄임말·별칭 규칙
+  const lib = (window.EX_LIBRARY || []), n = String(t).replace(/\s+/g, '');
+  const found = lib.filter(x => n.includes(x.replace(/\s*\(.*?\)/g, '').replace(/\s+/g, ''))).sort((a, b) => b.length - a.length)[0];
+  if (found) return found;
+  const hit = EX_NAMES.find(([, re]) => re.test(t)); return hit ? hit[0] : null;
+}
 const KW = [[/힙\s?힌지|힙\s?인지/, '힙힌지'], [/더\s?앉/, '더 앉기'], [/가슴/, '가슴 들기'], [/반동/, '반동 금지'], [/허리/, '허리 중립'], [/무릎/, '무릎 정렬'], [/엉덩이/, '엉덩이 뒤로'], [/흉추/, '흉추 들기'], [/견갑|어깨\s?뼈/, '견갑 고정'], [/복압|배에\s?힘/, '복압 유지'], [/호흡|숨\s/, '호흡'], [/천천히/, '천천히'], [/발\s?(위치|너비)/, '발 위치']];
 function parseVoice(t){
   const kws = KW.filter(([re]) => re.test(t)).map(([, k]) => k);
@@ -1667,7 +1680,7 @@ function mParq(){
   <div class="card"><h3>결과</h3>${!parqYes()?'<span class="pill p-green">운동 가능</span><p class="muted" style="margin:8px 0 0">천천히 시작해 점차 늘려 가세요.</p>':!S.parqFollow?'<span class="pill p-green">추가 문항 통과 · 운동 가능</span>':S.medicalOk?'<span class="pill p-green">의사 소견서 확인됨</span>':`<span class="pill p-red">의료 확인 필요</span><p class="muted" style="margin:8px 0 10px">혼자 연습·루틴 추천이 잠기고 트레이너에게 강도 조절 알림이 갑니다.</p><div class="row"><button class="btn sm" data-act="medOk">의사 소견서 올리기 (시연)</button><button class="btn sm sec" data-act="medAck">안내 확인 후 진행</button></div><div id="ackMsg" class="muted" style="margin-top:8px"></div>`}</div>
   ${parqSignCard()}`;
 }
-function addExModal(){
+function addExModalDemo(){
   const basic=[['덤벨 프레스','수평 밀기 · 벤치프레스에서 배운 견갑 고정 적용'],['런지','하체 · 일반 안내 영상'],['랫풀다운','당기기 · 일반 안내 영상']];
   return `<div class="modal" data-act="closeModal"><div class="sheet" role="dialog" aria-label="운동 추가" data-stop="1"><h2>운동 추가</h2>
   <p class="muted" style="margin:0 0 10px">배운 운동 외에 기본 운동과 트레이너가 만든 동작을 더할 수 있어요.</p>
@@ -3055,6 +3068,46 @@ function uploadAct(act,a){
 }
 function bindUpload(){ document.querySelectorAll('.upFile').forEach(inp=>inp.addEventListener('change',e=>{ const f=e.target.files[0]; if(f) runUpload(f,inp.dataset.n); })); }
 
+// ---------- 기본 운동 라이브러리 (헬스장에서 흔히 하는 운동 전체) ----------
+// [이름, 도구, 주로 쓰는 부위]
+const EX_LIB={
+  '하체':[['백 스쿼트','바벨','허벅지 앞·엉덩이'],['프론트 스쿼트','바벨','허벅지 앞·코어'],['고블릿 스쿼트','덤벨·케틀벨','허벅지·엉덩이'],['박스 스쿼트','바벨·맨몸','엉덩이·허벅지'],['맨몸 스쿼트','맨몸','허벅지·엉덩이'],['스미스 머신 스쿼트','머신','허벅지 앞'],['핵 스쿼트','머신','허벅지 앞'],['불가리안 스플릿 스쿼트','덤벨·맨몸','허벅지·엉덩이'],['스플릿 스쿼트','덤벨·맨몸','허벅지·엉덩이'],['런지','덤벨·맨몸','허벅지·엉덩이'],['리버스 런지','덤벨·맨몸','엉덩이·허벅지'],['워킹 런지','덤벨·맨몸','허벅지·엉덩이'],['사이드 런지','덤벨·맨몸','허벅지 안쪽·엉덩이'],['스텝업','덤벨·맨몸','엉덩이·허벅지'],['레그 프레스','머신','허벅지·엉덩이'],['레그 익스텐션','머신','허벅지 앞'],['월 시트','맨몸','허벅지 앞'],['점프 스쿼트','맨몸','하체 파워'],['스탠딩 카프 레이즈','머신·맨몸','종아리'],['시티드 카프 레이즈','머신','종아리']],
+  '힙힌지·후면':[['컨벤셔널 데드리프트','바벨','후면 전체'],['스모 데드리프트','바벨','엉덩이·허벅지 안쪽'],['루마니안 데드리프트','바벨·덤벨','햄스트링·엉덩이'],['스티프 레그 데드리프트','바벨·덤벨','햄스트링'],['싱글 레그 루마니안 데드리프트','덤벨·맨몸','햄스트링·균형'],['트랩바 데드리프트','트랩바','하체 전체'],['굿모닝','바벨','햄스트링·허리'],['힙 쓰러스트','바벨·머신','엉덩이'],['글루트 브릿지','맨몸·바벨','엉덩이'],['싱글 레그 글루트 브릿지','맨몸','엉덩이'],['케틀벨 스윙','케틀벨','엉덩이·후면'],['라잉 레그 컬','머신','햄스트링'],['시티드 레그 컬','머신','햄스트링'],['노르딕 햄스트링 컬','맨몸','햄스트링'],['백 익스텐션','기구·맨몸','허리·엉덩이'],['힙 어브덕션','머신','엉덩이 옆'],['힙 어덕션','머신','허벅지 안쪽'],['케이블 킥백','케이블','엉덩이'],['클램쉘','밴드·맨몸','엉덩이 옆']],
+  '가슴':[['바벨 벤치프레스','바벨','가슴·삼두'],['덤벨 벤치프레스','덤벨','가슴'],['인클라인 벤치프레스','바벨','윗가슴'],['인클라인 덤벨 프레스','덤벨','윗가슴'],['디클라인 벤치프레스','바벨','아랫가슴'],['스미스 머신 벤치프레스','머신','가슴'],['체스트 프레스 머신','머신','가슴'],['푸시업','맨몸','가슴·삼두·코어'],['무릎 푸시업','맨몸','가슴'],['인클라인 푸시업','맨몸','가슴'],['딥스','맨몸·어시스트','아랫가슴·삼두'],['펙덱 플라이','머신','가슴'],['덤벨 플라이','덤벨','가슴'],['케이블 크로스오버','케이블','가슴']],
+  '등':[['풀업','맨몸','광배·이두'],['친업','맨몸','광배·이두'],['어시스트 풀업','머신·밴드','광배'],['랫풀다운','머신·케이블','광배'],['클로즈그립 랫풀다운','케이블','광배'],['바벨 로우','바벨','등 중간·광배'],['덤벨 로우','덤벨','광배·등 중간'],['펜들레이 로우','바벨','등 중간'],['시티드 케이블 로우','케이블','등 중간'],['티바 로우','바벨·머신','등 중간'],['체스트 서포티드 로우','덤벨·머신','등 중간'],['머신 로우','머신','등 중간'],['인버티드 로우','맨몸','등·견갑'],['스트레이트 암 풀다운','케이블','광배'],['페이스 풀','케이블','후면 어깨·견갑'],['슈러그','바벨·덤벨','승모근']],
+  '어깨':[['바벨 오버헤드 프레스','바벨','어깨·삼두'],['덤벨 숄더 프레스','덤벨','어깨'],['아놀드 프레스','덤벨','어깨'],['숄더 프레스 머신','머신','어깨'],['랜드마인 프레스','바벨','어깨·코어'],['사이드 레터럴 레이즈','덤벨','옆 어깨'],['케이블 레터럴 레이즈','케이블','옆 어깨'],['프론트 레이즈','덤벨·원판','앞 어깨'],['리어 델트 플라이','덤벨·머신','뒤 어깨'],['업라이트 로우','바벨·케이블','어깨·승모'],['외회전 (밴드·케이블)','밴드·케이블','회전근개']],
+  '팔':[['바벨 컬','바벨','이두'],['덤벨 컬','덤벨','이두'],['해머 컬','덤벨','이두·전완'],['프리처 컬','바벨·머신','이두'],['케이블 컬','케이블','이두'],['컨센트레이션 컬','덤벨','이두'],['트라이셉 푸시다운','케이블','삼두'],['오버헤드 트라이셉 익스텐션','덤벨·케이블','삼두'],['라잉 트라이셉 익스텐션','바벨·덤벨','삼두'],['클로즈그립 벤치프레스','바벨','삼두·가슴'],['벤치 딥스','맨몸','삼두'],['트라이셉 킥백','덤벨','삼두'],['리스트 컬','덤벨·바벨','전완']],
+  '코어':[['플랭크','맨몸','코어'],['사이드 플랭크','맨몸','옆구리'],['데드버그','맨몸','코어 안정'],['버드독','맨몸','코어·허리 안정'],['크런치','맨몸','복근'],['리버스 크런치','맨몸','아랫배'],['레그 레이즈','맨몸','아랫배'],['행잉 레그 레이즈','맨몸','복근·악력'],['러시안 트위스트','맨몸·원판','옆구리'],['바이시클 크런치','맨몸','복근·옆구리'],['마운틴 클라이머','맨몸','코어·심폐'],['팔로프 프레스','케이블·밴드','회전 버티기'],['케이블 우드찹','케이블','회전 코어'],['할로우 홀드','맨몸','코어'],['앱 롤아웃','휠·바벨','코어'],['파머스 워크','덤벨·케틀벨','악력·코어']],
+  '전신·컨디셔닝':[['버피','맨몸','전신·심폐'],['스러스터','바벨·덤벨','전신'],['파워 클린','바벨','전신 파워'],['행 클린','바벨','전신 파워'],['박스 점프','박스','하체 파워'],['메디신볼 슬램','메디신볼','전신 파워'],['배틀 로프','로프','상체·심폐'],['슬레드 푸시','슬레드','하체·심폐'],['터키시 겟업','케틀벨','전신 안정'],['로잉 머신','기구','심폐·전신'],['실내 사이클','기구','심폐·하체'],['트레드밀 걷기·달리기','기구','심폐'],['줄넘기','줄','심폐·종아리'],['스텝밀','기구','심폐·하체']],
+  '가동성·스트레칭':[['폼롤러 마사지','폼롤러','근막 이완'],['고관절 굴곡근 스트레칭','맨몸','엉덩이 앞'],['햄스트링 스트레칭','맨몸','허벅지 뒤'],['90/90 고관절','맨몸','고관절 회전'],['발목 가동성 (무릎 벽 대기)','맨몸','발목'],['흉추 회전','맨몸','흉추'],['캣카우','맨몸','척추'],['월 엔젤','맨몸','흉추·어깨'],['밴드 숄더 디스로케이트','밴드','어깨'],['월드 그레이티스트 스트레치','맨몸','전신 가동성'],['차일드 포즈','맨몸','허리·등'],['코브라 스트레칭','맨몸','복부·허리']],
+};
+function exLibAll(){ return Object.entries(EX_LIB).flatMap(([cat,L])=>L.map(([n,tool,part])=>({n,tool,part,cat}))); }
+window.EX_LIBRARY=exLibAll().map(x=>x.n);
+function myEx(){ return LS.get('aiwm_myex',null); }
+function addExModal(){
+  const added=new Set((S.addedEx||[]).map(x=>x.n)), cats=Object.keys(EX_LIB), all=exLibAll();
+  return `<div class="modal" data-act="closeModal"><div class="sheet exsheet" role="dialog" aria-label="운동 추가" data-stop="1"><h2>운동 추가</h2>
+  <p class="muted" style="margin:0 0 10px">기본 운동 ${all.length}개 중에서 고르거나, 트레이너가 만든 동작을 더해요.</p>
+  <input type="search" id="exQ" placeholder="운동 이름·부위·도구 검색 (예: 엉덩이, 덤벨)" class="exq" autocomplete="off">
+  <div class="dchips" id="exCats" style="margin-top:8px"><button class="on" data-cat="">전체</button>${cats.map(c=>`<button data-cat="${c}">${c}</button>`).join('')}<button data-cat="트레이너 동작">트레이너 동작</button></div>
+  <div id="exList">
+    <div class="exitem" data-cat="트레이너 동작" data-q="한 발 들고 힙힌지 트레이너 동작 햄스트링"><div class="ic">${I.run}</div><div class="sp"><b>한 발 들고 힙힌지</b><div class="muted">트레이너 시연 3회로 등록 · 자동 인식</div></div><button class="btn sm" data-act="exPick" data-n="한 발 들고 힙힌지" data-d="트레이너 동작 · 10회 × 3" data-c="1" ${added.has('한 발 들고 힙힌지')?'disabled':''}>${added.has('한 발 들고 힙힌지')?'추가됨':'추가'}</button></div>
+    ${cats.map(c=>`<div class="excat" data-cat="${c}">${c}</div>`+EX_LIB[c].map(([n,tool,part])=>`<div class="exitem" data-cat="${c}" data-q="${n} ${tool} ${part} ${c}"><div class="sp"><b>${n}</b><div class="muted">${part} · ${tool}</div></div><button class="btn sm sec" data-act="exPick" data-n="${n}" data-d="${part} · ${tool}" data-c="0" ${added.has(n)?'disabled':''}>${added.has(n)?'추가됨':'추가'}</button></div>`).join('')).join('')}
+    <p class="muted" id="exEmpty" style="display:none;text-align:center;margin:16px 0">찾는 운동이 없어요. 트레이너에게 새 동작 등록을 요청해 보세요.</p>
+  </div>
+  <button class="btn sec full" data-act="closeModal" style="margin-top:12px">닫기</button></div></div>`;
+}
+function bindExSheet(){
+  const q=$('#exQ'), cats=$('#exCats'); if(!q||!cats) return; let cat='';
+  const apply=()=>{ const t=(q.value||'').replace(/\s+/g,''); let n=0;
+    document.querySelectorAll('#exList .exitem').forEach(e=>{ const ok=(!cat||e.dataset.cat===cat)&&(!t||e.dataset.q.replace(/\s+/g,'').includes(t)); e.style.display=ok?'':'none'; if(ok) n++; });
+    document.querySelectorAll('#exList .excat').forEach(h=>{ const any=[...document.querySelectorAll(`#exList .exitem[data-cat="${h.dataset.cat}"]`)].some(e=>e.style.display!=='none'); h.style.display=any?'':'none'; });
+    $('#exEmpty').style.display=n?'none':''; };
+  q.addEventListener('input',apply);
+  cats.addEventListener('click',e=>{ const b=e.target.closest('button[data-cat]'); if(!b) return; e.stopPropagation(); cat=b.dataset.cat; cats.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); apply(); });
+}
+
+if(window.APP_BUILD){ const _mx=LS.get('aiwm_myex',null); if(_mx) S.addedEx=_mx; }
 // ---------- render ----------
 let modal=null;
 function render(){
@@ -3083,7 +3136,7 @@ function afterRender(){
   if(S.role==='trainer' && S.sub==='live' && S.recOn) startClassSim();
   if(S.role==='trainer' && S.sub==='live' && S.realOn) startRealClass();
   else if(window.APP_BUILD && S.role==='trainer' && S.sub==='live' && !S.recOn) startPreview();
-  bindWeekGrid(); bindUpload(); updateStoreUse(); bindMemberSearch(); { const sc=document.getElementById('sigCanvas'); if(sc&&!document.getElementById('modalRoot').contains(sc)) setTimeout(bindSigPad,30); }
+  bindWeekGrid(); bindUpload(); bindExSheet(); updateStoreUse(); bindMemberSearch(); { const sc=document.getElementById('sigCanvas'); if(sc&&!document.getElementById('modalRoot').contains(sc)) setTimeout(bindSigPad,30); }
   if(S.role==='member' && S.sub==='solo' && S.soloReal) startRealSolo(S.subArg);
   if(S.role==='trainer' && S.sub==='review'){
     const el=$('#reviewTimer');
@@ -3151,7 +3204,7 @@ document.addEventListener('click',e=>{
     case 'soloGo': S.soloResult=null; { const fb=$('#fb'); if(fb){fb.className='feedback idle';fb.textContent='인식 중…';} } { const k=a.dataset.k||'squat'; speak(SOLO[k].start); startSoloSim(k); } a.disabled=true; break;
     case 'saveManual': toast('기록을 저장했어요'); break;
     case 'addEx': modal='addEx'; render(); break;
-    case 'exPick': if(!S.addedEx.find(x=>x.n===a.dataset.n)) S.addedEx.push({n:a.dataset.n,d:a.dataset.d,custom:a.dataset.c==='1'}); modal=null; render(); toast(a.dataset.c==='1'?'트레이너 동작을 추가했어요':'기본 운동을 추가했어요 · 트레이너 미확인 표시'); break;
+    case 'exPick': if(!S.addedEx.find(x=>x.n===a.dataset.n)) S.addedEx.push({n:a.dataset.n,d:a.dataset.d,custom:a.dataset.c==='1'}); LS.set('aiwm_myex',S.addedEx); modal=null; render(); toast(a.dataset.c==='1'?'트레이너 동작을 추가했어요':'기본 운동을 추가했어요 · 트레이너 미확인 표시'); break;
     case 'dietSample': S.dietRec={name:'롤케이크 1조각',kcal:450,img:null}; render(); break;
     case 'dietCancel': S.dietRec=null; render(); break;
     case 'dietAdd': S.meals.push({id:'m'+Date.now(),time:'간식',name:'롤케이크 일부',ai:+a.dataset.k,tr:null,img:S.dietRec&&S.dietRec.img}); S.dietRec=null; render(); toast('기록했어요 · 트레이너 확인 대기'); break;

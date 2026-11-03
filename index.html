@@ -338,6 +338,16 @@ input.nm{font:inherit;font-weight:800;font-size:16px;border:none;border-bottom:1
 .sum2 .sumv{font-size:20px;margin:0 0 2px}
 .sumcap{font-size:12px;line-height:1.45;color:var(--muted,#6B7280)}
 .sumcap i{font-style:normal;font-size:11px;opacity:.8}
+.mtbl{border:1px solid var(--line,#E5E7EB);border-radius:12px;overflow:hidden}
+.mtbl .mh,.mtbl .mr{display:grid;grid-template-columns:1.05fr .8fr 1.1fr 1.1fr 1.1fr .95fr;gap:4px;align-items:center;padding:9px 10px;font-size:13px;text-align:right}
+.mtbl .mh{background:var(--bg2,#F9FAFB);color:var(--muted,#6B7280);font-size:11.5px;font-weight:600}
+.mtbl .mh span:first-child,.mtbl .mr span:first-child{text-align:left}
+.mtbl .mr{width:100%;border:0;border-top:1px solid var(--line,#E5E7EB);background:#fff;font:inherit;font-size:13px;color:inherit;cursor:pointer}
+.mtbl .mr.on{background:#EFF6FF}
+.mtbl .mr.sum{background:var(--bg2,#F9FAFB);cursor:default}
+.mtbl .mr i{font-style:normal;color:var(--muted,#6B7280);font-size:11px;margin-left:3px}
+.mtbl em{font-style:normal;font-size:11.5px;font-weight:700}
+.mtbl em.ok{color:var(--green,#16A34A)} .mtbl em.op{color:var(--blue,#2563EB)} .mtbl em.no{color:#C2410C}
 
 .realbtn{display:flex;align-items:center;justify-content:center;gap:8px}
 </style>
@@ -2979,6 +2989,44 @@ function settleSummary(mk){ mk=mk||stMonth(); const md=monthDone(mk), PR=payroll
   const gross=PR.total+incentive+base, tax=c.tax?Math.floor(gross*0.033/10)*10:0;
   return {mk,md,PR,c,sales,salesAmt,lessonRev:PR.rev,lessonPay:PR.total,incentive,base,gross,tax,net:gross-tax,
     nNew:sales.filter(x=>x.kind==='신규').length,nRe:sales.filter(x=>x.kind==='재등록').length}; }
+// ---------- 월별 정산 현황 · 지급 완료 처리 · 남은 수업 ----------
+function paidMonths(){ return LS.get('aiwm_paidmon',{}); }
+function man(x){ x=+x||0; if(Math.abs(x)<10000) return fmt(x); const v=x/10000; return (Math.abs(v)>=100?Math.round(v):Math.round(v*10)/10).toLocaleString('ko-KR')+'만'; }
+function monthsWithData(){ const cur=monthKey(), set=new Set([cur]);
+  signs().forEach(x=>x.d&&set.add(x.d.slice(0,7))); noshows().forEach(x=>x.d&&set.add(x.d.slice(0,7)));
+  members.forEach(m=>(m.contracts||[]).forEach(c=>+c.amount>0&&c.date&&set.add(String(c.date).slice(0,7)))); Object.keys(paidMonths()).forEach(k=>set.add(k));
+  return [...set].filter(k=>k<=cur).sort().reverse().slice(0,12); }
+function monthStatus(mk){ const P=paidMonths()[mk]; return P?'paid':mk===monthKey()?'open':'unpaid'; }
+function monthTable(){ const L=monthsWithData().map(mk=>Object.assign(settleSummary(mk),{st:monthStatus(mk),paid:paidMonths()[mk]}));
+  const un=L.filter(x=>x.st!=='paid'&&x.md.length), unPast=un.filter(x=>x.st==='unpaid');
+  return {L,un,unAmt:un.reduce((a,x)=>a+x.gross,0),unN:un.reduce((a,x)=>a+x.md.length,0),unPastAmt:unPast.reduce((a,x)=>a+x.gross,0),unPastN:unPast.reduce((a,x)=>a+x.md.length,0),unPastM:unPast.length,
+    paidAmt:L.filter(x=>x.st==='paid').reduce((a,x)=>a+(x.paid.amount!=null?x.paid.amount:x.gross),0)}; }
+// 아직 안 한 수업: 회원별 남은 유료·보너스 회차와 그 금액(받아 둔 돈), 앞으로 받을 수당(지금 정산 방식 기준 예상)
+function remainingInfo(){ const c=settleCfg(), rows=[];
+  members.forEach(m=>{ const total=+m.total||0, done=+m.done||0; if(total<=done) return; let paid=0,bonus=0,val=0;
+    for(let n=done+1;n<=total;n++){ const si=sessionInfo(m,n); if(si.c){ if(si.bonus) bonus++; else { paid++; val+=si.unit||c.price; } } else { paid++; val+=unitPriceC(m.id,c); } }
+    rows.push({mid:m.id,name:m.name,paid,bonus,val,left:total-done}); });
+  rows.sort((a,b)=>b.val-a.val);
+  const paid=rows.reduce((a,x)=>a+x.paid,0), bonus=rows.reduce((a,x)=>a+x.bonus,0), val=rows.reduce((a,x)=>a+x.val,0);
+  const pct=c.mode==='rate'?+c.rate:c.mode==='tier'?tierPct(c,monthDone().length):0;
+  const est=c.mode==='fixed'?(paid+(c.bonusPay==='unit'?bonus:0))*(+c.fixed):Math.round(val*pct/100+(c.bonusPay==='unit'?rows.reduce((a,x)=>a+x.bonus*(x.paid?x.val/x.paid:0),0)*pct/100:0));
+  return {rows,paid,bonus,val,est}; }
+function statusCards(){ const T=monthTable(), RI=remainingInfo(), mk=stMonth();
+  return `<div class="card"><h3>월별 매출 · 정산</h3>
+    <div class="sumgrid" style="grid-template-columns:1fr 1fr;margin-bottom:10px">
+      <div class="sumbox" style="background:#FFF7ED;border-color:#FED7AA"><div class="muted">아직 안 받은 정산</div><div class="sumv" style="font-size:20px;color:#C2410C;margin:2px 0">${fmt(T.unAmt)}<small>원</small></div><div class="sumcap">수업 ${T.unN}회${T.unPastM?` · 지난 달 ${T.unPastM}개월 ${man(T.unPastAmt)}`:''}${T.L.some(x=>x.st==='open')?' · 이번 달 진행 중 포함':''}</div></div>
+      <div class="sumbox"><div class="muted">받은 정산 (표시한 달)</div><div class="sumv" style="font-size:20px;margin:2px 0">${fmt(T.paidAmt)}<small>원</small></div><div class="sumcap">지급 완료 ${T.L.filter(x=>x.st==='paid').length}개월</div></div></div>
+    <div class="mtbl"><div class="mh"><span>월</span><span>수업</span><span>등록 매출</span><span>수업 매출</span><span>정산액</span><span>상태</span></div>
+    ${T.L.map(x=>`<button class="mr ${x.mk===mk?'on':''}" data-act="stGoMonth" data-mk="${x.mk}"><span><b>${+x.mk.slice(5)}월</b>${x.mk.slice(0,4)!=String(new Date().getFullYear())?`<i>${x.mk.slice(2,4)}년</i>`:''}</span><span>${x.md.length}회</span><span>${man(x.salesAmt)}</span><span>${man(x.lessonRev)}</span><span><b>${man(x.paid&&x.paid.amount!=null?x.paid.amount:x.gross)}</b></span><span>${x.st==='paid'?'<em class="ok">완료</em>':x.st==='open'?'<em class="op">진행</em>':'<em class="no">미정산</em>'}</span></button>`).join('')}
+    <div class="mr sum"><span><b>합계</b></span><span>${T.L.reduce((a,x)=>a+x.md.length,0)}회</span><span>${man(T.L.reduce((a,x)=>a+x.salesAmt,0))}</span><span>${man(T.L.reduce((a,x)=>a+x.lessonRev,0))}</span><span><b>${man(T.L.reduce((a,x)=>a+(x.paid&&x.paid.amount!=null?x.paid.amount:x.gross),0))}</b></span><span></span></div></div>
+    <p class="muted" style="margin:8px 0 0;font-size:12px">달을 누르면 위 요약이 그 달로 바뀌어요. 정산액은 세전, 지급 완료한 달은 그때 금액으로 고정돼요.</p></div>
+  <div class="card"><h3>남은 수업 <span class="muted" style="font-size:13px;font-weight:600">회원들이 결제하고 아직 안 한 수업</span></h3>
+    <div class="sumgrid" style="grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+      <div class="sumbox"><div class="muted" style="font-size:12px">남은 횟수</div><div class="sumv" style="font-size:19px;margin:2px 0">${RI.paid}<small>회</small></div><div class="sumcap">${RI.bonus?`+ 보너스 ${RI.bonus}회`:'유료'}</div></div>
+      <div class="sumbox"><div class="muted" style="font-size:12px">남은 금액</div><div class="sumv" style="font-size:19px;margin:2px 0">${man(RI.val)}<small>원</small></div><div class="sumcap">받아 둔 수업료</div></div>
+      <div class="sumbox pay"><div class="muted" style="font-size:12px">예상 수당</div><div class="sumv" style="font-size:19px;margin:2px 0">${man(RI.est)}<small>원</small></div><div class="sumcap">남은 수업 다 하면</div></div></div>
+    <table class="t"><tr><th>회원</th><th>남은 회차</th><th>남은 금액</th></tr>${RI.rows.map(x=>`<tr><td>${esc(x.name)}</td><td>${x.paid}회${x.bonus?` <span class="muted">+보너스 ${x.bonus}</span>`:''}</td><td>${fmt(x.val)}</td></tr>`).join('')||'<tr><td colspan="3" class="muted">남은 수업이 없어요</td></tr>'}</table></div>`; }
+function stBadge(st){ return st==='paid'?'<span class="pill p-green">지급 완료</span>':st==='open'?'<span class="pill p-blue">진행 중</span>':'<span class="pill p-orange">미정산</span>'; }
 function todayLessons(){ const t=ymd(new Date()); return sched().filter(l=>l.date===t&&!isReq(l)).sort((a,b)=>a.time.localeCompare(b.time)).map(l=>{
   const sg=signs().find(s=>s.mid===l.mid&&s.d===t), ns=noshows().find(x=>x.lessonId===l.id);
   return Object.assign({},l,{state:ns?'noshow':sg?'done':'todo',sg,ns}); }); }
@@ -3025,7 +3073,8 @@ function summaryBlock(S2){ const c=S2.c;
 function settleText(){ const S2=settleSummary(), md=S2.md, PR=S2.PR, c=S2.c;
   const head=`${monthLabel(S2.mk)} 정산 내역\n\n[매출]\n- 등록 매출 ${fmt(S2.salesAmt)}원 (신규 ${S2.nNew}건 · 재등록 ${S2.nRe}건)\n- 수업 매출 ${fmt(S2.lessonRev)}원 (완료 ${md.length}회)\n\n[정산] ${fmt(S2.gross)}원${c.tax?` · 3.3% 공제 후 ${fmt(S2.net)}원`:''}\n- 수업 수당 ${fmt(S2.lessonPay)}원 (${PR.label})`+(+c.salesPct?`\n- 매출 인센티브 ${fmt(S2.incentive)}원 (등록 매출의 ${c.salesPct}%)`:'')+(+c.base?`\n- 기본급 ${fmt(S2.base)}원`:'')
     +(S2.sales.length?`\n\n[등록 내역]\n`+S2.sales.slice().reverse().map(x=>`${x.date} ${x.name} ${x.kind} ${x.count}회${x.bonus?'+보너스 '+x.bonus:''} · ${fmt(x.amount)}원${x.pay?' ('+x.pay+')':''}`).join('\n'):'');
-  return head+`\n\n[수업 내역]\n`+md.slice().reverse().map(x=>`${x.d} ${x.lt||''} ${x.name} ${x.n?x.n+'회차':''} · ${x.kind==='noshow'?'노쇼':'서명 '+x.at+(x.via==='member'?'(회원폰)':'(트레이너폰)')} · ${fmt(PR.pay[x.id]||0)}원`).join('\n'); }
+  const T=monthTable(), RI=remainingInfo();
+  return head+`\n\n[미정산] ${fmt(T.unAmt)}원 (수업 ${T.unN}회)\n[남은 수업] 유료 ${RI.paid}회${RI.bonus?' + 보너스 '+RI.bonus+'회':''} · ${fmt(RI.val)}원`+`\n\n[수업 내역]\n`+md.slice().reverse().map(x=>`${x.d} ${x.lt||''} ${x.name} ${x.n?x.n+'회차':''} · ${x.kind==='noshow'?'노쇼':'서명 '+x.at+(x.via==='member'?'(회원폰)':'(트레이너폰)')} · ${fmt(PR.pay[x.id]||0)}원`).join('\n'); }
 function noShow(lessonId){
   const l=sched().find(x=>x.id===lessonId); if(!l) return;
   const now=new Date(), m=members.find(x=>x.id===l.mid), P=policy();
@@ -3064,7 +3113,10 @@ function tSettle(){
   const cur=c.tiers.findIndex(t=>t.upto==null||n<=t.upto), nextT=c.tiers[cur];
   return `<div class="card"><div class="row" style="align-items:center;margin-bottom:10px"><button class="btn sm sec" data-act="stMonth" data-k="-1" aria-label="이전 달">‹</button><h3 class="sp" style="margin:0;text-align:center">${monthLabel(mk)} 정산 요약</h3><button class="btn sm sec" data-act="stMonth" data-k="1" aria-label="다음 달" ${mk>=monthKey()?'disabled':''}>›</button></div>
     ${summaryBlock(SS)}
+    <div class="row" style="align-items:center;margin-top:10px;gap:8px">${stBadge(monthStatus(mk))}<span class="sp muted" style="font-size:12.5px">${paidMonths()[mk]?`${paidMonths()[mk].at} 지급 확인 · ${fmt(paidMonths()[mk].amount)}원`:mk===monthKey()?'이 달이 끝나면 지급 완료로 바꿔 주세요':'센터에서 받으면 지급 완료로 바꿔 주세요'}</span>
+      <button class="btn sm ${paidMonths()[mk]?'sec':''}" data-act="stPaid" data-mk="${mk}">${paidMonths()[mk]?'취소':'지급 완료'}</button></div>
     <button class="btn sec full" data-act="tilePay" style="margin-top:10px">수업별·등록별 내역 보기 ›</button></div>
+  ${statusCards()}
   <div class="card"><h3>${monthLabel(mk)} 등록 내역 <span class="muted" style="font-size:13px;font-weight:600">${fmt(SS.salesAmt)}원</span></h3>${SS.sales.length?salesRows(SS.sales):'<p class="muted" style="margin:0;font-size:13px">이 달 계약일로 등록된 계약이 없어요. 회원 → 계약 추가(재등록)에서 받은 금액을 넣으면 여기에 잡혀요.</p>'}</div>
   <div class="card"><h3>정산 방식</h3>
     <div class="seg" role="group"><button class="${c.mode==='fixed'?'on':''}" data-act="stMode" data-v="fixed">회당 고정</button><button class="${c.mode==='rate'?'on':''}" data-act="stMode" data-v="rate">매출 비율</button><button class="${c.mode==='tier'?'on':''}" data-act="stMode" data-v="tier">구간별 비율</button></div>
@@ -3105,6 +3157,11 @@ function settleAct(act,a){
     case 'stMode': { const c=readSettleForm(); c.mode=a.dataset.v; saveSettle(c); keepScroll(render); return true; }
     case 'tierMode': { const c=readSettleForm(); c.tierMode=a.dataset.v; saveSettle(c); keepScroll(render); return true; }
     case 'stMonth': { const k=+a.dataset.k, nx=shiftMonth(stMonth(),k); S.stMonth=nx>=monthKey()?null:nx; keepScroll(render); return true; }
+    case 'stGoMonth': { const k=a.dataset.mk; S.stMonth=k===monthKey()?null:k; render(); return true; }
+    case 'stPaid': { const k=a.dataset.mk, P=paidMonths();
+      if(P[k]){ if(!confirm(`${monthLabel(k)} 지급 완료를 취소할까요?`)) return true; delete P[k]; }
+      else { const g=settleSummary(k).gross; if(!confirm(`${monthLabel(k)} 정산 ${fmt(g)}원을 받은 것으로 표시할까요?`)) return true; const n=new Date(); P[k]={amount:g,at:`${n.getMonth()+1}/${n.getDate()}`}; }
+      LS.set('aiwm_paidmon',P); keepScroll(render); return true; }
     case 'stTax': { const c=readSettleForm(); c.tax=!c.tax; saveSettle(c); keepScroll(render); return true; }
     case 'bonusPay': { const c=readSettleForm(); c.bonusPay=a.dataset.v; saveSettle(c); keepScroll(render); return true; }
     case 'tierAdd': { const c=readSettleForm(), last=c.tiers[c.tiers.length-1], prev=c.tiers[c.tiers.length-2]; const start=prev?+prev.upto:0; c.tiers.splice(c.tiers.length-1,0,{upto:start+20,pct:Math.min(100,(+(prev||{pct:last.pct-10}).pct)+5)}); saveSettle(c); keepScroll(render); return true; }

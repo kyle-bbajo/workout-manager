@@ -570,6 +570,92 @@ async function loadModel(onStatus){
   try { return await loading; } finally { loading = null; }
 }
 
+// ---------- 정밀 골격: RTMPose-m (Halpe26, 발뒤꿈치·발끝 포함) · 녹화 영상 분석용 ----------
+// MediaPipe가 사람 위치를 잡으면, 그 영역을 잘라 RTMPose로 관절을 다시 찾아 더 정확한 좌표로 바꿔 넣음
+const ORT_VER = '1.22.0', ORT_URL = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VER}/dist/`;
+const RTM_URL_DEFAULT = 'https://huggingface.co/pocketpose/onnx-models/resolve/main/pose_estimation-halpe26/halpe26_td-cc_rtmpose-m_body7_256x192.onnx';
+const RTM_IN_W = 192, RTM_IN_H = 256;
+// Halpe26 → MediaPipe 33 번호 (같은 자리에 넣어서 이후 계산은 그대로)
+const H26_TO_MP = { 0: 0, 1: 2, 2: 5, 3: 7, 4: 8, 5: 11, 6: 12, 7: 13, 8: 14, 9: 15, 10: 16, 11: 23, 12: 24, 13: 25, 14: 26, 15: 27, 16: 28, 20: 31, 21: 32, 24: 29, 25: 30 };
+const RTM = { session: null, loading: null, ep: '', norm: null, failed: '', ms: 0, n: 0 };
+function preciseOn(){ try { return localStorage.getItem('aiwm_precise') !== '0'; } catch (e) { return true; } }
+function rtmModelURL(){ const c = window.APP_CONFIG || {}; return c.rtmModel || RTM_URL_DEFAULT; }
+async function fetchModel(url, onStatus){
+  let cache = null; try { cache = await caches.open('aiwm-models-v1'); const hit = await cache.match(url); if (hit) return await hit.arrayBuffer(); } catch (e) {}
+  const r = await fetch(url); if (!r.ok) throw new Error('정밀 모델을 받지 못했어요 (' + r.status + ')');
+  const total = +r.headers.get('content-length') || 0, rd = r.body && r.body.getReader ? r.body.getReader() : null;
+  let buf;
+  if (rd){ const parts = []; let got = 0, last = 0;
+    for (;;){ const { done, value } = await rd.read(); if (done) break; parts.push(value); got += value.length;
+      if (onStatus && Date.now() - last > 300){ last = Date.now(); onStatus(`정밀 골격 모델 받는 중… ${total ? Math.round(got / total * 100) + '%' : Math.round(got / 1048576) + 'MB'} (처음 한 번만)`); } }
+    buf = new Uint8Array(got); let o = 0; for (const p of parts){ buf.set(p, o); o += p.length; } buf = buf.buffer;
+  } else buf = await r.arrayBuffer();
+  try { if (cache) await cache.put(url, new Response(buf.slice(0), { headers: { 'content-type': 'application/octet-stream' } })); } catch (e) {}
+  return buf;
+}
+async function loadRTM(onStatus){
+  if (RTM.session) return RTM.session; if (RTM.loading) return RTM.loading;
+  RTM.loading = (async () => {
+    const gpu = 'gpu' in navigator;
+    const ort = await import(ORT_URL + (gpu ? 'ort.webgpu.min.mjs' : 'ort.wasm.min.mjs'));
+    ort.env.wasm.wasmPaths = ORT_URL; ort.env.wasm.numThreads = (self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 2) : 1);
+    const buf = await fetchModel(rtmModelURL(), onStatus);
+    onStatus && onStatus('정밀 골격 모델 준비 중…');
+    let s = null, err = null;
+    for (const ep of (gpu ? ['webgpu', 'wasm'] : ['wasm'])){
+      try { s = await ort.InferenceSession.create(buf, { executionProviders: [ep], graphOptimizationLevel: 'all' }); RTM.ep = ep; break; } catch (e) { err = e; }
+    }
+    if (!s) throw err || new Error('정밀 모델을 열지 못했어요');
+    RTM.ort = ort; RTM.session = s; RTM.inName = s.inputNames[0]; RTM.out = s.outputNames; RTM.failed = '';
+    window.dispatchEvent(new Event('livecam-model'));
+    return s;
+  })();
+  try { return await RTM.loading; } catch (e) { RTM.failed = String(e && e.message || e); throw e; } finally { RTM.loading = null; }
+}
+let rcv = null, rctx = null;
+const NORMS = { rgb: { m: [123.675, 116.28, 103.53], s: [58.395, 57.12, 57.375], bgr: false }, bgr: { m: [103.53, 116.28, 123.675], s: [57.375, 57.12, 58.395], bgr: true }, raw: { m: [0, 0, 0], s: [255, 255, 255], bgr: false } };
+function rtmTensor(src, W, H, box, norm){
+  if (!rcv){ rcv = document.createElement('canvas'); rcv.width = RTM_IN_W; rcv.height = RTM_IN_H; rctx = rcv.getContext('2d', { willReadFrequently: true }); }
+  rctx.setTransform(1, 0, 0, 1, 0, 0); rctx.fillStyle = '#000'; rctx.fillRect(0, 0, RTM_IN_W, RTM_IN_H);
+  rctx.setTransform(RTM_IN_W / box.w, 0, 0, RTM_IN_H / box.h, -box.x * RTM_IN_W / box.w, -box.y * RTM_IN_H / box.h);
+  rctx.drawImage(src, 0, 0, W, H); rctx.setTransform(1, 0, 0, 1, 0, 0);
+  const d = rctx.getImageData(0, 0, RTM_IN_W, RTM_IN_H).data, n = RTM_IN_W * RTM_IN_H, t = new Float32Array(3 * n), N = NORMS[norm];
+  for (let i = 0, j = 0; i < n; i++, j += 4){ const r = d[j], g = d[j + 1], b = d[j + 2], c0 = N.bgr ? b : r, c2 = N.bgr ? r : b;
+    t[i] = (c0 - N.m[0]) / N.s[0]; t[n + i] = (g - N.m[1]) / N.s[1]; t[2 * n + i] = (c2 - N.m[2]) / N.s[2]; }
+  return new RTM.ort.Tensor('float32', t, [1, 3, RTM_IN_H, RTM_IN_W]);
+}
+function rtmDecode(out, box, W, H){
+  const xs = out[RTM.out.find(n => /x/i.test(n)) || RTM.out[0]], ys = out[RTM.out.find(n => /y/i.test(n)) || RTM.out[1]];
+  const K = xs.dims[1], LX = xs.dims[2], LY = ys.dims[2], rx = LX / RTM_IN_W, ry = LY / RTM_IN_H, kp = [];
+  for (let k = 0; k < K; k++){
+    let bx = 0, vx = -1e9, by = 0, vy = -1e9; const ox = k * LX, oy = k * LY;
+    for (let i = 0; i < LX; i++){ const v = xs.data[ox + i]; if (v > vx){ vx = v; bx = i; } }
+    for (let i = 0; i < LY; i++){ const v = ys.data[oy + i]; if (v > vy){ vy = v; by = i; } }
+    kp.push({ x: (box.x + bx / rx / RTM_IN_W * box.w) / W, y: (box.y + by / ry / RTM_IN_H * box.h) / H, s: Math.min(vx, vy) });
+  }
+  return kp;
+}
+// MediaPipe 결과로 사람 영역을 잡아 RTMPose로 다시 찾기
+async function rtmRefine(src, lm, W, H){
+  if (!RTM.session) return lm;
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const i of [0, 7, 8, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32]){ const p = lm[i]; if (!p) continue; x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); }
+  let cx = (x0 + x1) / 2 * W, cy = (y0 + y1) / 2 * H, bw = (x1 - x0) * W, bh = (y1 - y0) * H;
+  if (!(bw > 4 && bh > 4)) return lm;
+  const ar = RTM_IN_W / RTM_IN_H; if (bw > bh * ar) bh = bw / ar; else bw = bh * ar; bw *= 1.25; bh *= 1.25;
+  const box = { x: cx - bw / 2, y: cy - bh / 2, w: bw, h: bh }, t0 = performance.now();
+  // 처음 한 번: 입력 정규화 방식을 점수로 자동 선택 (모델마다 내보낸 방식이 달라서)
+  if (!RTM.norm){ let best = null;
+    for (const nm of ['rgb', 'bgr', 'raw']){ try { const o = await RTM.session.run({ [RTM.inName]: rtmTensor(src, W, H, box, nm) }); const kp = rtmDecode(o, box, W, H);
+      const sc = kp.slice(0, 17).reduce((a, k) => a + k.s, 0) / 17; if (!best || sc > best.sc) best = { nm, sc }; } catch (e) {} }
+    RTM.norm = best ? best.nm : 'rgb'; }
+  const out = await RTM.session.run({ [RTM.inName]: rtmTensor(src, W, H, box, RTM.norm) });
+  const kp = rtmDecode(out, box, W, H); RTM.ms = RTM.ms * 0.9 + (performance.now() - t0) * 0.1; RTM.n++;
+  const res = lm.map(p => ({ x: p.x, y: p.y, z: p.z, visibility: p.visibility }));
+  for (const [h, m] of Object.entries(H26_TO_MP)){ const k = kp[+h]; if (!k || k.s < 0.3) continue; res[m].x = k.x; res[m].y = k.y; res[m].visibility = Math.max(res[m].visibility || 0, Math.min(1, k.s)); }
+  return res;
+}
+
 // ---------- 흔들림 줄이기 (One Euro 필터) ----------
 // 가만히 있을 때는 강하게, 빠르게 움직일 때는 약하게 걸러서 떨림만 줄이고 동작은 따라감
 function lowpass(a, prev, x){ return prev == null ? x : prev + a * (x - prev); }
@@ -821,6 +907,8 @@ const LiveCam = {
   // 회원이 올린 영상을 한 프레임씩 분석 → 반복마다 가장 깊은 순간의 관절 각도
   async analyzeVideo(file, o = {}){
     await loadModel(o.onStatus);
+    let precise = o.precise != null ? o.precise : preciseOn(), model = 'MediaPipe ' + (loadedKind || 'full');
+    if (precise){ try { await loadRTM(o.onStatus); model = 'RTMPose-m (정밀)'; } catch (e) { precise = false; o.onStatus && o.onStatus('정밀 모델을 쓸 수 없어 기본 모델로 분석해요'); } }
     const video = document.createElement('video'); video.muted = true; video.playsInline = true; video.setAttribute('playsinline', ''); video.preload = 'auto';
     const url = URL.createObjectURL(file); video.src = url;
     await new Promise((res, rej) => { video.onloadeddata = res; video.onerror = () => rej(new Error('영상을 열 수 없어요 (mp4·mov 권장)')); });
@@ -831,7 +919,7 @@ const LiveCam = {
     const smooth = makeSmoother(), det = { hip: makeDetector(30), elbow: makeDetector(40) }, base = performance.now() + 1000;
     const reps = []; let cur = null, lastRepT = -1e9, seen = 0, frames = 0;
     const seek = t => new Promise(res => { const on = () => { video.removeEventListener('seeked', on); res(); }; video.addEventListener('seeked', on); video.currentTime = t; });
-    const step = 1 / (o.fps || 15);
+    const step = 1 / (o.fps || (precise ? 12 : 15));
     for (let t = 0; t < dur; t += step){
       await seek(Math.min(t, dur - 0.01)); frames++;
       const ts = base + t * 1000; let res; try { res = landmarker.detectForVideo(video, ts); } catch (e) { continue; }
@@ -840,7 +928,9 @@ const LiveCam = {
       o.onProgress && o.onProgress(Math.min(1, t / dur));
       if (!poses.length) continue;
       const size = lm => Math.hypot((lm[11].x + lm[12].x - lm[23].x - lm[24].x) / 2, (lm[11].y + lm[12].y - lm[23].y - lm[24].y) / 2);
-      const lm = smooth(poses.reduce((a, b) => size(b) > size(a) ? b : a), ts); seen++;
+      let raw = poses.reduce((a, b) => size(b) > size(a) ? b : a);
+      if (precise){ try { raw = await rtmRefine(video, raw, W, H); } catch (e) { precise = false; model = 'MediaPipe ' + (loadedKind || 'full'); o.onStatus && o.onStatus('정밀 모델 오류 · 기본 모델로 계속 분석해요'); } }
+      const lm = smooth(raw, ts); seen++;
       if (cv) drawSkeleton(ctx, lm, cv.width, cv.height, false);
       const m = metrics(lm, W, H); if (m.vis < 0.4) continue;
       const wasHigh = det.hip.state === 'high' || det.elbow.state === 'high';
@@ -855,7 +945,7 @@ const LiveCam = {
       }
     }
     URL.revokeObjectURL(url);
-    return { reps, aspect: W / H, duration: dur, seenRatio: frames ? seen / frames : 0 };
+    return { reps, aspect: W / H, duration: dur, seenRatio: frames ? seen / frames : 0, model };
   },
   isPreview(){ return !!(this.s && this.s.running && this.s.o.mode === 'preview'); },
   _frame(){
@@ -1030,6 +1120,7 @@ window.LiveCam = LiveCam;
 window.LiveCamNames = CLASS_NAME;
 window.LiveCamCue = CUE;
 window.LiveCamDetectName = detectName;
+window.LiveCamPrecise = { status: () => ({ loaded: !!RTM.session, ep: RTM.ep, norm: RTM.norm, ms: Math.round(RTM.ms), frames: RTM.n, failed: RTM.failed, url: rtmModelURL(), on: preciseOn() }), load: (cb) => loadRTM(cb) };
 window.LiveCamAngles = (lm, aspect) => jointAngles(lm, aspect || 4 / 3, 1);
 window.dispatchEvent(new Event('livecam-ready'));
 
@@ -2133,6 +2224,8 @@ function realAct(act,a){
     case 'realEnd': { const L=window.LiveCam; const p=L&&L.s?L.stop():Promise.resolve(null);
       p.then(res=>{ S.realOn=false; if(res){ res.ts=Date.now(); res.date=new Date().toLocaleDateString('ko-KR'); REAL.result=res; saveSession(res); } go('realReview'); if(res) processSession(res); }); return true; }
     case 'realAI': if(REAL.result){ REAL.result.busy=false; processSession(REAL.result); } return true;
+    case 'preciseT': { try{ localStorage.setItem('aiwm_precise',preciseOnApp()?'0':'1'); }catch(e){} keepScroll(render); toast(preciseOnApp()?'정밀 분석 켬 · 영상 분석이 조금 오래 걸려요':'정밀 분석 끔'); return true; }
+    case 'precisePre': { const P=window.LiveCamPrecise; if(!P) return true; toast('정밀 모델을 받는 중이에요'); P.load(t=>{ const e=document.getElementById('preStat'); if(e) e.textContent=t; }).then(()=>{ toast('정밀 모델 준비 완료'); keepScroll(render); }).catch(e=>{ toast('받지 못했어요 · '+(e&&e.message||'')); keepScroll(render); }); return true; }
     case 'poseKind': try{ localStorage.setItem('aiwm_pose',a.dataset.v); }catch(e){} if(window.LiveCam&&window.LiveCam.preload) window.LiveCam.preload(); keepScroll(render); return true;
     case 'openSession': openSession(a.dataset.id); return true;
     case 'sessAll': S.sessAll=true; keepScroll(render); return true;
@@ -2170,7 +2263,13 @@ function poseStateHTML(){ const ok=window.LiveCam&&window.LiveCam.ready&&window.
 function poseSettingHTML(){ let k='full'; try{ k=localStorage.getItem('aiwm_pose')==='lite'?'lite':'full'; }catch(e){}
   return `<div class="card" style="margin-top:12px"><h3>골격 인식 <span class="r" id="poseState">${poseStateHTML()}</span></h3>
     <div class="seg" role="group" aria-label="골격 모델"><button class="${k==='full'?'on':''}" data-act="poseKind" data-v="full">정확 · 덜 흔들림</button><button class="${k==='lite'?'on':''}" data-act="poseKind" data-v="lite">빠름 · 오래된 폰</button></div>
+    ${preciseRowHTML()}
     <p class="muted" style="margin:8px 0 0;font-size:12.5px;line-height:1.6">휴대폰을 거치대에 고정하고, 옆에서 2~3m, 골반 높이로 세우면 골격이 가장 덜 흔들려요. 밝은 곳, 몸에 붙는 옷이 좋아요.</p></div>`; }
+// 정밀 분석 (RTMPose) : 녹화·업로드 영상의 자세 점수에 사용
+function preciseOnApp(){ try{ return localStorage.getItem('aiwm_precise')!=='0'; }catch(e){ return true; } }
+function preciseRowHTML(){ const st=window.LiveCamPrecise?window.LiveCamPrecise.status():null, on=preciseOnApp();
+  const info=!st?'':st.loaded?`준비됨 · ${st.ep==='webgpu'?'GPU':'CPU'}${st.frames?` · 프레임당 ${st.ms}ms`:''}`:st.failed?`쓸 수 없음 · 기본 모델로 분석`:'처음 분석할 때 한 번 받아요 (약 56MB)';
+  return `<div class="row" style="align-items:center;margin-top:10px;gap:8px"><div class="sp"><b style="font-size:14px">정밀 분석 (RTMPose)</b><div class="muted" style="font-size:12px;line-height:1.45">녹화·올린 영상의 자세 점수를 더 정확한 모델로 계산 · ${info}</div></div><button class="toggle ${on?'on':''}" data-act="preciseT" aria-pressed="${on}" aria-label="정밀 분석"></button></div>`; }
 
 // ---------- AI 인식 (음식 사진 · 인바디 결과지) ----------
 // 사용자가 넣은 API 키로 브라우저에서 바로 호출 (키는 이 기기 브라우저에만 저장)
@@ -3547,7 +3646,7 @@ function uploadResultHTML(res,cls,ref){
     <div class="anal" style="margin-top:10px"><div class="clip" style="aspect-ratio:auto">${lmSVG(best.lm, ref.lm)}<span>${ref.lm?'점선: 수업 때 기준':'가장 깊이 앉은 순간'}</span></div>
     <div>${ref.gold?goldTable(cls,me):`<table class="t" style="font-size:12.5px"><tr><th>관절</th><th>수업</th><th>나</th></tr>${JOINT_LABEL.map(([k,l])=>{ const df=me[k]-R[k], big=k==='hipBack'?Math.abs(df)>0.06:Math.abs(df)>8; return `<tr><td>${l.split(' ')[0]}</td><td>${fmtJ(k,R[k])}</td><td><b style="color:${big?'var(--orange)':'var(--green)'}">${fmtJ(k,me[k])}</b></td></tr>`; }).join('')}</table>`}</div></div>
     <div class="muted" style="font-size:12px;margin:8px 0 4px">반복별</div><div>${perRep.map((f,i)=>`<span class="kw" style="${f.length?'background:var(--orange-soft);color:var(--orange)':''}">${i+1}회 ${f.length?f.map(x=>({depth:'더 앉기',trunk:'상체',hip:'엉덩이',ankle:'발목',knee:'무릎'})[x.k]).join('·'):'좋음'}</span>`).join('')}</div>
-    <p class="muted" style="font-size:12px;margin:8px 0">비교 기준: ${ref.src} · 수업 때 동작과 비교한 안내이며 의학적 판단이 아니에요</p>
+    <p class="muted" style="font-size:12px;margin:8px 0">비교 기준: ${ref.src}${res.model?' · 골격 '+res.model:''} · 수업 때 동작과 비교한 안내이며 의학적 판단이 아니에요</p>
     <div class="row"><button class="btn sm sec" data-act="upReset" style="flex:1">다른 영상 올리기</button><button class="btn sm sec" data-act="upShare" style="flex:1">트레이너에게 보내기</button></div>`;
 }
 async function runUpload(file,name){
@@ -3674,9 +3773,14 @@ const FIG_INK='#334155', FIG_FAR='#CBD5E1', FIG_HI='#F97316';
 const EX_IMG_DIR=(window.APP_CONFIG&&window.APP_CONFIG.exImgDir)||'ex/';
 function exImgName(n){ return String(n||'').trim().replace(/[\\/:*?"<>|]/g,''); }
 // 순서: ex/이름.mp4 (반복 영상) → ex/이름.png → 앱이 그린 막대 인형
+const EX_MISS=new Set();  // 없는 파일은 다시 요청하지 않음
 function figHTML(name,lm){ const n=exImgName(name); if(!n) return `<span class="figwrap">${figSVG(name,null)}</span>`; const b=EX_IMG_DIR+encodeURIComponent(n);
+  if(EX_MISS.has(b+'.png')&&EX_MISS.has(b+'.mp4')) return `<span class="figwrap">${figSVG(name,null)}</span>`;
+  if(EX_MISS.has(b+'.mp4')) return `<span class="figwrap">${figSVG(name,null)}<img class="eximg" src="${b}.png" alt="" loading="lazy" onerror="exImgMiss(this)"></span>`;
   return `<span class="figwrap">${figSVG(name,null)}<video class="eximg" src="${b}.mp4" data-png="${b}.png" autoplay loop muted playsinline preload="metadata" aria-hidden="true" onerror="exFigFallback(this)"></video></span>`; }
-function exFigFallback(v){ const i=document.createElement('img'); i.className='eximg'; i.alt=''; i.onerror=()=>i.remove(); i.src=v.dataset.png; v.replaceWith(i); }
+function exImgMiss(i){ EX_MISS.add(i.getAttribute('src')); i.remove(); }
+function exFigFallback(v){ EX_MISS.add(v.getAttribute('src')); const png=v.dataset.png; if(EX_MISS.has(png)){ v.remove(); return; } const i=document.createElement('img'); i.className='eximg'; i.alt=''; i.onerror=()=>exImgMiss(i); i.src=png; v.replaceWith(i); }
+window.exImgMiss=exImgMiss;
 window.exFigFallback=exFigFallback;
 function figSVG(name,lm,label){
   const kind=poseKind(name), hi=figHi(kind);
@@ -3865,7 +3969,7 @@ async function soloAnalyze(id,i,file,k){ const rec=wlogGet(id); if(!rec) return;
   try{ const res=await window.LiveCam.analyzeVideo(file,{canvas:document.createElement('canvas'),fps:15,onStatus:t=>set(null,t),onProgress:p=>set(p,`${k+1}세트 영상 분석 중… ${Math.round(p*100)}%`),onRep:(r,n)=>set(null,`${k+1}세트 · 반복 ${n}회 찾음`)});
     const reps=res.reps.filter(r=>r.cls===cls||r.cls==='squat'||r.cls==='hinge');
     if(!reps.length){ g.ana={err:res.reps.length?'이 운동과 다른 동작으로 보여요. 옆모습 전신이 나오게 다시 찍어 주세요.':'반복을 찾지 못했어요. 옆에서 2~3m 떨어져 머리부터 발까지 나오게 찍어 주세요.'}; }
-    else { const ref=refFor(cls), f=setForm(cls,reps.map(r=>r.ang),ref); L[k].form=f; if(!L[k].r) L[k].r=reps.length;
+    else { const ref=refFor(cls), f=setForm(cls,reps.map(r=>r.ang),ref); f.src=(f.src||'')+(res.model?' · 골격 '+res.model:''); L[k].form=f; if(!L[k].r) L[k].r=reps.length;
       const best=reps.slice().sort((a,b)=>repScore(cls,b.ang,ref).score-repScore(cls,a.ang,ref).score)[0]; g.best=best&&best.lm||g.best||null;
       g.ana={reps:reps.length,fb:f.fb,src:f.src,cls,me:avgAng(reps.map(r=>r.ang))}; }
   }catch(e){ const m=String(e&&e.message||''); g.ana={err:/fetch|import|network|load/i.test(m)?'골격 모델을 불러오지 못했어요 · 인터넷 연결을 확인하고 다시 올려 주세요':(m||'분석하지 못했어요')}; }
@@ -3939,10 +4043,11 @@ function tDev(){ renderTop('개발자',false); const C=window.APP_CONFIG||{}, ke
   return `<div class="card"><h3>앱 정보</h3><div class="kv">
       <span class="k">빌드</span><span class="v">${window.APP_BUILD===true?'휴대폰 웹앱 (GitHub Pages)':esc(String(window.APP_BUILD||'-'))} · ${new Date(document.lastModified).toLocaleString('ko-KR')}</span>
       <span class="k">AI</span><span class="v">${C.aiProxy?'중계 서버':C.aiKey?'앱에 포함된 키 (시험판)':'없음'} · ${esc(C.aiModel||'')}</span>
-      <span class="k">골격 모델</span><span class="v">${esc(localStorage.getItem('aiwm_pose')||'full')}</span>
+      <span class="k">골격 모델</span><span class="v">실시간 MediaPipe ${esc(localStorage.getItem('aiwm_pose')||'full')} · 영상 분석 ${preciseOnApp()?'RTMPose-m (정밀)':'MediaPipe'}</span>
+      <span class="k">정밀 모델</span><span class="v">${(()=>{ const st=window.LiveCamPrecise&&window.LiveCamPrecise.status(); return !st?'-':st.loaded?`준비됨 · ${st.ep} · 정규화 ${st.norm||'-'} · ${st.frames}프레임 · ${st.ms}ms`:st.failed?'오류: '+esc(st.failed):'아직 안 받음'; })()} <span id="preStat" class="muted"></span></span>
       <span class="k">기기 저장</span><span class="v">${keys.length}개 항목 · ${Math.round(size/1024)}KB <span id="devIdb"></span></span>
       <span class="k">화면</span><span class="v">${innerWidth}×${innerHeight} · ${esc(navigator.userAgent.match(/(iPhone|iPad|Android|Windows|Mac OS X)[^;)]*/)?.[0]||'')}</span></div>
-    ${typeof poseSettingHTML==='function'?poseSettingHTML():''}</div>
+    ${typeof poseSettingHTML==='function'?poseSettingHTML():''}<button class="btn sm sec full" data-act="precisePre" style="margin-top:8px">정밀 모델 미리 받기</button></div>
   <div class="card"><h3>데이터</h3>
     <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn sm sec" data-act="devExport" style="flex:1">기기 데이터 내보내기 (JSON)</button><label class="btn sm sec" style="flex:1;text-align:center">가져오기<input type="file" accept="application/json,.json" id="devImport" hidden></label></div>
     <p class="muted" style="font-size:12px;margin:6px 0 0">영상(IndexedDB)은 내보내기에 포함되지 않아요.</p>

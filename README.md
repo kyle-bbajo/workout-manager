@@ -27,7 +27,7 @@
 
 | 영역 | 내용 |
 |---|---|
-| **마커리스 자세 평가** | MediaPipe Pose(기기에서 실행)로 골격을 뽑아 반복마다 관절 각도를 잽니다. **세트별 자세 점수(0~100)**, 반복별 점수, 고칠 점, 다음 무게 제안. 트레이너 기준 동작이 있으면 그것과, 없으면 **일반 기준(골드 스탠다드)**과 비교합니다. |
+| **마커리스 자세 평가** | 실시간은 MediaPipe Pose, 녹화·올린 영상 분석은 **RTMPose-m 정밀 모델**(기기에서 실행, 발뒤꿈치·발끝 포함)로 골격을 뽑아 반복마다 관절 각도를 잽니다. **세트별 자세 점수(0~100)**, 반복별 점수, 고칠 점, 다음 무게 제안. 트레이너 기준 동작이 있으면 그것과, 없으면 **일반 기준(골드 스탠다드)**과 비교합니다. |
 | **수업 영상 → 운동 기록** | 촬영하면서 말한 내용을 AI(Gemini)가 자막으로 옮기고, 운동별로 이름·중량·기구 세팅(의자·핀·무게·템포)·방법·키워드·이번 회차 배운 점을 정리합니다. 자세 평가·몸풀기도 구간으로 나눕니다. |
 | **운동일지** | 기록지 형식: 회차 원, 운동마다 빨간 세트 원(무게)과 횟수·자세 점수, “최고 무게 \| 1RM \| 자세 점수”, 동작 그림, 내 영상 모음. 세트를 눌러 수정, 운동을 눌러 그 구간 영상 재생. |
 | **혼자 운동 (PT 없이)** | 회원이 직접 운동·세트를 적고, 세트마다 영상을 올리면 자세 점수와 피드백을 받습니다. |
@@ -40,6 +40,17 @@
 ## 운동 그림 · 반복 영상 넣기
 
 `ex/` 폴더에 **운동 이름 그대로** 파일을 넣으면 운동일지 그림 자리에 나옵니다. 우선순위는 `운동 이름.mp4`(소리 없이 반복 재생) → `운동 이름.png` → 앱이 그린 막대 인형입니다. 자세한 규격은 [ex/README.md](ex/README.md).
+
+## 골격 모델
+
+| 용도 | 모델 | 비고 |
+|---|---|---|
+| 실시간 촬영·미리보기 | MediaPipe Pose Landmarker full (lite 선택) | 빠름 |
+| 녹화·올린 영상 분석 (자세 점수) | **RTMPose-m (Halpe26, 256×192)** + ONNX Runtime Web | 더 정확. MediaPipe로 사람 위치를 잡고 그 영역을 RTMPose로 다시 찾음. 처음 한 번 모델 약 56MB + 실행 파일 11~21MB를 받아 기기에 보관. WebGPU가 되면 GPU, 아니면 CPU. 분석은 초당 12프레임 |
+
+- 켜기/끄기: 촬영 화면·개발자 탭의 **정밀 분석 (RTMPose)**. 받을 수 없거나 오류가 나면 자동으로 MediaPipe로 분석합니다.
+- 모델 주소는 `config.js`의 `rtmModel`로 바꿀 수 있습니다(직접 올린 파일 사용 등). 기본은 Hugging Face `pocketpose/onnx-models`의 RTMPose(Apache 2.0).
+- 결과 화면에 어떤 골격 모델로 분석했는지 표시됩니다.
 
 ## 촬영 팁 (자세 평가 정확도)
 
@@ -84,4 +95,6 @@ Settings → Pages → Source: `Deploy from a branch` → Branch: `main` / `(roo
 ## 사용한 오픈소스
 
 - [MediaPipe Tasks Vision](https://github.com/google-ai-edge/mediapipe) — Apache 2.0
+- [RTMPose / MMPose](https://github.com/open-mmlab/mmpose) — Apache 2.0
+- [ONNX Runtime Web](https://github.com/microsoft/onnxruntime) — MIT
 - [Pretendard](https://github.com/orioncactus/pretendard) — SIL Open Font License 1.1

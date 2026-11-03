@@ -288,6 +288,16 @@ input.nm{font:inherit;font-weight:800;font-size:16px;border:none;border-bottom:1
 .dchips button{flex:none;padding:7px 10px;border-radius:12px;border:1px solid var(--line);background:#fff;font-size:12.5px;line-height:1.25;text-align:center}
 .dchips button.on{background:var(--blue);color:#fff;border-color:var(--blue)}
 .dchips button[disabled]{opacity:.4}
+.lvdots{display:inline-flex;gap:3px}.lvdots i{width:8px;height:8px;border-radius:50%;background:#E5E7EB;display:inline-block}.lvdots i.on{background:var(--blue)}
+.focusit{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;width:100%}
+.rp-title{font:inherit;font-size:18px;font-weight:800;border:none;border-bottom:1px dashed #C9CED6;width:100%;padding:2px 0;margin-bottom:4px;background:transparent}
+.rp-sub{font:inherit;font-size:13px;color:var(--ink3);border:none;border-bottom:1px dashed #E5E7EB;width:100%;padding:2px 0;margin-bottom:6px;background:transparent}
+.rp-in{font:inherit;font-size:13px;border:none;border-bottom:1px dashed #D1D5DB;background:transparent;width:100%;padding:3px 0;color:var(--ink)}
+.rp-in.b{font-weight:800}
+.t.rp td{padding:4px 6px}
+.rp-ta{font:inherit;font-size:13.5px;width:100%;border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0 4px;resize:vertical;line-height:1.5}
+.rpf{border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin-bottom:8px}
+.rpf select{min-height:34px;border:1px solid var(--line);border-radius:8px;padding:0 8px;font:inherit;font-size:13px}
 
 .realbtn{display:flex;align-items:center;justify-content:center;gap:8px}
 </style>
@@ -433,10 +443,11 @@ function classify(r){
 }
 const CUE = { squat: '더 앉아요', hinge: '무릎 굽히지 마세요', press: '허리 젖히지 말고 배에 힘', pull: '반동 쓰지 말고 등으로', other: '수업 때 동작처럼 천천히' };
 function judge(cls, r, crit){
-  if (cls === 'squat'){ const ok = r.thighMin <= crit.depth; return { ok, txt: ok ? `깊이 수평 ${r.thighMin > 0 ? '+' : ''}${Math.round(r.thighMin)}° · 상체 ${Math.round(r.trunkMax)}°` : `깊이 부족 · 수평 +${Math.round(r.thighMin)}° (기준 +${crit.depth}°)` }; }
-  if (cls === 'hinge'){ const ok = r.kneePk <= 30; return { ok, txt: ok ? `힙힌지 좋음 · 고관절 ${Math.round(r.hipPk)}° / 무릎 ${Math.round(r.kneePk)}°` : `무릎 굽힘 ${Math.round(r.kneePk)}° · 스쿼트처럼 앉음` }; }
-  if (cls === 'press'){ const ok = r.trunkMin > -8; return { ok, txt: ok ? `머리 위 잠금 · 어깨 ${Math.round(r.shoulderPk)}°` : `허리 젖힘 ${Math.round(-r.trunkMin)}°` }; }
-  if (cls === 'pull'){ const sw = r.trunkMax - r.trunkMin, ok = sw < 12; return { ok, txt: ok ? `상체 고정 · 팔꿈치 ${Math.round(r.elbowPk)}°` : `상체 흔들림 ${Math.round(sw)}° · 반동` }; }
+  // 각도 숫자 대신 '목표 대비 가동범위'와 동작 평가로 표시
+  if (cls === 'squat'){ const ok = r.thighMin <= crit.depth, pct = Math.round((90 - r.thighMin) / (90 - crit.depth) * 100); r.rom = pct; return { ok, txt: ok ? `가동범위 목표의 ${pct}% · 좋음` : `가동범위 목표의 ${pct}% · 더 앉기` }; }
+  if (cls === 'hinge'){ const ok = r.kneePk <= 30; return { ok, txt: ok ? '힙힌지 좋음 · 무릎 개입 적음' : '무릎이 많이 굽음 · 스쿼트처럼 앉음' }; }
+  if (cls === 'press'){ const ok = r.trunkMin > -8; return { ok, txt: ok ? '머리 위 잠금 · 허리 중립' : '허리 젖힘 · 복압 풀림' }; }
+  if (cls === 'pull'){ const sw = r.trunkMax - r.trunkMin, ok = sw < 12; return { ok, txt: ok ? '상체 고정 · 끝까지 당김' : '상체 흔들림 · 반동 사용' }; }
   return { ok: true, txt: '동작 기록 · 기준 동작으로 저장' };
 }
 
@@ -682,7 +693,7 @@ const LiveCam = {
         // trainer judgment: "더 앉아" right after a rep → that rep was too shallow
         const last = S.lastRep;
         if (p.deeper && last && last.cls === 'squat' && performance.now() - last.t < 6000){
-          if (last.ok){ S.crit.depth = Math.min(S.crit.depth, Math.round(last.thighMin) - 2); last.ok = false; last.txt = `트레이너 판단: 더 앉기 · 기준을 수평 +${S.crit.depth}°로 조정`; }
+          if (last.ok){ S.crit.depth = Math.min(S.crit.depth, Math.round(last.thighMin) - 2); last.ok = false; last.txt = '트레이너 판단: 더 앉기 · 목표 깊이를 더 아래로 조정'; }
           else last.txt += ' · 트레이너 “더 앉아요” 일치';
           last.judged = true; if (seg) seg.judged++;
           this._emit('rep', { r: last, seg });
@@ -794,7 +805,7 @@ const squatNotes = [
   {s:'1회차',t:'발 너비는 어깨보다 조금 넓게, 무릎은 발끝 방향'},
   {s:'5회차',t:'내려갈 때 숨 들이마시고 복압 유지'},
   {s:'9회차',t:'엉덩이를 뒤로 먼저 빼며 앉기'},
-  {s:'13회차',t:'허벅지 수평까지, 상체 45° 안팎 유지'},
+  {s:'13회차',t:'허벅지 수평까지, 상체 각도 일정하게 유지'},
 ];
 const depthHist = [{s:1,v:18},{s:5,v:12},{s:9,v:6},{s:13,v:2},{s:17,v:-2}];
 
@@ -983,7 +994,8 @@ function stopSim(){ stopReal(); if(sim){cancelAnimationFrame(sim.raf); sim=null;
 function repAnalysis(key, peak){
   if(key==='squat'){
     const ok=peak.thigh<=S.criteria.depth;
-    return {ok, txt: ok? `깊이 수평 ${peak.thigh>0?'+':''}${Math.round(peak.thigh)}° · 상체 ${Math.round(peak.trunk)}°` : `깊이 부족 · 수평 +${Math.round(peak.thigh)}° (기준 +${S.criteria.depth}°)`};
+    const pct=Math.round((90-peak.thigh)/(90-S.criteria.depth)*100);
+    return {ok, txt: ok? `가동범위 목표의 ${pct}% · 좋음` : `가동범위 목표의 ${pct}% · 더 앉기`};
   }
   if(key!=='squat' && !repAnalysis.detail){
     const bad = key==='rdl'? peak.knee>25 : key==='row'? (peak.tMax-peak.tMin)>=10 : peak.tMin<0;
@@ -991,14 +1003,14 @@ function repAnalysis(key, peak){
   }
   if(key==='rdl'){
     const ok=peak.knee<=25;
-    return {ok, txt: ok? `힙힌지 좋음 · 고관절 ${Math.round(peak.hip)}° / 무릎 ${Math.round(peak.knee)}°` : `무릎 굽힘 과다 ${Math.round(peak.knee)}° · 스쿼트처럼 앉음`};
+    return {ok, txt: ok? '힙힌지 좋음 · 무릎 개입 적음' : '무릎이 많이 굽음 · 스쿼트처럼 앉음'};
   }
   if(key==='row'){
     const swing=peak.tMax-peak.tMin, ok=swing<10;
-    return {ok, txt: ok? `상체 고정 · 팔 당김 ${Math.round(peak.sig1)}°` : `상체 들림 ${Math.round(swing)}° · 반동 사용`};
+    return {ok, txt: ok? '상체 고정 · 끝까지 당김' : '상체가 들림 · 반동 사용'};
   }
   const ok=peak.tMin>=0;
-  return {ok, txt: ok? `머리 위 잠금 · 어깨 ${Math.round(peak.sig1)}° · 허리 중립` : `허리 젖힘 ${Math.round(-peak.tMin)}° · 복압 풀림`};
+  return {ok, txt: ok? '머리 위 잠금 · 허리 중립' : '허리 젖힘 · 복압 풀림'};
 }
 function startClassSim(){
   stopSim();
@@ -1184,9 +1196,9 @@ const CAL={
   plan:{'2026-11-04':'18:00','2026-11-06':'10:00','2026-11-10':'10:00'},
 };
 const DAY={
-  '2026-11-03':{t:'PT 17회차 · 측정 촬영',rows:[['스쿼트','60kg · 10·10·8회','깊이 수평 −4°'],['루마니안 데드리프트','40kg · 5회','기준 동작 저장'],['덤벨 로우','14kg · 4회','기준 동작 저장'],['오버헤드 프레스','25kg · 4회','기준 동작 저장']],kw:['깊이 수평 아래','더 앉기','힙힌지','반동 금지']},
+  '2026-11-03':{t:'PT 17회차 · 측정 촬영',rows:[['스쿼트','60kg · 10·10·8회','가동범위 +5%'],['루마니안 데드리프트','40kg · 5회','기준 동작 저장'],['덤벨 로우','14kg · 4회','기준 동작 저장'],['오버헤드 프레스','25kg · 4회','기준 동작 저장']],kw:['깊이 수평 아래','더 앉기','힙힌지','반동 금지']},
   '2026-11-02':{t:'혼자 운동 · 32분',rows:[['스쿼트','맨몸 15회 × 3','일치도 88%'],['루마니안 데드리프트','20kg 10회 × 3','일치도 91%']],kw:['깊이 수평까지']},
-  '2026-11-01':{t:'PT 16회차 · 측정 촬영',rows:[['스쿼트','55kg · 10·10·10회','깊이 수평 +2°'],['벤치프레스','30kg · 10회 × 3','기준 동작 저장']],kw:['흉추 들기','견갑 고정']},
+  '2026-11-01':{t:'PT 16회차 · 측정 촬영',rows:[['스쿼트','55kg · 10·10·10회','가동범위 +3%'],['벤치프레스','30kg · 10회 × 3','기준 동작 저장']],kw:['흉추 들기','견갑 고정']},
 };
 function ymd(y,m,d){return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');}
 function calendar(){
@@ -1257,7 +1269,7 @@ function sparkline(){
     <line x1="${pad}" x2="${W-pad}" y1="${y(0)}" y2="${y(0)}" stroke="#9CA3AF" stroke-dasharray="4 4"/>
     <text x="${W-pad}" y="${y(0)-5}" font-size="10" fill="#6B7280" text-anchor="end">허벅지 수평</text>
     <path d="${path}" fill="none" stroke="#1D4ED8" stroke-width="2.5"/>
-    ${depthHist.map((d,i)=>`<circle cx="${xs[i]}" cy="${y(d.v)}" r="4" fill="${i===depthHist.length-1?'#1D4ED8':'#fff'}" stroke="#1D4ED8" stroke-width="2"/><text x="${xs[i]}" y="${y(d.v)-9}" font-size="10.5" fill="#111827" text-anchor="middle">${d.v>0?'+':''}${d.v}°</text><text x="${xs[i]}" y="${H-6}" font-size="10" fill="#6B7280" text-anchor="middle">${d.s}회</text>`).join('')}
+    ${depthHist.map((d,i)=>`<circle cx="${xs[i]}" cy="${y(d.v)}" r="4" fill="${i===depthHist.length-1?'#1D4ED8':'#fff'}" stroke="#1D4ED8" stroke-width="2"/><text x="${xs[i]}" y="${y(d.v)-9}" font-size="10.5" fill="#111827" text-anchor="middle">${(r=>(r>0?'+':'')+r)(Math.round((romOf(d.v)/romOf(depthHist[0].v)-1)*100))}%</text><text x="${xs[i]}" y="${H-6}" font-size="10" fill="#6B7280" text-anchor="middle">${d.s}회</text>`).join('')}
   </svg>`;
 }
 function tMemberDetail(id){
@@ -1281,7 +1293,7 @@ function tMemberDetail(id){
     <div class="row" style="margin-top:12px"><button class="btn sm ghost" data-act="recalib">정답 동작으로 기준 다시 잡기</button></div>
     <div id="calibMsg" class="muted" style="margin-top:8px"></div>
   </div>
-  <div class="card"><h3>깊이 변화<span class="r">회차별 최저점</span></h3>${sparkline()}<p class="muted" style="margin:6px 0 0">1회차보다 20° 더 내려갑니다. 리포트에 자동으로 들어갑니다.</p></div>
+  <div class="card"><h3>깊이 변화<span class="r">회차별 최저점</span></h3>${sparkline()}<p class="muted" style="margin:6px 0 0">1회차보다 가동범위가 ${romGain().total}% 늘었어요 (지난주보다 +${romGain().week}%). 리포트에 자동으로 들어갑니다.</p></div>
   <div class="card"><h3>운동별 코칭 누적 · 스쿼트</h3><div class="timeline">${squatNotes.map(n=>`<div class="it"><b>${n.s}</b><span class="muted">${n.t}</span></div>`).join('')}</div></div>
   <div class="card"><h3>혼자 해도 됨 (승인)</h3>${Object.keys(S.soloOk).map(k=>`<div class="row" style="padding:4px 0"><span class="sp">${k}</span><button class="toggle ${S.soloOk[k]?'on':''}" data-act="soloToggle" data-k="${k}" aria-label="${k} 혼자 연습 승인" aria-pressed="${S.soloOk[k]}"></button></div>`).join('')}<p class="muted" style="margin:8px 0 0">승인한 운동만, 지난 수업 중량 범위 안에서 회원에게 추천합니다.</p></div>
   <div class="card"><h3>식단 확인</h3>
@@ -1305,7 +1317,7 @@ function tLive(){
       <div class="hud"><span class="chip ok">전신 인식 OK</span><span class="chip">측면 각도 OK</span></div></div>
     ${window.APP_BUILD?`<button class="recbtn" data-act="realStart" aria-label="카메라로 측정 촬영 시작"><i></i><span>촬영 시작</span></button><button class="btn ghost full" data-act="recStart" style="margin-top:6px">카메라 없이 시연 보기</button>${poseSettingHTML()}`:`<button class="recbtn" data-act="recStart" aria-label="측정 촬영 시작"><i></i><span>촬영 시작</span></button><button class="btn sec full realbtn" data-act="realStart" style="margin-top:6px">${I.cam||''}실제 카메라로 촬영 (휴대폰 웹앱)</button>`}
     <p class="muted" style="text-align:center;margin:6px 0 0;line-height:1.6">누르면 측정 영상 촬영이 시작됩니다.<br>운동 종류·관절 각도·코칭 멘트가 운동별로 자동 정리됩니다.</p>
-    <div class="cue" style="margin-top:14px"><b>지난 코칭 · 이 회원</b><span class="kw">#깊이 수평까지</span><span class="kw">#상체 45°</span><span class="kw">#엉덩이 뒤로</span></div>
+    <div class="cue" style="margin-top:14px"><b>지난 코칭 · 이 회원</b><span class="kw">#깊이 수평까지</span><span class="kw">#상체 각도 유지</span><span class="kw">#엉덩이 뒤로</span></div>
     <div class="card" style="margin-top:12px"><h3>분석하는 운동</h3><div class="muted" style="font-size:12.5px;line-height:1.7"><b style="color:var(--ink)">하체</b> 스쿼트 · 런지 · 스플릿 스쿼트 · 레그프레스<br><b style="color:var(--ink)">힙힌지</b> 데드리프트 · 루마니안 데드리프트 · 힙 쓰러스트<br><b style="color:var(--ink)">당기기</b> 덤벨·바벨 로우 · 랫풀다운 · 풀업<br><b style="color:var(--ink)">밀기</b> 오버헤드 프레스 · 푸시업 · 벤치프레스(측면 거치)<br><b style="color:var(--ink)">트레이너 동작</b> 시연 3회로 등록한 커스텀 동작</div></div>`;
   }
   return `
@@ -1327,12 +1339,12 @@ function tLive(){
   <p class="foot">시연용 동작 재현 · 실제 앱은 카메라로 실시간 분석</p>`;
 }
 const FIND={
-  squat:[['깊이','수평 −4°','ok'],['상체 기울기','41°','ok'],['움직임 순서','고관절 먼저','ok'],['지난주 대비','6° 더 깊게','up']],
-  rdl:[['고관절 굴곡','86°','ok'],['무릎 굴곡','16°','ok'],['4회째','무릎 과다 36°','warn'],['바 경로','몸에 붙음','ok']],
-  row:[['팔 당김','80°','ok'],['상체 각도','63° 유지','ok'],['3회째','반동 22°','warn'],['좌우 차이','측면 촬영 · 다음 정면','up']],
-  press:[['어깨 굴곡','180° 잠금','ok'],['허리','중립','ok'],['4회째','허리 젖힘 10°','warn'],['바 경로','머리 위 수직','ok']],
+  squat:[['가동범위','지난주보다 +5%','up'],['무게중심','발 중앙 유지','ok'],['움직임 순서','고관절 먼저','ok'],['오늘 핵심','흉추 펴고 앉기','up']],
+  rdl:[['힙힌지','엉덩이 뒤로 먼저','ok'],['무릎','거의 편 채 유지','ok'],['4회째','무릎이 굽어 스쿼트처럼','warn'],['바 경로','몸에 붙음','ok']],
+  row:[['당김','끝까지','ok'],['상체','고정','ok'],['3회째','반동 사용','warn'],['좌우 차이','다음 수업 정면 촬영','up']],
+  press:[['잠금','머리 위 완전','ok'],['허리','중립','ok'],['4회째','허리 젖힘','warn'],['바 경로','머리 위 수직','ok']],
 };
-const JUDGE={squat:'트레이너 “더 앉아” 2회 = 측정 깊이 부족 2회 → 혜원 깊이 기준(+5°) 확정',rdl:'트레이너 “무릎 굽히지 마” = 무릎 36° 반복 → 무릎 25° 이하를 기준으로',row:'트레이너 “반동 쓰지 마” = 상체 들림 22° 반복 → 상체 변화 10° 이하를 기준으로',press:'트레이너 “허리 젖히지 마” = 허리 젖힘 10° 반복 → 허리 중립을 기준으로'};
+const JUDGE={squat:'트레이너 “더 앉아” 2회 = 가동범위가 부족한 반복 2회 → 혜원 목표 깊이로 확정',rdl:'트레이너 “무릎 굽히지 마” = 무릎이 굽은 반복 → 무릎을 거의 편 동작을 기준으로',row:'트레이너 “반동 쓰지 마” = 상체가 들린 반복 → 상체 고정을 기준으로',press:'트레이너 “허리 젖히지 마” = 허리가 젖혀진 반복 → 허리 중립을 기준으로'};
 const REFJ={rdl:'트레이너가 “무릎 굽히지 마”라고 한 반복은 빼고, 나머지를 기준 동작으로 저장',row:'트레이너가 “반동 쓰지 마”라고 한 반복은 빼고, 나머지를 기준 동작으로 저장',press:'트레이너가 “허리 젖히지 마”라고 한 반복은 빼고, 나머지를 기준 동작으로 저장'};
 function reviewExercise(i){
   const s=SESSION[i], rec=(S.rec&&S.rec.segs[i])||{reps:[],kws:[],w:null};
@@ -1364,7 +1376,7 @@ function tReview(){
   <div class="seg" role="group" aria-label="보기 방식" style="margin-bottom:12px"><button class="${S.viewMode!=='video'?'on':''}" data-act="viewMode" data-v="skel">골격만 보기</button><button class="${S.viewMode==='video'?'on':''}" data-act="viewMode" data-v="video">영상 + 골격 (얼굴 흐림)</button></div>
   ${SESSION.map((_,i)=>reviewExercise(i)).join('')}
   <div class="card" style="border-color:#F5C77E"><h3>확인 필요 1건<span class="pill p-orange" style="margin-left:auto">AI 확신 낮음</span></h3>
-    <div style="font-size:13.5px;line-height:1.5">루마니안 데드리프트 1세트 4회째: 무릎이 36° 굽어 스쿼트 패턴에 가깝습니다.</div>
+    <div style="font-size:13.5px;line-height:1.5">루마니안 데드리프트 1세트 4회째: 무릎이 많이 굽어 스쿼트 패턴에 가깝습니다.</div>
     <div class="row" style="margin-top:10px" id="confirmRow"><button class="btn sm" data-act="conf" data-v="in">자세 주의로 표시</button><button class="btn sm sec" data-act="conf" data-v="out">기록에서 제외</button></div>
   </div>
   <div class="card"><h3>숙제</h3><div><span class="kw">#맨몸 스쿼트 15×3</span><span class="kw">#깊이 수평 아래</span><span class="kw">#힙힌지 벽 터치 10×3</span></div>
@@ -1377,7 +1389,7 @@ function tKakao(){
   const kw=i=>{const s=SESSION[i], rec=(S.rec&&S.rec.segs[i]); const ks=(rec&&rec.kws.length?rec.kws:s.voice.filter(v=>v.kw).flatMap(v=>v.kw)).filter(k=>!(S.kwRemoved||{})[k]); return ks.map(k=>'#'+k).join(' ');};
   return `<div class="msg-wrap"><div class="bubble">
     <div class="h">[11/3 수업] 혜원님 17회차</div>
-    <b>스쿼트</b> 60kg · 깊이 수평 −4° (지난주보다 6° 깊게)<br>${kw(0)}<br><br>
+    <b>스쿼트</b> 60kg · 가동범위 지난주보다 +${romGain().week}% · 오늘 핵심 흉추 펴고 앉기 · 스쿼트 스킬 ${skillOf('hw')?skillOf('hw').label:''}<br>${kw(0)}<br><br>
     <b>루마니안 데드리프트</b> 40kg · 힙힌지 좋음, 1회 무릎 주의<br>${kw(1)}<br><br>
     <b>덤벨 로우</b> 14kg · 상체 고정, 1회 반동<br>${kw(2)}<br><br>
     <b>오버헤드 프레스</b> 25kg · 잠금 좋음, 1회 허리 젖힘<br>${kw(3)}<br><br>
@@ -1405,7 +1417,7 @@ function tSettle(){
   <button class="btn sec full" data-act="copySettle">센터 제출용 내역 복사</button>
   <p class="foot">계산과 내역 관리만 합니다 · 실제 지급은 센터에서</p>`;
 }
-function reReportModal(){
+function reReportModalDemo(){
   return `<div class="modal" data-act="closeModal"><div class="sheet" role="dialog" aria-label="재등록 리포트" data-stop="1">
     <h2>혜원님 20회 성과 요약</h2><p class="muted" style="margin:0 0 12px">10월 1일 – 11월 3일 · 상담 자료</p>
     <table class="t"><tr><th>항목</th><th>처음</th><th>지금</th></tr>
@@ -1425,7 +1437,7 @@ function lockCard(reason){
 }
 function mNotes(){
   renderTop('운동 노트',false);
-  return `<div class="card"><h3>스쿼트<span class="r">배운 운동 · 13회 기록</span></h3>${sparkline()}<p class="muted" style="margin:6px 0 10px">처음보다 20° 더 깊게 앉고 있어요.</p>
+  return `<div class="card"><h3>스쿼트<span class="r">배운 운동 · 13회 기록</span></h3>${sparkline()}<p class="muted" style="margin:6px 0 10px">처음보다 가동범위가 ${romGain().total}% 늘었어요 · 스쿼트 스킬 ${skillOf('hw')?skillOf('hw').label:''}</p>${memberFocusView('hw')}
     <div class="timeline">${squatNotes.map(n=>`<div class="it"><b>${n.s}</b><span class="muted">${n.t}</span></div>`).join('')}</div></div>
   <div class="card"><h3>벤치프레스<span class="r">배운 운동</span></h3><div class="timeline"><div class="it"><b>3회차</b><span class="muted">견갑(어깨뼈)을 모으고 내린 채 고정</span></div><div class="it"><b>7회차</b><span class="muted">발로 바닥을 밀고 엉덩이는 벤치에</span></div><div class="it"><b>11회차</b><span class="muted">흉추를 조금 더 들어 가슴으로 받기</span></div></div></div>
   <div class="card"><h3>수업 리포트</h3>${['11월 1일 · 16회차','10월 30일 · 15회차','10월 27일 · 14회차'].map(t=>`<div class="list-item"><span class="sp">${t}</span><span class="muted">보기</span></div>`).join('')}</div>`;
@@ -2207,6 +2219,7 @@ function memberCard(m){
     <div class="kv" style="margin-top:8px"><span class="k">총 계약</span><span class="v">${contractTotal(m)}회 · ${won(m.contracts.reduce((x,c)=>x+(+c.amount||0),0))}</span><span class="k">결제</span><span class="v">${[...new Set(m.contracts.map(c=>c.pay))].join(', ')}</span></div>`:'<p class="muted" style="margin:8px 0 0">계약 기록이 없어요.</p>'}
     <button class="btn sm ${left<=3?'':'sec'} full" data-act="cfNew" data-id="${m.id}" style="margin-top:10px">${I.plus} 계약 추가 (재등록)</button></div>
   <div class="card"><h3>예정된 수업<span class="r">${up.length}개</span></h3>${up.length?up.map(x=>`<button class="list-item" data-act="schedEdit" data-id="${x.id}"><b style="width:96px">${mdLabel(x.date)}</b><span class="sp">${x.time} · ${x.dur}분${x.note?' · '+esc(x.note):''}</span><span class="muted">›</span></button>`).join(''):'<p class="muted" style="margin:0">예정된 수업이 없어요.</p>'}</div>
+  ${focusCard(m.id)}<button class="btn sec full" data-act="reReport" data-m="${m.id}" style="margin-bottom:12px">재등록 리포트 보기·고치기</button>
   ${signCard(m.id)}${signHistory(m.id)}
   ${m.custom?`<button class="btn ghost full" data-act="memDel" data-id="${m.id}" style="color:var(--red)">회원 삭제</button>`:'<p class="foot">예시 회원입니다 · 혜원 회원에서 전체 상세 화면을 볼 수 있어요</p>'}`;
 }
@@ -2602,6 +2615,103 @@ function handleReqHash(){
 handleReqHash();
 window.addEventListener('hashchange',()=>{ if(handleReqHash()) render(); });
 
+// ---------- 수업 핵심 포인트(커리큘럼) · 가동범위 · 재등록 리포트(수정 가능) ----------
+const LEVELS=['','처음 배움','익히는 중','혼자 가능','무게 올려도 유지','숙련'];
+const FOCUS_DEF={hw:[
+  {n:1,focus:'힙힌지',level:4,note:'엉덩이를 뒤로 빼며 앉는 순서가 자리 잡음'},
+  {n:2,focus:'무게중심 이동',level:3,note:'발 중앙에 무게 두기 · 뒤꿈치 들림 줄어듦'},
+  {n:3,focus:'스쿼트 종류 다양화',level:3,note:'고블릿 → 박스 → 스플릿 스쿼트로 확장'},
+  {n:4,focus:'흉추 가동성에 따른 스쿼트 변화',level:2,note:'흉추를 펴면 상체가 덜 숙여짐 · 계속 연습'},
+]};
+function focusAll(){ return Object.assign({},FOCUS_DEF,LS.get('aiwm_focus',{})); }
+function focusOf(mid){ return (focusAll()[mid]||[]).slice().sort((a,b)=>a.n-b.n); }
+function saveFocus(mid,L){ const all=LS.get('aiwm_focus',{}); all[mid]=L; LS.set('aiwm_focus',all); }
+function dots(l){ return `<span class="lvdots" aria-label="${LEVELS[l]||''}">${[1,2,3,4,5].map(i=>`<i class="${i<=l?'on':''}"></i>`).join('')}</span>`; }
+// 스쿼트 스킬 종합: 핵심 포인트 단계의 평균
+function skillOf(mid){ const L=focusOf(mid); if(!L.length) return null; const avg=L.reduce((a,x)=>a+(+x.level||0),0)/L.length; return {avg:Math.round(avg*10)/10,label:LEVELS[Math.round(avg)]||''}; }
+// 가동범위: 허벅지가 내려간 정도(서 있을 때 0 → 허벅지 수평 90)를 1회차 대비 %로
+function romOf(v){ return 90-v; }
+function romGain(){ const f=romOf(depthHist[0].v), l=romOf(depthHist[depthHist.length-1].v), p=romOf(depthHist[depthHist.length-2].v);
+  return {total:Math.round((l/f-1)*100), week:Math.round((l/p-1)*100), firstS:depthHist[0].s, lastS:depthHist[depthHist.length-1].s}; }
+function focusCard(mid){
+  const L=focusOf(mid), sk=skillOf(mid);
+  return `<div class="card"><h3>수업 핵심 포인트<span class="r">${sk?'스킬 종합 '+sk.label:''}</span></h3>
+    ${L.length?`<div class="timeline">${L.map(x=>`<button class="it focusit" data-act="focusEdit" data-m="${mid}" data-n="${x.n}"><b>${x.n}회차 · ${esc(x.focus)}</b><span class="row" style="align-items:center;gap:8px">${dots(x.level)}<span class="muted" style="font-size:12px">${LEVELS[x.level]||''}</span></span>${x.note?`<span class="muted">${esc(x.note)}</span>`:''}</button>`).join('')}</div>`:'<p class="muted" style="margin:0 0 8px">회차마다 가르친 핵심을 남기면 리포트에 단계별로 들어가요.</p>'}
+    <button class="btn sm sec full" data-act="focusNew" data-m="${mid}" style="margin-top:8px">${I.plus} 핵심 포인트 추가</button></div>`;
+}
+function focusSheet(mid,x){
+  const f=x||{n:(focusOf(mid).slice(-1)[0]||{n:0}).n+1,focus:'',level:2,note:''};
+  return `<div class="modal" id="focusModal"><div class="sheet" role="dialog" aria-label="수업 핵심 포인트">
+    <h2>${x?'핵심 포인트 수정':'핵심 포인트 추가'}</h2><p class="muted" style="margin:0 0 12px">그 수업에서 가르친 핵심과 지금 단계를 남겨요.</p>
+    <div class="grid2"><label class="field"><span>회차</span><input type="number" id="ffN" min="1" value="${f.n}"></label>
+      <label class="field"><span>단계</span><select id="ffL">${[1,2,3,4,5].map(i=>`<option value="${i}" ${+f.level===i?'selected':''}>${i} · ${LEVELS[i]}</option>`).join('')}</select></label></div>
+    <label class="field"><span>핵심 포인트</span><input type="text" id="ffF" value="${esc(f.focus)}" placeholder="예: 무게중심 이동" list="focusPresets"></label>
+    <datalist id="focusPresets">${['힙힌지','무게중심 이동','스쿼트 종류 다양화','흉추 가동성에 따른 스쿼트 변화','호흡·복압','무릎 정렬','발 너비·각도','템포 조절','한 발 동작'].map(t=>`<option value="${t}">`).join('')}</datalist>
+    <label class="field"><span>코멘트 (선택)</span><input type="text" id="ffNote" value="${esc(f.note||'')}" placeholder="예: 뒤꿈치 들림 줄어듦"></label>
+    <div class="row"><button class="btn" data-act="focusSave" data-m="${mid}" data-old="${x?x.n:''}" style="flex:1">저장</button>${x?`<button class="btn sec" data-act="focusDel" data-m="${mid}" data-n="${x.n}" style="color:var(--red)">삭제</button>`:''}<button class="btn sec" data-act="focusClose">닫기</button></div></div></div>`;
+}
+// 재등록 리포트: 자동으로 채우고, 트레이너가 고쳐서 저장·전송
+function reportDefault(mid){
+  const m=members.find(x=>x.id===mid)||members[0], g=romGain(), sk=skillOf(mid), ib=S.inbody;
+  return {title:`${m.name}님 ${m.total}회 성과 요약`, period:'10월 1일 – '+todayLabel(),
+    rows:[['체지방률','31.8%',ib.pbf+'%'],['골격근량','21.6kg',ib.smm+'kg'],['스쿼트 가동범위',`${g.firstS}회차 기준`,`+${g.total}% (지난주보다 +${g.week}%)`],['스쿼트 중량','20kg','60kg'],['출석 · 숙제',`${m.done}/${m.done}회 출석`,'숙제 82%']],
+    skill:sk?Math.round(sk.avg):3, skillNote:'힙힌지와 무게중심은 혼자서도 안정적이에요. 흉추를 펴는 연습을 더하면 무게를 올려도 자세가 유지될 단계예요.',
+    focus:focusOf(mid).map(x=>({n:x.n,focus:x.focus,level:x.level,note:x.note})),
+    comment:'처음보다 앉는 깊이가 확실히 늘었고, 동작 순서가 자리 잡았어요.',
+    next:'체지방률 24%까지 지금 속도로 약 12주. 다음 단계는 템포 조절과 한 발 동작입니다.'};
+}
+function reportOf(mid){ const saved=(LS.get('aiwm_report',{})||{})[mid]; return saved||reportDefault(mid); }
+function reReportModal(){
+  const mid=S.reportMid||'hw', r=reportOf(mid), saved=!!(LS.get('aiwm_report',{})||{})[mid];
+  return `<div class="modal"><div class="sheet" role="dialog" aria-label="재등록 리포트">
+    <input class="rp-title" id="rpTitle" value="${esc(r.title)}" aria-label="리포트 제목">
+    <input class="rp-sub" id="rpPeriod" value="${esc(r.period)}" aria-label="기간">
+    <p class="muted" style="margin:0 0 10px;font-size:12px">${saved?'저장된 리포트 · ':''}모든 칸을 눌러 고칠 수 있어요</p>
+    <table class="t rp"><tr><th>항목</th><th>처음</th><th>지금</th></tr>${r.rows.map((row,i)=>`<tr>${row.map((c,j)=>`<td><input class="rp-in${j===2?' b':''}" data-rp="${i}-${j}" value="${esc(c)}"></td>`).join('')}</tr>`).join('')}</table>
+    <div class="secttl" style="margin-top:14px">스쿼트 스킬 종합</div>
+    <div class="row" style="align-items:center;gap:8px"><select id="rpSkill" style="flex:1;min-height:40px;border:1px solid var(--line);border-radius:10px;padding:0 10px">${[1,2,3,4,5].map(i=>`<option value="${i}" ${+r.skill===i?'selected':''}>${i}단계 · ${LEVELS[i]}</option>`).join('')}</select>${dots(+r.skill)}</div>
+    <textarea class="rp-ta" id="rpSkillNote" rows="2">${esc(r.skillNote)}</textarea>
+    <div class="secttl">수업 핵심 포인트별 변화</div>
+    ${r.focus.length?r.focus.map((f,i)=>`<div class="rpf"><b>${f.n}회차 · <input class="rp-in" data-rf="${i}-focus" value="${esc(f.focus)}" style="width:70%"></b>
+      <div class="row" style="align-items:center;gap:8px;margin-top:4px"><select data-rf="${i}-level">${[1,2,3,4,5].map(k=>`<option value="${k}" ${+f.level===k?'selected':''}>${k} · ${LEVELS[k]}</option>`).join('')}</select></div>
+      <input class="rp-in" data-rf="${i}-note" value="${esc(f.note||'')}" placeholder="코멘트"></div>`).join(''):'<p class="muted">회원 화면의 ‘수업 핵심 포인트’를 추가하면 여기에 들어가요.</p>'}
+    <div class="secttl">트레이너 총평</div><textarea class="rp-ta" id="rpComment" rows="3">${esc(r.comment)}</textarea>
+    <div class="secttl">다음 목표</div><textarea class="rp-ta" id="rpNext" rows="2">${esc(r.next)}</textarea>
+    <div class="row" style="margin-top:12px"><button class="btn" data-act="rpSave" style="flex:1">저장</button><button class="btn sec" data-act="rpShare" style="flex:1">카카오톡으로 보내기</button></div>
+    <div class="row" style="margin-top:8px"><button class="btn sm ghost" data-act="rpReset" style="flex:1">자동 내용으로 되돌리기</button><button class="btn sm sec" data-act="closeModal" style="flex:1">닫기</button></div></div></div>`;
+}
+function readReport(){
+  const mid=S.reportMid||'hw', r=JSON.parse(JSON.stringify(reportOf(mid)));
+  r.title=$('#rpTitle').value; r.period=$('#rpPeriod').value;
+  document.querySelectorAll('[data-rp]').forEach(e=>{ const [i,j]=e.dataset.rp.split('-').map(Number); r.rows[i][j]=e.value; });
+  r.skill=+$('#rpSkill').value; r.skillNote=$('#rpSkillNote').value;
+  document.querySelectorAll('[data-rf]').forEach(e=>{ const [i,k]=e.dataset.rf.split('-'); r.focus[+i][k]=k==='level'?+e.value:e.value; });
+  r.comment=$('#rpComment').value; r.next=$('#rpNext').value; return r;
+}
+function reportText(r){
+  return `[${r.title}]\n${r.period}\n\n`+r.rows.map(x=>`· ${x[0]}: ${x[1]} → ${x[2]}`).join('\n')+
+    `\n\n스쿼트 스킬: ${r.skill}단계 (${LEVELS[r.skill]})\n${r.skillNote}\n\n수업 핵심 포인트\n`+r.focus.map(f=>`${f.n}회차 ${f.focus} — ${LEVELS[f.level]}${f.note?' · '+f.note:''}`).join('\n')+
+    `\n\n${r.comment}\n\n다음 목표: ${r.next}`;
+}
+function focusAct(act,a){
+  switch(act){
+    case 'focusNew': $('#modalRoot').innerHTML=focusSheet(a.dataset.m,null); return true;
+    case 'focusEdit': { const x=focusOf(a.dataset.m).find(f=>f.n===+a.dataset.n); $('#modalRoot').innerHTML=focusSheet(a.dataset.m,x); return true; }
+    case 'focusClose': $('#modalRoot').innerHTML=''; return true;
+    case 'focusSave': { const mid=a.dataset.m, n=Math.max(1,parseInt($('#ffN').value,10)||1), focus=($('#ffF').value||'').trim(); if(!focus){ toast('핵심 포인트를 넣어 주세요'); return true; }
+      let L=focusOf(mid).filter(f=>f.n!==+a.dataset.old&&f.n!==n); L.push({n,focus,level:+$('#ffL').value,note:($('#ffNote').value||'').trim()}); saveFocus(mid,L.sort((x,y)=>x.n-y.n));
+      $('#modalRoot').innerHTML=''; keepScroll(render); toast('핵심 포인트를 저장했어요 · 리포트에 반영돼요'); return true; }
+    case 'focusDel': { const mid=a.dataset.m; saveFocus(mid,focusOf(mid).filter(f=>f.n!==+a.dataset.n)); $('#modalRoot').innerHTML=''; keepScroll(render); return true; }
+    case 'reReport': S.reportMid=a.dataset.m||(S.sub==='member'?S.subArg:'hw'); modal='re'; render(); return true;
+    case 'rpSave': { const all=LS.get('aiwm_report',{})||{}; all[S.reportMid||'hw']=readReport(); LS.set('aiwm_report',all); toast('리포트를 저장했어요'); return true; }
+    case 'rpShare': { const r=readReport(); const all=LS.get('aiwm_report',{})||{}; all[S.reportMid||'hw']=r; LS.set('aiwm_report',all); const t=reportText(r);
+      if(navigator.share) navigator.share({text:t}).catch(()=>{}); else { try{ navigator.clipboard.writeText(t).then(()=>toast('리포트를 복사했어요 · 카카오톡에 붙여 넣으세요'),()=>toast('복사가 막혀 있어요')); }catch(e){ toast('복사가 막혀 있어요'); } } return true; }
+    case 'rpReset': { const all=LS.get('aiwm_report',{})||{}; delete all[S.reportMid||'hw']; LS.set('aiwm_report',all); render(); toast('자동 내용으로 되돌렸어요'); return true; }
+  }
+  return false;
+}
+function memberFocusView(mid){ const L=focusOf(mid); if(!L.length) return ''; return `<div class="muted" style="font-size:12px;margin:4px 0 6px">수업 핵심 포인트</div><div class="timeline">${L.map(x=>`<div class="it"><b>${x.n}회차 · ${esc(x.focus)}</b><span class="row" style="align-items:center;gap:8px">${dots(x.level)}<span class="muted" style="font-size:12px">${LEVELS[x.level]||''}</span></span></div>`).join('')}</div>`; }
+
 // ---------- render ----------
 let modal=null;
 function render(){
@@ -2613,7 +2723,7 @@ function render(){
     else if(S.sub==='realReview') html=realReview();
     else if(S.sub==='review') html=tReview();
     else if(S.sub==='kakao') html=tKakao();
-    else if(S.sub==='member') html=tMemberDetail(S.subArg)+(S.subArg==='hw'?signCard('hw')+signHistory('hw'):'');
+    else if(S.sub==='member') html=tMemberDetail(S.subArg)+(S.subArg==='hw'?focusCard('hw')+signCard('hw')+signHistory('hw'):'');
     else html={home:tHome,schedule:tSchedule,members:tMembers,session:tSession,settle:tSettle}[S.tab]();
   } else {
     if(S.sub==='solo') html=(S.soloReal&&!S.ptEnded&&!needMedical())?(renderTop('혼자 연습 · '+S.subArg,true),soloRealView(S.subArg)):mSolo(S.subArg);
@@ -2670,6 +2780,7 @@ document.addEventListener('click',e=>{
   if(memAct(act,a)) return;
   if(signAct(act,a)) return;
   if(reqAct(act,a)) return;
+  if(focusAct(act,a)) return;
   switch(act){
     case 'back':
       if(S.role==='trainer'){ if(S.sub==='kakao') go('review'); else if(S.sub==='review') go(null); else go(null);} else go(null); break;

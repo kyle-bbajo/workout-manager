@@ -476,6 +476,12 @@ input.nm{font:inherit;font-weight:800;font-size:16px;border:none;border-bottom:1
 .wl-set.add{background:none;border:0;width:auto;height:auto}
 .wl-set i{width:40px;height:40px;font-size:14px}
 .wl-sets{gap:6px}
+.card.goalhi{border:1.5px solid #FDBA74}
+.goalres{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+.goalres>div{background:var(--bg2,#F9FAFB);border:1px solid var(--line,#E5E7EB);border-radius:12px;padding:8px 10px}
+.goalres span{display:block;font-size:11.5px;color:var(--muted,#6B7280)}
+.goalres b{display:block;font-size:18px;letter-spacing:-.02em}
+.goalres i{display:block;font-style:normal;font-size:11px;color:var(--muted,#6B7280)}
 
 .realbtn{display:flex;align-items:center;justify-content:center;gap:8px}
 </style>
@@ -1530,7 +1536,7 @@ function tMemberDetail(id){
   return `
   <div class="card"><div class="row"><div class="av">혜</div><div class="sp"><b>혜원</b><div class="muted">수강권 17/20회 · 다음 수업 오늘 10:00</div></div><span class="pill p-orange">남은 3회</span></div>
     <div class="row" style="margin-top:12px"><button class="btn sm" data-act="reReport">재등록 리포트</button><button class="btn sm sec" data-act="startClass" data-id="hw">수업 시작</button></div></div>
-  ${memberInfoCard(members.find(x=>x.id==='hw'))}${noteCard('hw')}${contractCard(members.find(x=>x.id==='hw'))}
+  ${memberInfoCard(members.find(x=>x.id==='hw'))}${goalCard(members.find(x=>x.id==='hw'))}${noteCard('hw')}${contractCard(members.find(x=>x.id==='hw'))}
   ${parqTrainerCard('hw')}
   <div class="card" style="display:none"><h3>PAR-Q+ · 건강 확인</h3>${needMedical()?'<span class="pill p-red">의료 확인 필요</span><p class="muted" style="margin:8px 0 0">추가 문항 ‘예’. 혼자 연습·루틴 추천 잠김. 의사 소견서를 올리면 풀립니다.</p>':parqYes()&&!S.parqFollow?'<span class="pill p-orange">추가 문항 확인 중</span>':'<span class="pill p-green">통과 · 10월 1일 작성</span>'}</div>
   ${focusCard('hw')}
@@ -1793,7 +1799,7 @@ function mGoal(){
     <div class="kv"><span class="k">체중</span><span class="v">${ib.w}kg</span><span class="k">골격근량</span><span class="v">${ib.smm}kg</span><span class="k">체지방량</span><span class="v">${ib.fm}kg</span><span class="k">체지방률</span><span class="v">${ib.pbf}%</span><span class="k">기초대사량</span><span class="v">${fmt(ib.bmr)}kcal</span></div>
     <label class="drop" style="margin-top:12px">결과지 사진 · 인바디 앱 캡처 올리기<input type="file" accept="image/*" id="ocrFile" hidden></label>
     <button class="btn sec full sm" data-act="ocrSample" style="margin-top:8px">예시 결과지로 해보기</button></div>`}
-  <div class="card"><h3>목표 설정</h3>
+  <div class="card"><h3>목표 설정<span class="r">${goalBy('hw')?(goalBy('hw').by==='member'?'내가 ':'트레이너가 ')+goalBy('hw').at+' 설정':''}</span></h3><p class="muted" style="margin:-4px 0 8px;font-size:12.5px">목표 체지방률과 기간을 정하면 하루 섭취·운동 칼로리가 계산돼요. 트레이너가 정한 목표도 직접 바꿀 수 있어요.</p>
     <div class="grid2">
       <label class="field"><span>목표 체지방률 (%)</span><input type="number" id="g_target" value="${g.target}"></label>
       <label class="field"><span>기간 (주)</span><input type="number" id="g_weeks" value="${g.weeks}"></label>
@@ -2514,7 +2520,7 @@ function memberCard(m){
   const today=ymd(new Date()), up=sched().filter(x=>x.mid===m.id&&x.date>=today).slice(0,5), left=Math.max(0,m.total-m.done);
   return `<div class="card"><div class="row"><div class="av">${esc(m.name[0]||'?')}</div><div class="sp"><b>${esc(m.name)}</b><div class="muted">수강권 ${m.done}/${m.total}회 · 다음 수업 ${m.next}</div></div><span class="pill ${left<=3?'p-orange':'p-green'}">남은 ${left}회</span></div>
     <div class="row" style="margin-top:12px"><button class="btn sm" data-act="schedNew" data-m="${m.id}">수업 잡기</button><button class="btn sm sec" data-act="startClass" data-id="${m.id}">수업 시작</button></div></div>
-  ${memberInfoCard(m)}${noteCard(m.id)}
+  ${memberInfoCard(m)}${goalCard(m)}${noteCard(m.id)}
   ${contractCard(m)}
   <div class="card"><h3>예정된 수업<span class="r">${up.length}개</span></h3>${up.length?up.map(x=>`<button class="list-item" data-act="schedEdit" data-id="${x.id}"><b style="width:96px">${mdLabel(x.date)}</b><span class="sp">${x.time} · ${x.dur}분${x.note?' · '+esc(x.note):''}</span><span class="muted">›</span></button>`).join(''):'<p class="muted" style="margin:0">예정된 수업이 없어요.</p>'}</div>
   ${parqTrainerCard(m.id)}
@@ -2617,6 +2623,42 @@ function normBirth(v){ const d=String(v||'').replace(/\D/g,''); if(d.length===8)
   if(d.length===4) return d; return String(v||'').trim(); }
 document.addEventListener('input',e=>{ const t=e.target; if(!t||t.id!=='mfBirth') return; const d=t.value.replace(/\D/g,'').slice(0,8);
   t.value=d.length>6?d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6):d.length>4&&d.length!==6?d.slice(0,4)+'-'+d.slice(4):d; });
+
+// ---------- 체지방 목표 (트레이너가 정하거나, 회원이 직접 정함) ----------
+// 혜원(회원 앱 시연)은 인바디·목표를 회원 앱과 같이 씀. 다른 회원은 회원별로 저장.
+function goalAll(){ return LS.get('aiwm_goals',{}); }
+function goalBy(mid){ return (LS.get('aiwm_goalby',{})||{})[mid]||null; }
+function setGoalBy(mid,by){ const a=LS.get('aiwm_goalby',{})||{}; const n=new Date(); a[mid]={by,at:`${n.getMonth()+1}/${n.getDate()}`}; LS.set('aiwm_goalby',a); }
+function goalOf(mid){ if(mid==='hw') return {ib:S.inbody,g:S.goal,set:true};
+  const x=goalAll()[mid]; const w=x&&+x.w||0, pbf=x&&+x.pbf||0;
+  const ib={w:w||70,pbf:pbf||25,fm:Math.round((w||70)*(pbf||25))/100,bmr:x&&+x.bmr||0,date:x&&x.ibDate||''};
+  if(!ib.bmr) ib.bmr=Math.round(370+21.6*(ib.w-ib.fm)); // 제지방량으로 추정 (Katch-McArdle)
+  return {ib,g:Object.assign({target:Math.max(10,Math.round((pbf||25)-5)),weeks:12,ratio:40,floor:'80',act:1.375,short:0},x||{}),set:!!(x&&x.w&&x.pbf)}; }
+function goalCalcFor(ib,g){ const a=S.inbody,b=S.goal; S.inbody=ib; S.goal=g; try{ return goalCalc(); } finally{ S.inbody=a; S.goal=b; } }
+function isDiet(m){ return /다이어트|체지방|감량|바디프로필/.test(m&&m.goal||''); }
+function goalCard(m){ if(!m) return ''; const G=goalOf(m.id), ib=G.ib, g=G.g, c=goalCalcFor(ib,g), by=goalBy(m.id), hw=m.id==='hw';
+  const tw=ib.w-c.x, fast=c.weeklyPct>1;
+  return `<div class="card ${isDiet(m)?'goalhi':''}"><h3>체지방 목표${isDiet(m)?'<span class="pill p-orange" style="font-size:11px;margin-left:6px">다이어트</span>':''}<span class="r">${by?`${by.by==='member'?'회원이':'트레이너가'} ${by.at} 설정`:'아직 설정 전'}</span></h3>
+    ${hw?`<div class="muted" style="font-size:12.5px;margin:-4px 0 8px">인바디 ${esc(ib.date||'')} · 체중 ${ib.w}kg · 체지방률 ${ib.pbf}% · 기초대사 ${fmt(ib.bmr)}kcal</div>`:
+      `<div class="grid2"><label class="field"><span>현재 체중 (kg)</span><input type="number" inputmode="decimal" id="gfW" value="${G.set?ib.w:''}" placeholder="예: 70"></label><label class="field"><span>현재 체지방률 (%)</span><input type="number" inputmode="decimal" id="gfP" value="${G.set?ib.pbf:''}" placeholder="예: 28"></label></div>
+       <label class="field"><span>기초대사량 (kcal · 모르면 비워 두기)</span><input type="number" inputmode="numeric" id="gfB" value="${goalAll()[m.id]&&goalAll()[m.id].bmr||''}" placeholder="자동 추정 ${fmt(ib.bmr)}"></label>`}
+    <div class="grid2"><label class="field"><span>목표 체지방률 (%)</span><input type="number" inputmode="decimal" id="gfT" value="${g.target}"></label><label class="field"><span>기간 (주)</span><input type="number" inputmode="numeric" id="gfWk" value="${g.weeks}"></label></div>
+    ${G.set?`<div class="goalres">
+      <div><span>목표 체중</span><b>${tw.toFixed(1)}kg</b><i>지금 ${ib.w}kg</i></div>
+      <div><span>빼야 할 체지방</span><b>${c.x.toFixed(1)}kg</b><i>${ib.pbf}% → ${g.target}%</i></div>
+      <div><span>주당 감량</span><b style="${fast?'color:var(--red)':''}">${c.weekly.toFixed(2)}kg</b><i>체중의 ${c.weeklyPct.toFixed(1)}%</i></div>
+      <div><span>하루 적자</span><b>${fmt(c.daily)}kcal</b><i>섭취 ${fmt(c.intake)} · 운동 ${fmt(c.exTarget)}</i></div></div>
+      ${fast?'<div class="alert o" style="margin:8px 0 0"><div>주당 체중의 1%보다 빨라요 · 기간을 늘리거나 목표를 낮춰 주세요</div></div>':''}${c.note?`<div class="alert o" style="margin:8px 0 0"><div>${c.note}</div></div>`:''}`:'<p class="muted" style="font-size:12.5px;margin:0">현재 체중과 체지방률을 넣으면 목표 체중·하루 칼로리를 계산해요.</p>'}
+    <div class="row" style="margin-top:10px"><button class="btn sm" data-act="goalSave" data-id="${m.id}" style="flex:1">목표 저장 · 회원 앱에 반영</button></div>
+    <p class="muted" style="font-size:11.5px;margin:6px 0 0">회원도 앱의 ‘인바디 · 목표’에서 직접 바꿀 수 있어요 (PT가 끝난 뒤에도)</p></div>`; }
+function goalAct(act,a){
+  if(act!=='goalSave') return false; const mid=a.dataset.id, num=id=>{ const e=$('#'+id); const v=e?parseFloat(e.value):NaN; return isFinite(v)?v:null; };
+  const T=num('gfT'), Wk=num('gfWk'); if(T==null||T<5||T>50){ toast('목표 체지방률을 5~50% 사이로 넣어 주세요'); return true; }
+  if(mid==='hw'){ S.goal.target=T; if(Wk) S.goal.weeks=Math.max(1,Math.round(Wk)); LS.set('aiwm_goal',S.goal); }
+  else { const all=goalAll(), x=Object.assign({},all[mid]||{}), W=num('gfW'), P=num('gfP'), B=num('gfB'); if(W==null||P==null){ toast('현재 체중과 체지방률을 넣어 주세요'); return true; }
+    if(T>=P){ toast('목표 체지방률은 지금보다 낮게 넣어 주세요'); return true; }
+    Object.assign(x,{w:W,pbf:P,bmr:B||0,target:T,weeks:Wk?Math.max(1,Math.round(Wk)):12,ibDate:x.ibDate||todayLabel()}); all[mid]=x; LS.set('aiwm_goals',all); }
+  setGoalBy(mid,'trainer'); keepScroll(render); toast('체지방 목표를 저장했어요'); return true; }
 
 // ---------- 트레이너 스케줄 (주간 · 월간 드롭다운 · 수업 중 예약) ----------
 const DOW='일월화수목금토';
@@ -3788,7 +3830,7 @@ function afterRender(){
   const dt=$('#dietTotal'); if(dt) dt.addEventListener('change',()=>{ const v=parseFloat(dt.value); if(S.dietRec&&isFinite(v)&&v>0){ S.dietRec.total=Math.round(v); keepScroll(render); } });
   document.querySelectorAll('.dietFile').forEach(df=>df.addEventListener('change',e=>{ const f=e.target.files[0]; if(f) analyzeFood(f); }));
   const of=$('#ocrFile'); if(of) of.addEventListener('change',e=>{ const f=e.target.files[0]; if(f) analyzeInbody(f); });
-  ['g_target','g_weeks'].forEach(id=>{const el=$('#'+id); if(el) el.addEventListener('change',()=>{const v=parseFloat(el.value); if(!isFinite(v))return; if(id==='g_target')S.goal.target=Math.min(Math.max(8,v),S.inbody.pbf-0.5); else S.goal.weeks=Math.min(Math.max(2,Math.round(v)),52); render();});});
+  ['g_target','g_weeks'].forEach(id=>{const el=$('#'+id); if(el) el.addEventListener('change',()=>{const v=parseFloat(el.value); if(!isFinite(v))return; if(typeof setGoalBy==='function') setGoalBy('hw','member'); if(id==='g_target')S.goal.target=Math.min(Math.max(8,v),S.inbody.pbf-0.5); else S.goal.weeks=Math.min(Math.max(2,Math.round(v)),52); render();});});
   const gr=$('#g_ratio'); if(gr) gr.addEventListener('input',()=>{S.goal.ratio=+gr.value; keepScroll(render);});
   const gs=$('#g_short'); if(gs) gs.addEventListener('input',()=>{S.goal.short=+gs.value; keepScroll(render);});
   ['stPrice','stRate'].forEach(id=>{const el=$('#'+id); if(el) el.addEventListener('change',()=>{const v=parseFloat(el.value); if(!isFinite(v)||v<0)return; if(id==='stPrice')S.settle.price=v; else S.settle.rate=Math.min(100,v); render();});});
@@ -3825,6 +3867,7 @@ document.addEventListener('click',e=>{
   if(settleAct(act,a)) return;
   if(noteAct(act,a)) return;
   if(wlogAct(act,a)) return;
+  if(goalAct(act,a)) return;
   switch(act){
     case 'back':
       if(S.role==='trainer'){ if(S.sub==='kakao') go('review'); else if(S.sub==='review') go(null); else go(null);} else go(null); break;

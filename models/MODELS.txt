@@ -1,2 +1,2 @@
-# 파일이름 원본주소  (GitHub Actions 'fetch-pose-model'가 받아서 이 폴더에 넣음)
-rtmpose-m_halpe26_256x192.onnx https://huggingface.co/pocketpose/onnx-models/resolve/main/pose_estimation-halpe26/halpe26_td-cc_rtmpose-m_body7_256x192.onnx
+# 파일이름 원본주소  (GitHub Actions 'fetch-pose-model'가 받아서 이 폴더에 넣음, zip이면 안의 end2end.onnx를 꺼냄)
+rtmpose-m_halpe26_256x192.onnx https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.zip

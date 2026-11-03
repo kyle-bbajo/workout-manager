@@ -18,7 +18,11 @@ jobs:
           while read -r name url; do
             [ -z "$name" ] && continue; case "$name" in \#*) continue;; esac
             if [ ! -s "models/$name" ]; then
-              echo "download $name"; curl -fL --retry 3 -o "models/$name" "$url"
+              echo "download $name"
+              case "$url" in
+                *.zip) curl -fL --retry 3 -o /tmp/m.zip "$url"; rm -rf /tmp/mz; mkdir /tmp/mz; unzip -q /tmp/m.zip -d /tmp/mz; f=$(find /tmp/mz -name '*.onnx' | head -1); echo "found $f"; cp "$f" "models/$name";;
+                *) curl -fL --retry 3 -o "models/$name" "$url";;
+              esac
             fi
             ls -la "models/$name"
           done < models/MODELS.txt

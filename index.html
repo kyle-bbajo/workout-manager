@@ -583,7 +583,7 @@ const RTM = { session: null, loading: null, ep: '', norm: null, failed: '', ms: 
 function preciseOn(){ try { return localStorage.getItem('aiwm_precise') !== '0'; } catch (e) { return true; } }
 function rtmModelURL(){ const c = window.APP_CONFIG || {}; return c.rtmModel || RTM.url || RTM_LOCAL; }
 async function fetchModelAny(urls, onStatus){ const errs = [];
-  for (const u of urls){ try { const b = await fetchModel(u, onStatus); RTM.url = u; return b; } catch (e) { errs.push((/huggingface/.test(u) ? '원본' : '앱 폴더') + ': ' + (e && e.message || e)); } }
+  for (const u of urls){ try { const b = await fetchModel(u, onStatus); RTM.url = u; return b; } catch (e) { errs.push((u === RTM_LOCAL ? '앱 폴더' : '설정 주소') + ': ' + (e && e.message || e)); } }
   throw new Error('모델 파일 · ' + errs.join(' / ')); }
 async function fetchModel(url, onStatus){
   let cache = null; try { cache = await caches.open('aiwm-models-v1'); const hit = await cache.match(url); if (hit) return await hit.arrayBuffer(); } catch (e) {}
@@ -607,7 +607,7 @@ async function loadRTM(onStatus){
     if (!ort) throw new Error('실행 파일 · ' + ierr);
     ort.env.wasm.wasmPaths = base; ort.env.wasm.numThreads = (self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 2) : 1);
     const c = window.APP_CONFIG || {};
-    const buf = await fetchModelAny(c.rtmModel ? [c.rtmModel] : [RTM_LOCAL, RTM_URL_DEFAULT], onStatus);
+    const buf = await fetchModelAny(c.rtmModel ? [c.rtmModel, RTM_LOCAL] : [RTM_LOCAL], onStatus);
     onStatus && onStatus('정밀 골격 모델 준비 중…');
     let s = null, err = null;
     for (const ep of (gpu ? ['webgpu', 'wasm'] : ['wasm'])){

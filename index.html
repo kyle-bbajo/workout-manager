@@ -235,6 +235,12 @@ button,input,select,textarea{font-family:inherit}
 #camBox canvas{width:100%;display:block}
 input.nm{font:inherit;font-weight:800;font-size:16px;border:none;border-bottom:1px dashed #C9CED6;background:transparent;color:var(--ink);width:62%;padding:2px 0;border-radius:0}
 .fd span{white-space:nowrap}
+.portion{position:relative;border-radius:12px;overflow:hidden;background:#000}
+.portion img{width:100%;max-height:260px;object-fit:cover;display:block}
+.portion .shade{position:absolute;top:0;bottom:0;right:0;background:rgba(17,24,39,.55)}
+.portion .cut{position:absolute;top:0;bottom:0;border-left:3px dashed #22C55E}
+.portion .cut span{position:absolute;top:8px;left:6px;white-space:nowrap;background:#16A34A;color:#fff;font-size:12px;font-weight:800;padding:3px 8px;border-radius:999px}
+.portion .cut.r span{left:auto;right:6px}
 .realbtn{display:flex;align-items:center;justify-content:center;gap:8px}
 </style>
 </head>
@@ -1086,7 +1092,7 @@ function tMemberDetail(id){
   if(m.id!=='hw'){
     return `<div class="card"><h3>${m.name}</h3><div class="kv"><span class="k">수강권</span><span class="v">${m.done}/${m.total}회</span><span class="k">최근 기록</span><span class="v">${m.last}</span></div></div><div class="alert b"><div>시연에서는 <b>혜원</b> 회원의 상세 화면을 준비했습니다.</div><button class="btn sm sec" data-act="memberDetail" data-id="hw" style="margin-left:auto;align-self:center">이동</button></div>`;
   }
-  const meal=S.meals.find(x=>x.id==='m2');
+  const meal=[...S.meals].reverse().find(m=>m.own)||S.meals.find(x=>x.id==='m2')||{id:'m2',time:'점심',name:'김치볶음밥 1인분',ai:720,tr:null};
   return `
   <div class="card"><div class="row"><div class="av">혜</div><div class="sp"><b>혜원</b><div class="muted">수강권 17/20회 · 다음 수업 오늘 10:00</div></div><span class="pill p-orange">남은 3회</span></div>
     <div class="row" style="margin-top:12px"><button class="btn sm" data-act="reReport">재등록 리포트</button><button class="btn sm sec" data-act="startClass" data-id="hw">수업 시작</button></div></div>
@@ -1104,7 +1110,7 @@ function tMemberDetail(id){
   <div class="card"><h3>운동별 코칭 누적 · 스쿼트</h3><div class="timeline">${squatNotes.map(n=>`<div class="it"><b>${n.s}</b><span class="muted">${n.t}</span></div>`).join('')}</div></div>
   <div class="card"><h3>혼자 해도 됨 (승인)</h3>${Object.keys(S.soloOk).map(k=>`<div class="row" style="padding:4px 0"><span class="sp">${k}</span><button class="toggle ${S.soloOk[k]?'on':''}" data-act="soloToggle" data-k="${k}" aria-label="${k} 혼자 연습 승인" aria-pressed="${S.soloOk[k]}"></button></div>`).join('')}<p class="muted" style="margin:8px 0 0">승인한 운동만, 지난 수업 중량 범위 안에서 회원에게 추천합니다.</p></div>
   <div class="card"><h3>식단 확인</h3>
-    <div class="kcal-row"><div class="thumb">${I.food}</div><div class="sp"><b style="font-size:13.5px">점심 · 김치볶음밥 1인분</b><div class="muted">AI 추정 720kcal</div></div><input class="small-input" id="trKcal" type="number" value="${meal.tr??meal.ai}" aria-label="트레이너 수정 칼로리"><button class="btn sm" data-act="saveKcal">수정</button></div>
+    <div class="kcal-row"><div class="thumb">${meal.img?`<img src="${meal.img}" alt="">`:I.food}</div><div class="sp"><b style="font-size:13.5px">${meal.time} · ${meal.name}</b><div class="muted">AI 추정 ${fmt(meal.ai)}kcal</div></div><input class="small-input" id="trKcal" type="number" value="${meal.tr??meal.ai}" aria-label="트레이너 수정 칼로리"><button class="btn sm" data-act="saveKcal" data-id="${meal.id}">수정</button></div>
     <p class="muted" style="margin:8px 0 0">밥 양이 사진보다 적다고 들었으면 고쳐 주세요. 회원 화면에 ‘트레이너 수정’으로 표시되고, 다음 추정에 반영됩니다.</p>
   </div>`;
 }
@@ -1288,7 +1294,7 @@ function rollCakeSVG(frac){
     <text x="${(x0+cut)/2}" y="96" fill="#14532D" font-size="13" font-weight="800" text-anchor="middle">${Math.round(frac*100)}%</text>
   </svg>`;
 }
-function mDiet(){
+function mDietDemo(){
   renderTop('식단',false);
   if(S.ptEnded) return lockCard('pt');
   const g=goalCalc();
@@ -1322,6 +1328,7 @@ function mDiet(){
 function mMe(){
   renderTop('내 정보',false);
   return `<div class="card"><h3>수강권</h3><div class="kv"><span class="k">PT 20회</span><span class="v">17회 완료 · 남은 3회</span><span class="k">수업 완료 확인</span><span class="v">17/17</span></div></div>
+  ${aiSettingsCard(false)}
   <button class="card list-item" data-act="goGoal" style="border:1px solid var(--line);padding:14px"><div class="sp"><b>인바디 · 목표</b><div class="muted">${S.inbody.date} · 체지방률 ${S.inbody.pbf}% · 목표 ${S.goal.target}%</div></div><span class="muted">›</span></button>
   <button class="card list-item" data-act="goParq" style="border:1px solid var(--line);padding:14px"><div class="sp"><b>PAR-Q+ 건강 확인</b><div class="muted">${needMedical()?'의료 확인 필요':parqYes()?'추가 문항 확인 중':'통과 · 10월 1일'}</div></div><span class="muted">›</span></button>
   <div class="card"><h3>내 운동 영상 보관</h3>
@@ -1335,11 +1342,12 @@ function mGoal(){
   const ib=S.inbody,g=S.goal,c=goalCalc();
   const ocr=S.ocr;
   return `
+  ${S.ocrBusy?`<div class="card"><h3>결과지 읽는 중…</h3><img class="preview-img" src="${S.ocrBusy}" alt="올린 인바디 결과지"><div class="feedback idle">AI가 값을 읽고 있어요 (5~15초)</div></div>`:''}
   ${ocr?`<div class="card" style="border-color:var(--blue)"><h3>결과지 인식 · 맞는지 확인해 주세요</h3>
     ${ocr.img?`<img class="preview-img" src="${ocr.img}" alt="올린 인바디 결과지">`:''}
     <div class="grid2">
       <label class="field"><span>기종</span><input type="text" id="o_model" value="${ocr.model}"></label>
-      <label class="field"><span>측정 시각 (11월 3일)</span><input type="text" id="o_time" value="${ocr.time}"></label>
+      <label class="field"><span>측정 시각 (${ocr.date||todayLabel()})</span><input type="text" id="o_time" value="${ocr.time}"></label>
       <label class="field"><span>체중 (kg)</span><input type="number" step="0.1" id="o_w" value="${ocr.w}"></label>
       <label class="field"><span>골격근량 (kg)</span><input type="number" step="0.1" id="o_smm" value="${ocr.smm}"></label>
       <label class="field"><span>체지방량 (kg)</span><input type="number" step="0.1" id="o_fm" value="${ocr.fm}"></label>
@@ -1587,6 +1595,174 @@ function realAct(act,a){
   return false;
 }
 
+// ---------- AI 인식 (음식 사진 · 인바디 결과지) ----------
+// 사용자가 넣은 API 키로 브라우저에서 바로 호출 (키는 이 기기 브라우저에만 저장)
+const AI_MODELS=[['gemini-flash-latest','Gemini Flash · 무료 사용량 있음'],['claude-sonnet-5-5','Claude Sonnet 5.5 · 정확'],['claude-haiku-5-5','Claude Haiku 5.5 · 빠름']];
+function aiCfg(){ return Object.assign({model:'gemini-flash-latest',key:''}, LS.get('aiwm_ai',{})); }
+function aiReady(){ return !!aiCfg().key; }
+function todayKey(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function todayLabel(){ const d=new Date(); return (d.getMonth()+1)+'월 '+d.getDate()+'일'; }
+function slotNow(){ const h=new Date().getHours()+new Date().getMinutes()/60; return h<10.5?'아침':h<15?'점심':h<21?'저녁':'간식'; }
+// 사진 → 긴 변 max px JPEG (아이폰 HEIC도 사파리가 디코딩)
+function imgToJpeg(file,max){
+  return new Promise((res,rej)=>{
+    const url=URL.createObjectURL(file), im=new Image();
+    im.onload=()=>{ const s=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight)); const c=document.createElement('canvas'); c.width=Math.round(im.naturalWidth*s); c.height=Math.round(im.naturalHeight*s);
+      c.getContext('2d').drawImage(im,0,0,c.width,c.height); URL.revokeObjectURL(url); const d=c.toDataURL('image/jpeg',0.82); res({dataURL:d,b64:d.split(',')[1]}); };
+    im.onerror=()=>{ URL.revokeObjectURL(url); rej(new Error('사진을 열 수 없어요')); };
+    im.src=url;
+  });
+}
+function thumbOf(dataURL){ return new Promise(res=>{ const im=new Image(); im.onload=()=>{ const c=document.createElement('canvas'); c.width=c.height=120; const s=Math.min(im.width,im.height); c.getContext('2d').drawImage(im,(im.width-s)/2,(im.height-s)/2,s,s,0,0,120,120); res(c.toDataURL('image/jpeg',0.7)); }; im.onerror=()=>res(null); im.src=dataURL; }); }
+function parseJSON(t){ t=String(t||'').replace(/```json|```/g,''); const a=t.indexOf('{'), b=t.lastIndexOf('}'); if(a<0||b<a) throw new Error('AI 답을 읽지 못했어요'); return JSON.parse(t.slice(a,b+1)); }
+async function aiCall(prompt,b64){
+  const c=aiCfg(); if(!c.key) throw new Error('NOKEY');
+  let r, j;
+  try{
+    if(c.model.startsWith('gemini')){
+      const parts=[]; if(b64) parts.push({inline_data:{mime_type:'image/jpeg',data:b64}}); parts.push({text:prompt});
+      r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(c.model)}:generateContent`,{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':c.key},
+        body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{temperature:0.2,responseMimeType:'application/json'}})});
+      j=await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(aiErr(r.status,(j.error&&j.error.message)||''));
+      return ((j.candidates||[])[0]?.content?.parts||[]).map(p=>p.text||'').join('');
+    }
+    const content=[]; if(b64) content.push({type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}}); content.push({type:'text',text:prompt});
+    r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':c.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:c.model,max_tokens:1200,messages:[{role:'user',content}]})});
+    j=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(aiErr(r.status,(j.error&&j.error.message)||''));
+    return (j.content||[]).map(b=>b.text||'').join('');
+  }catch(e){
+    if(e instanceof TypeError) throw new Error('AI 서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.');
+    throw e;
+  }
+}
+function aiErr(st,msg){
+  if(st===400&&/api key|API_KEY/i.test(msg)) return 'API 키가 맞지 않아요. 내 정보 → AI 연결에서 다시 넣어 주세요.';
+  if(st===401||st===403) return 'API 키가 맞지 않거나 권한이 없어요. 내 정보 → AI 연결에서 확인해 주세요.';
+  if(st===404) return '모델 이름을 찾지 못했어요. AI 연결에서 다른 모델을 골라 보세요.';
+  if(st===429) return '사용량 한도에 걸렸어요. 잠시 뒤 다시 해 주세요.';
+  if(st===402||/credit|billing/i.test(msg)) return 'API 결제(크레딧)가 필요해요.';
+  return 'AI 오류 ('+st+') '+msg.slice(0,80);
+}
+const FOOD_PROMPT=`이 사진 속 음식을 한국 식단 기준으로 분석해 주세요. 사진에 보이는 양 그대로(먹기 전 전체 양) 추정합니다. 그릇·수저 크기를 참고하세요.
+JSON 하나만 답하세요:
+{"foods":[{"name":"음식 이름(한국어)","amount":"양(예: 1공기 약 210g)","kcal":숫자,"carb_g":숫자,"protein_g":숫자,"fat_g":숫자}],"total_kcal":숫자,"confidence":"높음|보통|낮음","note":"추정 근거나 주의 한 줄"}
+음식이 아니면 foods를 빈 배열, total_kcal 0, note에 이유를 쓰세요.`;
+const INBODY_PROMPT=`인바디(InBody) 결과지 사진이나 인바디 앱 화면입니다. 보이는 값을 그대로 읽어 JSON 하나만 답하세요. 추측하지 말고 읽을 수 없으면 null.
+{"model":"기종(예: InBody 570) 또는 빈 문자열","date":"YYYY-MM-DD 또는 빈 문자열","time":"HH:MM 또는 빈 문자열","weight_kg":숫자|null,"smm_kg":숫자|null,"fat_mass_kg":숫자|null,"pbf_pct":숫자|null,"bmr_kcal":숫자|null}`;
+function aiSettingsCard(compact){
+  const c=aiCfg();
+  return `<div class="card" id="aiCard"><h3>AI 연결 <span class="r">${c.key?'<span class="pill p-green">연결됨</span>':'<span class="pill p-orange">필요</span>'}</span></h3>
+    ${compact?'<p class="muted" style="margin:-4px 0 10px">음식 사진 인식에 AI가 필요해요. API 키를 한 번만 넣어 주세요.</p>':''}
+    <label class="field"><span>AI 모델</span><select id="aiModel">${AI_MODELS.map(([v,t])=>`<option value="${v}" ${c.model===v?'selected':''}>${t}</option>`).join('')}</select></label>
+    <label class="field"><span>API 키</span><input type="password" id="aiKey" autocomplete="off" placeholder="${c.key?'저장됨 · 바꾸려면 새로 입력':'여기에 붙여 넣기'}"></label>
+    <div class="row"><button class="btn sm" data-act="aiSave" style="flex:1">저장하고 확인</button>${c.key?'<button class="btn sm sec" data-act="aiClear">키 지우기</button>':''}</div>
+    <p class="muted" id="aiMsg" style="margin:8px 0 0;font-size:12px;line-height:1.6">Gemini 키: aistudio.google.com → Get API key (무료 사용량 있음)<br>Claude 키: console.anthropic.com → API Keys<br>키는 이 기기 브라우저에만 저장되고, 사진은 고른 AI 회사로 보내져 분석됩니다.</p></div>`;
+}
+function loadMeals(){ const all=LS.get('aiwm_meals',{}); return all[todayKey()]||[]; }
+function saveMeals(){ const all=LS.get('aiwm_meals',{}); all[todayKey()]=S.meals; const keys=Object.keys(all).sort().slice(-60); const out={}; keys.forEach(k=>out[k]=all[k]); if(!LS.set('aiwm_meals',out)) toast('기기 저장 공간이 부족해 기록이 저장되지 않았어요'); }
+async function analyzeFood(file){
+  let pic; try{ pic=await imgToJpeg(file,1024); }catch(e){ toast(e.message); return; }
+  S.dietRec={img:pic.dataURL, slot:slotNow(), status:aiReady()?'loading':'nokey'}; keepScroll(render);
+  if(!aiReady()) return;
+  try{
+    const res=parseJSON(await aiCall(FOOD_PROMPT,pic.b64));
+    const foods=(res.foods||[]).filter(f=>f&&f.name);
+    const total=Math.round(+res.total_kcal||foods.reduce((a,f)=>a+(+f.kcal||0),0));
+    if(!S.dietRec||S.dietRec.img!==pic.dataURL) return;
+    Object.assign(S.dietRec,{status:foods.length?'done':'notfood',foods,total,conf:res.confidence||'',note:res.note||''});
+  }catch(e){ if(S.dietRec) Object.assign(S.dietRec,{status:'error',err:e.message==='NOKEY'?'AI 연결이 필요해요':e.message}); }
+  if(S.tab==='diet') keepScroll(render);
+}
+async function analyzeInbody(file){
+  let pic; try{ pic=await imgToJpeg(file,1600); }catch(e){ toast(e.message); return; }
+  const blank={img:pic.dataURL,model:'',time:'',w:'',smm:'',fm:'',bmr:''};
+  if(!aiReady()){ S.ocr=blank; render(); toast('AI를 연결하면 값이 자동으로 채워져요. 지금은 직접 입력해 주세요'); return; }
+  S.ocrBusy=pic.dataURL; render();
+  try{
+    const r=parseJSON(await aiCall(INBODY_PROMPT,pic.b64));
+    const n=v=>v==null||v===''||!isFinite(+v)?'':+v;
+    let fm=n(r.fat_mass_kg); if(fm===''&&n(r.pbf_pct)!==''&&n(r.weight_kg)!=='') fm=Math.round(r.weight_kg*r.pbf_pct/10)/100;
+    S.ocr={img:pic.dataURL,model:r.model||'',time:r.time||'',w:n(r.weight_kg),smm:n(r.smm_kg),fm,bmr:n(r.bmr_kcal),date:r.date||''};
+    toast('읽은 값을 확인하고 저장해 주세요');
+  }catch(e){ S.ocr=blank; toast(e.message==='NOKEY'?'AI 연결이 필요해요':e.message); }
+  S.ocrBusy=null; if(S.sub==='goal') render();
+}
+function portionView(img,frac){
+  const p=Math.round(frac*100);
+  return `<div class="portion"><img src="${img}" alt="음식 사진"><div class="shade" style="left:${p}%"></div><div class="cut${p>65?' r':''}" style="left:${p}%"><span>여기까지 ${p}%</span></div></div>`;
+}
+function mDiet(){
+  renderTop('식단',false);
+  if(S.ptEnded) return lockCard('pt');
+  const g=goalCalc();
+  const kc=m=>m.tr??m.ai;
+  const eaten=S.meals.reduce((a,m)=>a+kc(m),0);
+  const share={'아침':25,'점심':35,'저녁':30,'간식':10};
+  const budget=k=>Math.round(g.intake*share[k]/100);
+  const eatenOf=k=>S.meals.filter(m=>m.time===k).reduce((a,m)=>a+kc(m),0);
+  const rec=S.dietRec;
+  let recBlock='';
+  if(rec){
+    const slot=rec.slot||slotNow(), left=Math.max(0,budget(slot)-eatenOf(slot));
+    const slotSeg=`<div class="seg" role="group" aria-label="끼니" style="margin:10px 0">${Object.keys(share).map(k=>`<button class="${slot===k?'on':''}" data-act="dietSlot" data-v="${k}">${k}</button>`).join('')}</div>`;
+    if(rec.status==='loading') recBlock=`<div class="card"><h3>음식 분석 중…</h3><img class="preview-img" src="${rec.img}" alt="올린 음식 사진"><div class="feedback idle">AI가 음식과 양을 보고 있어요 (5~15초)</div></div>`;
+    else if(rec.status==='nokey') recBlock=`<div class="card"><h3>사진을 받았어요</h3><img class="preview-img" src="${rec.img}" alt="올린 음식 사진"><p class="muted" style="margin:0">AI를 연결하면 바로 분석해요. 아래에서 키를 넣고 ‘다시 분석’을 눌러 주세요.</p><div class="row" style="margin-top:10px"><button class="btn sm" data-act="dietRetry">다시 분석</button><button class="btn sm sec" data-act="dietCancel">취소</button></div></div>${aiSettingsCard(true)}`;
+    else if(rec.status==='error'||rec.status==='notfood') recBlock=`<div class="card"><h3>${rec.status==='error'?'분석하지 못했어요':'음식을 찾지 못했어요'}</h3><img class="preview-img" src="${rec.img}" alt="올린 음식 사진"><div class="feedback warn">${rec.status==='error'?rec.err:(rec.note||'음식이 잘 보이게 다시 찍어 주세요')}</div><div class="row" style="margin-top:10px"><button class="btn sm" data-act="dietRetry">다시 분석</button><button class="btn sm sec" data-act="dietCancel">취소</button></div></div>`;
+    else {
+      const total=Math.max(1,rec.total), frac=Math.max(0.05,Math.min(1,left/total)), part=Math.round(total*frac);
+      recBlock=`<div class="card"><h3>인식 결과<span class="pill ${rec.conf==='높음'?'p-green':'p-orange'}" style="margin-left:auto">${rec.sample?'예시':'AI 추정'}${rec.conf?' · 확신 '+rec.conf:''}</span></h3>
+        ${frac<1?portionView(rec.img,frac):`<img class="preview-img" src="${rec.img}" alt="올린 음식 사진">`}
+        <table class="t" style="margin-top:10px"><tr><th>음식</th><th>양</th><th>kcal</th></tr>${rec.foods.map(f=>`<tr><td>${f.name}</td><td>${f.amount||''}</td><td>${fmt(Math.round(+f.kcal||0))}</td></tr>`).join('')}</table>
+        <div class="grid2" style="margin-top:8px"><label class="field"><span>전체 칼로리 (고칠 수 있어요)</span><input type="number" id="dietTotal" value="${total}"></label><div class="field"><span>${slot} 남은 몫</span><b style="display:block;padding:9px 0;font-size:16px">${fmt(left)}kcal</b></div></div>
+        ${rec.note?`<p class="muted" style="margin:0 0 6px;font-size:12.5px">${rec.note}</p>`:''}
+        ${slotSeg}
+        <p style="font-size:13.5px;margin:4px 0 10px">${frac<1?`<b>먹을 만큼 보기</b> · ${slot} 몫으로는 전체의 약 <b>${Math.round(frac*100)}%</b>(${fmt(part)}kcal)까지예요. 사진의 초록 선까지 드세요.`:`${slot} 몫 안에 들어와요. 다 드셔도 됩니다.`}</p>
+        <div class="row">${frac<1?`<button class="btn sm" data-act="dietAdd" data-k="${part}" data-p="${Math.round(frac*100)}">${Math.round(frac*100)}%만 먹고 기록</button>`:''}<button class="btn sm ${frac<1?'sec':''}" data-act="dietAdd" data-k="${total}" data-p="100">다 먹고 기록</button><button class="btn sm sec" data-act="dietCancel">취소</button></div>
+        <p class="foot">사진으로 추정한 값이라 실제와 다를 수 있어요 · 트레이너가 확인하면 수정값으로 바뀝니다</p></div>`;
+    }
+  }
+  return `<div class="card"><h3>끼니별 목표<span class="r">하루 ${fmt(g.intake)}kcal</span></h3>
+    <table class="t"><tr><th>끼니</th><th>목표</th><th>먹은 양</th></tr>${Object.keys(share).map(k=>`<tr><td>${k}</td><td>${fmt(budget(k))}kcal</td><td>${fmt(eatenOf(k))}kcal</td></tr>`).join('')}</table>
+    <p class="muted" style="margin:8px 0 0">하루 목표는 인바디·목표 화면에서 계산됩니다.</p></div>
+  <div class="card"><h3>${todayLabel()}<span class="r">${fmt(eaten)} / ${fmt(g.intake)} kcal</span></h3>
+    ${S.meals.length?S.meals.map(m=>`<div class="kcal-row"><div class="thumb">${m.img?`<img src="${m.img}" alt="">`:I.food}</div><div class="sp"><b style="font-size:13.5px">${m.time} · ${m.name}</b><div class="muted">${m.tr!=null?`AI ${fmt(m.ai)} → <b style="color:var(--green)">트레이너 수정 ${fmt(m.tr)}kcal</b>`:`AI 추정 ${fmt(m.ai)}kcal${m.p&&m.p<100?' · '+m.p+'% 먹음':''} · 트레이너 확인 전`}</div></div>${m.own?`<button class="btn sm sec" data-act="mealDel" data-id="${m.id}" aria-label="${m.name} 기록 지우기" style="padding:6px 10px">지우기</button>`:''}</div>`).join(''):'<p class="muted" style="margin:0">아직 기록이 없어요. 아래에서 음식 사진을 찍어 보세요.</p>'}
+  </div>
+  ${recBlock}
+  ${rec?'':`<div class="row"><label class="drop" style="flex:1">${I.cam}<br><b>카메라로 찍기</b><input type="file" accept="image/*" capture="environment" class="dietFile" hidden></label><label class="drop" style="flex:1">${I.food}<br><b>앨범에서 고르기</b><input type="file" accept="image/*" class="dietFile" hidden></label></div>
+  ${aiReady()?'':aiSettingsCard(true)}
+  <button class="btn ghost full" data-act="dietSample" style="margin-top:10px">예시로 보기 (롤케이크)</button>`}`;
+}
+function aiAct(act,a){
+  switch(act){
+    case 'aiSave': { const m=$('#aiModel').value, k=($('#aiKey').value||'').trim(); const c=aiCfg(); c.model=m; if(k) c.key=k; LS.set('aiwm_ai',c);
+      const msg=$('#aiMsg'); if(!c.key){ if(msg) msg.textContent='API 키를 넣어 주세요.'; return true; }
+      if(msg) msg.textContent='확인 중…';
+      aiCall('연결 확인입니다. {"ok":true} 만 답하세요.').then(()=>{ toast('AI 연결 완료'); if(S.dietRec&&S.dietRec.status==='nokey'){ S.dietRec.status='error'; S.dietRec.err='‘다시 분석’을 눌러 주세요'; } keepScroll(render); })
+        .catch(e=>{ const mm=$('#aiMsg'); if(mm) mm.textContent=e.message; else toast(e.message); });
+      return true; }
+    case 'aiClear': { const c=aiCfg(); c.key=''; LS.set('aiwm_ai',c); keepScroll(render); toast('키를 지웠어요'); return true; }
+    case 'dietSlot': if(S.dietRec){ S.dietRec.slot=a.dataset.v; keepScroll(render); } return true;
+    case 'dietRetry': { const r=S.dietRec; if(!r) return true; if(!aiReady()){ toast('먼저 AI를 연결해 주세요'); return true; }
+      r.status='loading'; keepScroll(render);
+      aiCall(FOOD_PROMPT,r.img.split(',')[1]).then(t=>{ const res=parseJSON(t); const foods=(res.foods||[]).filter(f=>f&&f.name); Object.assign(r,{status:foods.length?'done':'notfood',foods,total:Math.round(+res.total_kcal||foods.reduce((x,f)=>x+(+f.kcal||0),0)),conf:res.confidence||'',note:res.note||''}); })
+        .catch(e=>Object.assign(r,{status:'error',err:e.message})).then(()=>{ if(S.tab==='diet') keepScroll(render); });
+      return true; }
+    case 'dietSample': S.dietRec={img:rollCakeDataURL(),slot:'간식',status:'done',sample:true,foods:[{name:'롤케이크',amount:'1조각(통째) 약 100g',kcal:450}],total:450,conf:'',note:''}; keepScroll(render); return true;
+    case 'dietCancel': S.dietRec=null; keepScroll(render); return true;
+    case 'dietAdd': { const r=S.dietRec; if(!r) return true; const ti=$('#dietTotal'); let total=ti?parseFloat(ti.value):r.total; if(!isFinite(total)||total<=0) total=r.total;
+      const p=+a.dataset.p||100, k=Math.round(total*p/100);
+      thumbOf(r.img).then(th=>{ S.meals.push({id:'u'+Date.now(),own:true,time:r.slot||slotNow(),name:r.foods.map(f=>f.name).join(' · ')||'음식',ai:k,p,tr:null,img:th}); saveMeals(); S.dietRec=null; keepScroll(render); toast('기록했어요 · 트레이너 확인 대기'); });
+      return true; }
+    case 'mealDel': S.meals=S.meals.filter(m=>m.id!==a.dataset.id); saveMeals(); keepScroll(render); return true;
+  }
+  return false;
+}
+function rollCakeDataURL(){ return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 170"><rect width="320" height="170" fill="#2B2118"/><rect x="20" y="118" width="280" height="14" rx="7" fill="#E5E7EB" opacity=".9"/><rect x="40" y="60" width="240" height="62" rx="28" fill="#E8C08A" stroke="#B9864A" stroke-width="3"/><ellipse cx="280" cy="91" rx="16" ry="31" fill="#F6E7CF" stroke="#B9864A" stroke-width="3"/></svg>`); }
+
+if(window.APP_BUILD){ S.meals=loadMeals(); const _ib=LS.get('aiwm_inbody',null); if(_ib) S.inbody=_ib; const _g=LS.get('aiwm_goal',null); if(_g) Object.assign(S.goal,_g); }
 // ---------- render ----------
 let modal=null;
 function render(){
@@ -1619,8 +1795,9 @@ function afterRender(){
     const tick=()=>{const e=$('#reviewTimer'); if(!e||S.sub!=='review')return; const s=Math.floor((Date.now()-S.report.startedAt)/1000); e.textContent='확인 시간 '+Math.floor(s/60)+'분 '+(s%60)+'초'; setTimeout(tick,1000);};
     if(el) tick();
   }
-  const df=$('#dietFile'); if(df) df.addEventListener('change',e=>readImg(e.target.files[0],img=>{S.dietRec={name:'롤케이크 1조각',kcal:450,img};render();}));
-  const of=$('#ocrFile'); if(of) of.addEventListener('change',e=>readImg(e.target.files[0],img=>{S.ocr={img,model:'InBody 570',time:'07:40',w:61.4,smm:22.6,fm:17.9,bmr:1328};render();}));
+  const dt=$('#dietTotal'); if(dt) dt.addEventListener('change',()=>{ const v=parseFloat(dt.value); if(S.dietRec&&isFinite(v)&&v>0){ S.dietRec.total=Math.round(v); keepScroll(render); } });
+  document.querySelectorAll('.dietFile').forEach(df=>df.addEventListener('change',e=>{ const f=e.target.files[0]; if(f) analyzeFood(f); }));
+  const of=$('#ocrFile'); if(of) of.addEventListener('change',e=>{ const f=e.target.files[0]; if(f) analyzeInbody(f); });
   ['g_target','g_weeks'].forEach(id=>{const el=$('#'+id); if(el) el.addEventListener('change',()=>{const v=parseFloat(el.value); if(!isFinite(v))return; if(id==='g_target')S.goal.target=Math.min(Math.max(8,v),S.inbody.pbf-0.5); else S.goal.weeks=Math.min(Math.max(2,Math.round(v)),52); render();});});
   const gr=$('#g_ratio'); if(gr) gr.addEventListener('input',()=>{S.goal.ratio=+gr.value; keepScroll(render);});
   const gs=$('#g_short'); if(gs) gs.addEventListener('input',()=>{S.goal.short=+gs.value; keepScroll(render);});
@@ -1646,6 +1823,7 @@ document.addEventListener('click',e=>{
   if(a.dataset.act==='closeModal'){ if(e.target.closest('[data-stop]') && !e.target.closest('button[data-act="closeModal"]')) return; modal=null;render();return;}
   const act=a.dataset.act;
   if(realAct(act,a)) return;
+  if(aiAct(act,a)) return;
   switch(act){
     case 'back':
       if(S.role==='trainer'){ if(S.sub==='kakao') go('review'); else if(S.sub==='review') go(null); else go(null);} else go(null); break;
@@ -1661,7 +1839,7 @@ document.addEventListener('click',e=>{
     case 'reReport': modal='re'; render(); break;
     case 'recalib': { const m=$('#calibMsg'); m.textContent='정답 동작 3회 촬영 중… (시연)'; setTimeout(()=>{S.criteria.depth=4;S.criteria.trunk=[34,46];render();toast('기준 저장: 허벅지 수평 +4° 이하 · 상체 34–46°');},1300);} break;
     case 'soloToggle': S.soloOk[a.dataset.k]=!S.soloOk[a.dataset.k]; keepScroll(render); break;
-    case 'saveKcal': { const v=parseFloat($('#trKcal').value); if(isFinite(v)&&v>0){S.meals.find(x=>x.id==='m2').tr=Math.round(v);toast('트레이너 수정값 저장 · 회원 화면에 반영됩니다');} } break;
+    case 'saveKcal': { const v=parseFloat($('#trKcal').value); if(isFinite(v)&&v>0){const mm=S.meals.find(x=>x.id===(a.dataset.id||'m2')); if(mm){mm.tr=Math.round(v); if(mm.own) saveMeals();} toast('트레이너 수정값 저장 · 회원 화면에 반영됩니다');} } break;
     case 'acceptReq': S.scheduleReqAccepted=true; render(); toast('예약 승인 · 회원에게 알림이 갑니다'); break;
     case 'settleMode': S.settle.mode=a.dataset.v; if(a.dataset.v==='rate'){S.settle.rate=40;} else {S.settle.rate=50;} render(); break;
     case 'copySettle': { const st=S.settle; const t='10월 정산 내역\n완료 수업 46회\n방식: '+(st.mode==='fixed'?'회당 수당':'매출 비율')+'\n단가 '+fmt(st.price)+'원 × '+st.rate+'%\n정산금 '+fmt(46*st.price*st.rate/100)+'원';
@@ -1697,7 +1875,7 @@ document.addEventListener('click',e=>{
       const prev=S.inbody, model=($('#o_model').value||'').trim()||'기종 미상', time=($('#o_time').value||'').trim();
       const hr=t=>parseInt((t||'0').split(':')[0],10)||0; const diffModel=model!==prev.model, diffTime=Math.abs(hr(time)-hr(prev.time))>=4;
       S.ibWarn=(diffModel||diffTime)? `이전 측정(${prev.model}, ${prev.time})과 ${diffModel&&diffTime?'기종·시간대가':diffModel?'기종이':'시간대가'} 달라 값이 흔들릴 수 있어요. 예측 vs 실측 비교에 반영합니다.`:null;
-      S.inbody={date:'11월 3일',model,time,w,smm,fm,pbf:Math.round(fm/w*1000)/10,bmr}; S.ocr=null; if(S.goal.target>=S.inbody.pbf) S.goal.target=Math.floor(S.inbody.pbf-1); render(); toast('인바디 저장 · 목표를 다시 계산했어요'); } break;
+      S.inbody={date:todayLabel(),model,time,w,smm,fm,pbf:Math.round(fm/w*1000)/10,bmr}; LS.set('aiwm_inbody',S.inbody); S.ocr=null; if(S.goal.target>=S.inbody.pbf) S.goal.target=Math.floor(S.inbody.pbf-1); render(); toast('인바디 저장 · 목표를 다시 계산했어요'); } break;
     case 'floor': S.goal.floor=a.dataset.v; keepScroll(render); break;
     case 'parq': S.parq[+a.dataset.i]=a.dataset.v==='1'; if(!parqYes()){S.parqFollow=false;S.medicalOk=false;} keepScroll(render); break;
     case 'parqF': S.parqFollow=a.dataset.v==='1'; S.medicalOk=false; keepScroll(render); break;

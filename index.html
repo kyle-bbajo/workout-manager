@@ -325,6 +325,7 @@ input.nm{font:inherit;font-weight:800;font-size:16px;border:none;border-bottom:1
 .tline{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:6px 0;border-top:1px dashed #EEF0F3;font-size:13px}
 .tline:first-of-type{border-top:none}
 .tline .tn{width:44px;flex:none;font-size:12px;color:var(--blue);font-weight:800}
+.pill.p-violet{background:#EDE9FE;color:#6D28D9}
 
 .realbtn{display:flex;align-items:center;justify-content:center;gap:8px}
 </style>
@@ -2290,7 +2291,12 @@ if(window.APP_BUILD){ S.meals=loadMeals(); const _ib=LS.get('aiwm_inbody',null);
 // ---------- 회원 추가 · 수정 (이 기기에 저장) ----------
 (function(){ const L=LS.get('aiwm_members',[]); L.forEach(m=>{ const ex=members.find(x=>x.id===m.id); if(ex) Object.assign(ex,m); else members.push(Object.assign({left:0,flag:null,last:'기록 없음',custom:true},m)); }); })();
 const PAYS=['카드','계좌이체','현금','기타'];
-function contractTotal(m){ return (m.contracts||[]).reduce((a,c)=>a+(+c.count||0),0); }
+function contractTotal(m){ return (m.contracts||[]).reduce((a,c)=>a+(+c.count||0)+(+c.bonus||0),0); }
+// 회당 단가 = 실제 받은 금액 ÷ 유료 횟수 (보너스 횟수는 빼고 계산)
+function cUnit(c){ return +c.count>0&&+c.amount>0?Math.round(c.amount/c.count):0; }
+function cDisc(c){ return +c.list>0&&+c.amount>0&&+c.amount<+c.list?Math.round((1-c.amount/c.list)*100):0; }
+// n회차 수업이 어느 계약의 유료/보너스 회차인지 (계약 순서대로 유료 → 보너스)
+function sessionInfo(m,n){ const L=(m&&m.contracts)||[]; let acc=0; for(const c of L){ const paid=+c.count||0, bonus=+c.bonus||0; if(n<=acc+paid) return {c,bonus:false,unit:cUnit(c)}; if(n<=acc+paid+bonus) return {c,bonus:true,unit:cUnit(c)}; acc+=paid+bonus; } return {c:null,bonus:false,unit:0}; }
 function syncTotal(m){ if(m.contracts&&m.contracts.length) m.total=contractTotal(m); }
 function won(n){ return (Math.round(+n||0)).toLocaleString('ko-KR')+'원'; }
 function ageOf(y){ y=+y; return y>1900?(new Date().getFullYear()-y)+'세':''; }
@@ -2308,8 +2314,10 @@ function memberSheet(m){
     <div class="grid2"><label class="field"><span>연락처</span><input type="tel" id="mfPhone" value="${esc(f.phone||'')}" placeholder="010-0000-0000"></label>
       <label class="field"><span>키 (cm)</span><input type="number" id="mfHeight" inputmode="decimal" value="${esc(f.height||'')}" placeholder="선택"></label></div>
     ${m?'':`<div class="secttl">계약</div>
-    <div class="grid2"><label class="field"><span>계약 횟수 (회)</span><input type="number" id="cfCount" inputmode="numeric" min="1" value="10"></label>
-      <label class="field"><span>계약 금액 (원)</span><input type="number" id="cfAmount" inputmode="numeric" min="0" step="10000" placeholder="예: 700000"></label></div>
+    <div class="grid2"><label class="field"><span>유료 횟수 (회)</span><input type="number" id="cfCount" inputmode="numeric" min="1" value="10"></label>
+      <label class="field"><span>보너스 횟수 (회)</span><input type="number" id="cfBonus" inputmode="numeric" min="0" value="0"></label></div>
+    <div class="grid2"><label class="field"><span>실제 받은 금액 (원)</span><input type="number" id="cfAmount" inputmode="numeric" min="0" step="10000" placeholder="할인 후 금액"></label>
+      <label class="field"><span>정가 (원, 선택)</span><input type="number" id="cfList" inputmode="numeric" min="0" step="10000" placeholder="할인 전"></label></div>
     <div class="grid2"><label class="field"><span>계약일</span><input type="date" id="cfDate" value="${today}"></label>
       <label class="field"><span>결제 방법</span><select id="cfPay">${PAYS.map(p=>`<option>${p}</option>`).join('')}</select></label></div>
     <p class="muted" id="cfUnit" style="margin:-2px 0 10px;font-size:12.5px">회당 단가는 금액을 넣으면 계산돼요</p>
@@ -2324,24 +2332,29 @@ function contractSheet(m){
   const today=ymd(new Date()), last=(m.contracts||[]).slice(-1)[0];
   return `<div class="modal" id="memModal"><div class="sheet" role="dialog" aria-label="계약 추가">
     <h2>계약 추가 (재등록)</h2><p class="muted" style="margin:0 0 12px">${esc(m.name)} · 지금 수강권 ${m.done}/${m.total}회</p>
-    <div class="grid2"><label class="field"><span>계약 횟수 (회)</span><input type="number" id="cfCount" inputmode="numeric" min="1" value="${last?last.count:10}"></label>
-      <label class="field"><span>계약 금액 (원)</span><input type="number" id="cfAmount" inputmode="numeric" min="0" step="10000" value="${last?last.amount:''}"></label></div>
+    <div class="grid2"><label class="field"><span>유료 횟수 (회)</span><input type="number" id="cfCount" inputmode="numeric" min="1" value="${last?last.count:10}"></label>
+      <label class="field"><span>보너스 횟수 (회)</span><input type="number" id="cfBonus" inputmode="numeric" min="0" value="${last?(last.bonus||0):0}"></label></div>
+    <div class="grid2"><label class="field"><span>실제 받은 금액 (원)</span><input type="number" id="cfAmount" inputmode="numeric" min="0" step="10000" value="${last?last.amount:''}" placeholder="할인 후 금액"></label>
+      <label class="field"><span>정가 (원, 선택)</span><input type="number" id="cfList" inputmode="numeric" min="0" step="10000" value="${last&&last.list?last.list:''}" placeholder="할인 전"></label></div>
     <div class="grid2"><label class="field"><span>계약일</span><input type="date" id="cfDate" value="${today}"></label>
       <label class="field"><span>결제 방법</span><select id="cfPay">${PAYS.map(p=>`<option ${last&&last.pay===p?'selected':''}>${p}</option>`).join('')}</select></label></div>
     <p class="muted" id="cfUnit" style="margin:-2px 0 10px;font-size:12.5px"></p>
     <div class="row"><button class="btn" data-act="cfSave" data-id="${m.id}" style="flex:1">계약 추가</button><button class="btn sec" data-act="memClose">닫기</button></div>
   </div></div>`;
 }
-function bindContractUnit(){ const c=$('#cfCount'), a=$('#cfAmount'), u=$('#cfUnit'); if(!c||!a||!u) return; const f=()=>{ const n=+c.value, w=+a.value; u.textContent=n>0&&w>0?`회당 단가 ${won(w/n)}`:'회당 단가는 금액을 넣으면 계산돼요'; }; c.addEventListener('input',f); a.addEventListener('input',f); f(); }
-function readContract(){ const count=Math.max(1,parseInt($('#cfCount').value,10)||0), amount=Math.max(0,parseInt($('#cfAmount').value,10)||0); return {id:'c'+Date.now().toString(36),date:$('#cfDate').value||ymd(new Date()),count,amount,pay:$('#cfPay').value}; }
+function bindContractUnit(){ const c=$('#cfCount'), a=$('#cfAmount'), u=$('#cfUnit'), bo=$('#cfBonus'), li=$('#cfList'); if(!c||!a||!u) return;
+  const f=()=>{ const k={count:+c.value,bonus:bo?+bo.value:0,amount:+a.value,list:li?+li.value:0}, un=cUnit(k), d=cDisc(k);
+    u.innerHTML=un?`회당 단가 <b>${won(un)}</b> = ${won(k.amount)} ÷ 유료 ${k.count}회${k.bonus?` · 보너스 ${k.bonus}회는 따로(총 ${k.count+k.bonus}회)`:''}${d?` · 할인 ${d}%`:''}`:'회당 단가는 받은 금액 ÷ 유료 횟수로 계산돼요 (보너스 횟수 제외)'; };
+  [c,a,bo,li].forEach(e=>e&&e.addEventListener('input',f)); f(); }
+function readContract(){ const v=id=>{ const e=$('#'+id); return e?Math.max(0,parseInt(e.value,10)||0):0; }; return {id:'c'+Date.now().toString(36),date:($('#cfDate')||{}).value||ymd(new Date()),count:Math.max(1,v('cfCount')),bonus:v('cfBonus'),amount:v('cfAmount'),list:v('cfList'),pay:($('#cfPay')||{}).value||'기타'}; }
 function memberCard(m){
   const today=ymd(new Date()), up=sched().filter(x=>x.mid===m.id&&x.date>=today).slice(0,5), left=Math.max(0,m.total-m.done);
   return `<div class="card"><div class="row"><div class="av">${esc(m.name[0]||'?')}</div><div class="sp"><b>${esc(m.name)}</b><div class="muted">수강권 ${m.done}/${m.total}회 · 다음 수업 ${m.next}</div></div><span class="pill ${left<=3?'p-orange':'p-green'}">남은 ${left}회</span></div>
     ${m.custom?`<div class="kv" style="margin-top:10px"><span class="k">성별 · 나이</span><span class="v">${[m.gender,m.birth?ageOf(m.birth)+' ('+m.birth+')':''].filter(Boolean).join(' · ')||'-'}</span><span class="k">연락처</span><span class="v">${m.phone?`<a href="tel:${esc(m.phone)}">${esc(m.phone)}</a>`:'-'}</span>${m.height?`<span class="k">키</span><span class="v">${esc(m.height)}cm</span>`:''}${m.goal?`<span class="k">목표</span><span class="v">${esc(m.goal)}</span>`:''}${m.note?`<span class="k">메모</span><span class="v">${esc(m.note)}</span>`:''}</div>`:''}
     <div class="row" style="margin-top:12px"><button class="btn sm" data-act="schedNew" data-m="${m.id}">수업 잡기</button><button class="btn sm sec" data-act="startClass" data-id="${m.id}">수업 시작</button>${m.custom?`<button class="btn sm sec" data-act="memEdit" data-id="${m.id}">정보 수정</button>`:''}</div></div>
   <div class="card"><h3>수강권 · 계약</h3><div class="row" style="align-items:center"><span class="sp">한 수업 <b>${m.done}</b> / 계약 ${m.total}회</span><button class="btn sm sec" data-act="memDone" data-id="${m.id}" data-v="-1" aria-label="한 수업 1회 빼기">−1</button><button class="btn sm" data-act="memDone" data-id="${m.id}" data-v="1" aria-label="한 수업 1회 더하기">+1</button></div>
-    ${(m.contracts||[]).length?`<table class="t" style="margin-top:10px"><tr><th>계약일</th><th>횟수</th><th>금액</th><th>회당</th><th></th></tr>${m.contracts.map(c=>`<tr><td>${c.date.slice(2).replace(/-/g,'.')}</td><td>${c.count}회</td><td>${c.amount?won(c.amount):'-'}</td><td>${c.amount?won(c.amount/c.count):'-'}</td><td><button class="btn sm sec" data-act="cfDel" data-id="${m.id}" data-c="${c.id}" aria-label="이 계약 삭제" style="padding:2px 8px">×</button></td></tr>`).join('')}</table>
-    <div class="kv" style="margin-top:8px"><span class="k">총 계약</span><span class="v">${contractTotal(m)}회 · ${won(m.contracts.reduce((x,c)=>x+(+c.amount||0),0))}</span><span class="k">결제</span><span class="v">${[...new Set(m.contracts.map(c=>c.pay))].join(', ')}</span></div>`:'<p class="muted" style="margin:8px 0 0">계약 기록이 없어요.</p>'}
+    ${(m.contracts||[]).length?`<table class="t" style="margin-top:10px"><tr><th>계약일</th><th>횟수</th><th>받은 금액</th><th>회당</th><th></th></tr>${m.contracts.map(c=>`<tr><td>${c.date.slice(2).replace(/-/g,'.')}</td><td>${c.count}회${+c.bonus?`<br><span class="muted" style="font-size:11px">+보너스 ${c.bonus}</span>`:''}</td><td>${c.amount?won(c.amount):'-'}${cDisc(c)?`<br><span class="muted" style="font-size:11px">할인 ${cDisc(c)}%</span>`:''}</td><td>${cUnit(c)?won(cUnit(c)):'-'}</td><td><button class="btn sm sec" data-act="cfDel" data-id="${m.id}" data-c="${c.id}" aria-label="이 계약 삭제" style="padding:2px 8px">×</button></td></tr>`).join('')}</table>
+    <div class="kv" style="margin-top:8px"><span class="k">총 계약</span><span class="v">${contractTotal(m)}회 (보너스 ${m.contracts.reduce((x,c)=>x+(+c.bonus||0),0)}회) · ${won(m.contracts.reduce((x,c)=>x+(+c.amount||0),0))}</span><span class="k">지금 회차</span><span class="v">${(()=>{ const si=sessionInfo(m,m.done+1); return `${m.done+1}회차 · ${si.c?(si.bonus?'보너스 수업':'유료 · 회당 '+won(si.unit)):'계약 범위 밖'}`; })()}</span><span class="k">결제</span><span class="v">${[...new Set(m.contracts.map(c=>c.pay))].join(', ')}</span></div>`:'<p class="muted" style="margin:8px 0 0">계약 기록이 없어요.</p>'}
     <button class="btn sm ${left<=3?'':'sec'} full" data-act="cfNew" data-id="${m.id}" style="margin-top:10px">${I.plus} 계약 추가 (재등록)</button></div>
   <div class="card"><h3>예정된 수업<span class="r">${up.length}개</span></h3>${up.length?up.map(x=>`<button class="list-item" data-act="schedEdit" data-id="${x.id}"><b style="width:96px">${mdLabel(x.date)}</b><span class="sp">${x.time} · ${x.dur}분${x.note?' · '+esc(x.note):''}</span><span class="muted">›</span></button>`).join(''):'<p class="muted" style="margin:0">예정된 수업이 없어요.</p>'}</div>
   ${parqTrainerCard(m.id)}
@@ -2372,7 +2385,7 @@ function memAct(act,a){
       const v={name,phone:val('mfPhone'),gender:val('mfGender'),birth:val('mfBirth'),height:val('mfHeight'),goal:val('mfGoal'),note:val('mfNote')};
       let m=a.dataset.id&&find(a.dataset.id);
       if(m){ Object.assign(m,v); sched().forEach(x=>{ if(x.mid===m.id) x.name=m.name; }); saveSched(); }
-      else { const c=readContract(); m=Object.assign({id:'u'+Date.now().toString(36),left:0,flag:null,last:'기록 없음',custom:true,start:c.date,contracts:[c],total:c.count,done:Math.min(c.count,Math.max(0,parseInt(val('mfDone'),10)||0))},v); members.push(m); ensureNext(m); }
+      else { const c=readContract(); m=Object.assign({id:'u'+Date.now().toString(36),left:0,flag:null,last:'기록 없음',custom:true,start:c.date,contracts:[c],total:c.count+(+c.bonus||0),done:Math.min(c.count,Math.max(0,parseInt(val('mfDone'),10)||0))},v); members.push(m); ensureNext(m); }
       saveMembers(); $('#modalRoot').innerHTML='';
       if(a.dataset.id){ keepScroll(render); toast('회원 정보를 저장했어요'); } else { S.tab='members'; go('member',m.id); toast(`${m.name} 회원을 추가했어요 · 첫 수업을 잡아 보세요`); }
       return true; }
@@ -2910,18 +2923,22 @@ function policy(){ return Object.assign({nsDeduct:true,nsPay:true},LS.get('aiwm_
 function noshows(){ return LS.get('aiwm_noshow',[]); }
 function unitPrice(mid){ const m=members.find(x=>x.id===mid); const c=m&&m.contracts&&m.contracts.slice().reverse().find(c=>+c.amount>0); return c?Math.round(c.amount/c.count):S.settle.price; }
 // 정산 방식: fixed 회당 고정 수당(원) · rate 매출 비율(%) · tier 이번 달 수업 수 구간별 비율
-function settleCfg(){ return Object.assign({mode:'rate',fixed:30000,price:S.settle.price,rate:S.settle.rate,tierMode:'all',tiers:[{upto:40,pct:40},{upto:80,pct:50},{upto:null,pct:60}]},LS.get('aiwm_settle',{})); }
+function settleCfg(){ return Object.assign({mode:'rate',fixed:30000,price:S.settle.price,rate:S.settle.rate,bonusPay:'none',tierMode:'all',tiers:[{upto:40,pct:40},{upto:80,pct:50},{upto:null,pct:60}]},LS.get('aiwm_settle',{})); }
 function saveSettle(c){ LS.set('aiwm_settle',c); S.settle.price=c.price; S.settle.rate=c.rate; }
 function tierPct(c,n){ const t=c.tiers.find(t=>t.upto==null||n<=t.upto)||c.tiers[c.tiers.length-1]; return t?+t.pct:0; }
-function unitPriceC(mid,c){ const m=members.find(x=>x.id===mid); const k=m&&m.contracts&&m.contracts.slice().reverse().find(k=>+k.amount>0); return k?Math.round(k.amount/k.count):c.price; }
+function unitPriceC(mid,c){ const m=members.find(x=>x.id===mid); const k=m&&m.contracts&&m.contracts.slice().reverse().find(k=>+k.amount>0); return k?cUnit(k):c.price; }
+// 이 수업(n회차)의 매출: 그 회차가 속한 계약의 회당 단가. 보너스 회차는 매출 0 (설정에 따라 수당 계산)
+function sessionRev(x,c){ const m=members.find(y=>y.id===x.mid); const si=m&&x.n?sessionInfo(m,x.n):{c:null}; const unit=si.c?(si.unit||c.price):unitPriceC(x.mid,c); return {unit,bonus:!!si.bonus,rev:si.bonus?0:unit}; }
 function payroll(md){
   const c=settleCfg(), items=md.slice().sort((a,b)=>(a.d+(a.lt||'')).localeCompare(b.d+(b.lt||''))), n=items.length, pay={};
-  items.forEach((x,i)=>{ const rev=unitPriceC(x.mid,c);
-    let v=c.mode==='fixed'?+c.fixed:c.mode==='rate'?rev*c.rate/100:rev*tierPct(c,c.tierMode==='all'?n:i+1)/100;
+  const bonusIds={};
+  items.forEach((x,i)=>{ const sr=sessionRev(x,c); if(sr.bonus) bonusIds[x.id]=1;
+    const base=sr.bonus?(c.bonusPay==='unit'?sr.unit:0):sr.rev;
+    let v=c.mode==='fixed'?(sr.bonus&&c.bonusPay==='none'?0:+c.fixed):c.mode==='rate'?base*c.rate/100:base*tierPct(c,c.tierMode==='all'?n:i+1)/100;
     pay[x.id]=Math.round(v); });
-  const total=Object.values(pay).reduce((a,b)=>a+b,0), rev=items.reduce((a,x)=>a+unitPriceC(x.mid,c),0);
+  const total=Object.values(pay).reduce((a,b)=>a+b,0), rev=items.reduce((a,x)=>a+sessionRev(x,c).rev,0);
   let label=c.mode==='fixed'?`회당 ${fmt(c.fixed)}원`:c.mode==='rate'?`매출의 ${c.rate}%`:c.tierMode==='all'?`이번 달 ${n}회 → ${tierPct(c,n)}% 구간`:'구간별 누진';
-  return {pay,total,rev,label,n,cfg:c};
+  return {pay,total,rev,label,n,cfg:c,bonusIds};
 }
 function payOf(mid){ const c=settleCfg(); return c.mode==='fixed'?+c.fixed:Math.round(unitPriceC(mid,c)*(c.mode==='rate'?c.rate:tierPct(c,monthDone().length))/100); }
 function monthKey(d){ return (d||ymd(new Date())).slice(0,7); }
@@ -2947,22 +2964,23 @@ function homeTiles(){
   return `<div class="tiles">${tile2('tileToday','오늘 수업 (건)',tl.length,`완료 ${done}${ns?' · 노쇼 '+ns:''} · 남음 ${tl.length-done-ns}`,'gray')}${tile2('tileDone','수업 완료 (회)',md.length,'이번 달 · 서명 '+md.filter(x=>x.kind==='sign').length,'green')}${tile2('tilePay','정산 대기',Math.round(pay/10000)+'만','이번 달 예정','orange')}</div>`;
 }
 function rowLesson(x){ // 한 줄: 언제 · 누구 · 몇 회차 · 서명 몇 시
+  const _m=members.find(y=>y.id===x.mid), _si=_m&&x.n?sessionInfo(_m,x.n):null; x=Object.assign({},x,{_bonus:_si&&_si.bonus});
   const tag=x.kind==='noshow'||x.state==='noshow'?'<span class="pill p-red">노쇼</span>':x.state==='todo'?'<span class="pill p-gray">진행 전</span>':'<span class="pill p-green">서명</span>';
   const sub=x.kind==='noshow'||x.state==='noshow'?`노쇼 처리 ${x.at||(x.ns&&x.ns.at)||''}${policy().nsDeduct?' · 수강권 차감':''}`:x.state==='todo'?'서명 전':`서명 ${x.at||(x.sg&&x.sg.t)} · ${(x.via||(x.sg&&x.sg.via))==='member'?'회원 휴대폰':'트레이너 휴대폰'}`;
-  return `<div class="lrow"><div class="lt"><b>${mdLabel(x.d||x.date)}</b><span>${x.lt||x.time||''}</span></div><div class="sp"><b style="font-size:14px">${esc(x.name)}${x.n?` · ${x.n}회차`:''}</b><div class="muted" style="font-size:12.5px">${sub}</div></div>${tag}</div>`;
+  return `<div class="lrow"><div class="lt"><b>${mdLabel(x.d||x.date)}</b><span>${x.lt||x.time||''}</span></div><div class="sp"><b style="font-size:14px">${esc(x.name)}${x.n?` · ${x.n}회차`:''}${x._bonus?' <span class="pill p-violet" style="font-size:10.5px">보너스</span>':''}</b><div class="muted" style="font-size:12.5px">${sub}</div></div>${tag}</div>`;
 }
 function tileSheet(kind){
   const close='<button class="btn sec full" data-act="tileClose" style="margin-top:12px">닫기</button>';
   if(kind==='today'){ const tl=todayLessons();
     return `<div class="modal"><div class="sheet" role="dialog" aria-label="오늘 수업"><h2>오늘 수업</h2><p class="muted" style="margin:0 0 10px">${mdLabel(ymd(new Date()))} · ${tl.length}건</p>
       ${tl.length?tl.map(x=>`${rowLesson(x)}${x.state==='todo'?`<div class="row" style="margin:-2px 0 10px 64px;gap:6px"><button class="btn sm" data-act="signHere" data-m="${x.mid}">서명받기</button><button class="btn sm sec" data-act="nsMark" data-id="${x.id}" style="color:var(--red)">노쇼 처리</button></div>`:x.state==='noshow'?`<div class="row" style="margin:-2px 0 10px 64px"><button class="btn sm sec" data-act="nsUndo" data-id="${x.ns.id}">노쇼 취소</button></div>`:x.sg?`<div style="margin:-2px 0 10px 64px;max-width:180px">${sigSVG(x.sg.sig,38)}</div>`:''}`).join(''):'<p class="muted">오늘 잡힌 수업이 없어요.</p>'}${close}</div></div>`; }
-  const md=monthDone(), PR=payroll(md), byM={}; md.forEach(x=>{ (byM[x.mid]=byM[x.mid]||{name:x.name,c:0,ns:0,pay:0}); byM[x.mid].c++; if(x.kind==='noshow') byM[x.mid].ns++; byM[x.mid].pay+=PR.pay[x.id]||0; });
+  const md=monthDone(), PR=payroll(md), byM={}; md.forEach(x=>{ (byM[x.mid]=byM[x.mid]||{name:x.name,c:0,ns:0,bo:0,pay:0}); byM[x.mid].c++; if(x.kind==='noshow') byM[x.mid].ns++; if(PR.bonusIds[x.id]) byM[x.mid].bo++; byM[x.mid].pay+=PR.pay[x.id]||0; });
   if(kind==='done') return `<div class="modal"><div class="sheet" role="dialog" aria-label="수업 완료"><h2>이번 달 수업 완료</h2><p class="muted" style="margin:0 0 10px">${md.length}회 · 서명 ${md.filter(x=>x.kind==='sign').length} · 노쇼 ${md.filter(x=>x.kind==='noshow').length}</p>
       ${md.map(x=>`${rowLesson(x)}${x.sig?`<div style="margin:-2px 0 10px 64px;max-width:180px">${sigSVG(x.sig,38)}</div>`:''}`).join('')||'<p class="muted">이번 달 완료한 수업이 없어요.</p>'}${close}</div></div>`;
   const total=PR.total;
   return `<div class="modal"><div class="sheet" role="dialog" aria-label="정산 대기"><h2>정산 대기 · 이번 달</h2><p class="muted" style="margin:0 0 10px">서명 완료${policy().nsPay?' + 노쇼':''} 수업 기준 · ${PR.label}</p>
     <div class="big" style="color:var(--blue);margin-bottom:8px">${fmt(total)}원</div>
-    <table class="t"><tr><th>회원</th><th>완료</th><th>회당 단가</th><th>수당</th></tr>${Object.entries(byM).map(([mid,v])=>`<tr><td>${esc(v.name)}</td><td>${v.c}회${v.ns?` <span class="muted">(노쇼 ${v.ns})</span>`:''}</td><td>${fmt(unitPriceC(mid,PR.cfg))}</td><td><b>${fmt(v.pay)}</b></td></tr>`).join('')}</table>
+    <table class="t"><tr><th>회원</th><th>완료</th><th>회당 단가</th><th>수당</th></tr>${Object.entries(byM).map(([mid,v])=>`<tr><td>${esc(v.name)}</td><td>${v.c}회${v.ns?` <span class="muted">(노쇼 ${v.ns})</span>`:''}${v.bo?` <span class="muted">(보너스 ${v.bo})</span>`:''}</td><td>${fmt(unitPriceC(mid,PR.cfg))}</td><td><b>${fmt(v.pay)}</b></td></tr>`).join('')}</table>
     <div class="secttl" style="margin-top:12px">수업별 내역</div>${md.map(rowLesson).join('')}
     <button class="btn full" data-act="copySettle2" style="margin-top:10px">센터 제출용 내역 복사</button>${close}</div></div>`;
 }
@@ -3015,6 +3033,9 @@ function tSettle(){
       <div class="seg" role="group"><button class="${c.tierMode==='all'?'on':''}" data-act="tierMode" data-v="all">도달한 구간 비율을 전체에</button><button class="${c.tierMode==='progressive'?'on':''}" data-act="tierMode" data-v="progressive">구간별로 나눠 적용</button></div>
       <p class="muted" style="margin:6px 0 0;font-size:12px">${c.tierMode==='all'?'예: 45회 하면 1~45회 모두 50%':'예: 45회 하면 1~40회는 40%, 41~45회는 50%'}</p>
       <div class="alert b" style="margin:10px 0 0"><div>이번 달 <b>${n}회</b> · 지금 <b>${tierPct(c,n)}%</b> 구간${nextT&&nextT.upto!=null?` · 다음 구간까지 ${nextT.upto-n+1}회`:''}</div></div>`:''}
+    <div class="secttl" style="margin-top:12px">보너스(서비스) 수업 수당</div>
+    <div class="seg" role="group"><button class="${c.bonusPay==='none'?'on':''}" data-act="bonusPay" data-v="none">지급 안 함</button><button class="${c.bonusPay==='unit'?'on':''}" data-act="bonusPay" data-v="unit">회당 단가로 지급</button></div>
+    <p class="muted" style="margin:6px 0 0;font-size:12px">회원마다 회당 단가는 ‘받은 금액 ÷ 유료 횟수’예요. 보너스 회차는 매출에 넣지 않아요.</p>
     <button class="btn sm full" data-act="stSave" style="margin-top:10px">정산 방식 저장</button></div>
   <button class="card tilebtn" data-act="tilePay" style="width:100%;text-align:left"><div class="muted">완료 수업 (서명${P.nsPay?' + 노쇼':''}) · ${PR.label}</div><div class="big">${n}회 <span class="muted" style="font-size:13px;font-weight:600">매출 ${fmt(PR.rev)}원</span></div>
     <div class="muted" style="margin-top:8px">예상 정산금</div><div class="big" style="color:var(--blue)">${fmt(PR.total)}원</div><div class="muted" style="font-size:12px;margin-top:4px">눌러서 수업별 내역 보기 ›</div></button>
@@ -3036,6 +3057,7 @@ function settleAct(act,a){
   switch(act){
     case 'stMode': { const c=readSettleForm(); c.mode=a.dataset.v; saveSettle(c); keepScroll(render); return true; }
     case 'tierMode': { const c=readSettleForm(); c.tierMode=a.dataset.v; saveSettle(c); keepScroll(render); return true; }
+    case 'bonusPay': { const c=readSettleForm(); c.bonusPay=a.dataset.v; saveSettle(c); keepScroll(render); return true; }
     case 'tierAdd': { const c=readSettleForm(), last=c.tiers[c.tiers.length-1], prev=c.tiers[c.tiers.length-2]; const start=prev?+prev.upto:0; c.tiers.splice(c.tiers.length-1,0,{upto:start+20,pct:Math.min(100,(+(prev||{pct:last.pct-10}).pct)+5)}); saveSettle(c); keepScroll(render); return true; }
     case 'tierDel': { const c=readSettleForm(); c.tiers.splice(+a.dataset.i,1); saveSettle(c); keepScroll(render); return true; }
     case 'stSave': { const c=readSettleForm(); for(let i=1;i<c.tiers.length;i++){ const p=c.tiers[i-1]; if(p.upto==null||(c.tiers[i].upto!=null&&c.tiers[i].upto<=p.upto)){ toast('구간 횟수는 위에서 아래로 커져야 해요'); return true; } } saveSettle(c); keepScroll(render); toast('정산 방식을 저장했어요'); return true; }

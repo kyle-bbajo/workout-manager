@@ -317,6 +317,9 @@ input.nm{font:inherit;font-weight:800;font-size:16px;border:none;border-bottom:1
 .exitem .ic{width:34px;height:34px;border-radius:10px;background:var(--blue-soft);display:flex;align-items:center;justify-content:center;flex:none}
 .exitem .ic svg{width:18px;height:18px}
 .exitem button[disabled]{opacity:.5}
+.tierrow{display:grid;grid-template-columns:64px 72px 18px 64px 18px auto;gap:6px;align-items:center;margin-bottom:8px;font-size:13px}
+.tierrow input{min-height:38px;border:1px solid var(--line);border-radius:10px;padding:0 8px;font:inherit;width:100%;background:#fff}
+.tierrow b{grid-column:span 2;font-size:13px}
 
 .realbtn{display:flex;align-items:center;justify-content:center;gap:8px}
 </style>
@@ -2896,7 +2899,21 @@ handleParqHash(); window.addEventListener('hashchange',()=>{ if(handleParqHash()
 function policy(){ return Object.assign({nsDeduct:true,nsPay:true},LS.get('aiwm_policy',{})); }
 function noshows(){ return LS.get('aiwm_noshow',[]); }
 function unitPrice(mid){ const m=members.find(x=>x.id===mid); const c=m&&m.contracts&&m.contracts.slice().reverse().find(c=>+c.amount>0); return c?Math.round(c.amount/c.count):S.settle.price; }
-function payOf(mid){ return Math.round(unitPrice(mid)*S.settle.rate/100); }
+// 정산 방식: fixed 회당 고정 수당(원) · rate 매출 비율(%) · tier 이번 달 수업 수 구간별 비율
+function settleCfg(){ return Object.assign({mode:'rate',fixed:30000,price:S.settle.price,rate:S.settle.rate,tierMode:'all',tiers:[{upto:40,pct:40},{upto:80,pct:50},{upto:null,pct:60}]},LS.get('aiwm_settle',{})); }
+function saveSettle(c){ LS.set('aiwm_settle',c); S.settle.price=c.price; S.settle.rate=c.rate; }
+function tierPct(c,n){ const t=c.tiers.find(t=>t.upto==null||n<=t.upto)||c.tiers[c.tiers.length-1]; return t?+t.pct:0; }
+function unitPriceC(mid,c){ const m=members.find(x=>x.id===mid); const k=m&&m.contracts&&m.contracts.slice().reverse().find(k=>+k.amount>0); return k?Math.round(k.amount/k.count):c.price; }
+function payroll(md){
+  const c=settleCfg(), items=md.slice().sort((a,b)=>(a.d+(a.lt||'')).localeCompare(b.d+(b.lt||''))), n=items.length, pay={};
+  items.forEach((x,i)=>{ const rev=unitPriceC(x.mid,c);
+    let v=c.mode==='fixed'?+c.fixed:c.mode==='rate'?rev*c.rate/100:rev*tierPct(c,c.tierMode==='all'?n:i+1)/100;
+    pay[x.id]=Math.round(v); });
+  const total=Object.values(pay).reduce((a,b)=>a+b,0), rev=items.reduce((a,x)=>a+unitPriceC(x.mid,c),0);
+  let label=c.mode==='fixed'?`회당 ${fmt(c.fixed)}원`:c.mode==='rate'?`매출의 ${c.rate}%`:c.tierMode==='all'?`이번 달 ${n}회 → ${tierPct(c,n)}% 구간`:'구간별 누진';
+  return {pay,total,rev,label,n,cfg:c};
+}
+function payOf(mid){ const c=settleCfg(); return c.mode==='fixed'?+c.fixed:Math.round(unitPriceC(mid,c)*(c.mode==='rate'?c.rate:tierPct(c,monthDone().length))/100); }
 function monthKey(d){ return (d||ymd(new Date())).slice(0,7); }
 // 처음 열 때 이번 달 예시 서명 기록을 몇 건 넣어 둠 (시연용)
 (function(){ if(LS.get('aiwm_signs',null)) return; const t=new Date(), out=[]; const wave=k=>encSig([[...Array(14)].map((_,i)=>[0.1+i*0.06,0.5+Math.sin(i/2+k)*0.25]),[[0.2,0.75],[0.5,0.78],[0.8,0.72]]]);
@@ -2915,7 +2932,7 @@ function todayLessons(){ const t=ymd(new Date()); return sched().filter(l=>l.dat
   return Object.assign({},l,{state:ns?'noshow':sg?'done':'todo',sg,ns}); }); }
 function homeTiles(){
   const tl=todayLessons(), done=tl.filter(x=>x.state==='done').length, ns=tl.filter(x=>x.state==='noshow').length, md=monthDone();
-  const pay=md.reduce((a,x)=>a+payOf(x.mid),0);
+  const pay=payroll(md).total;
   const tile2=(act,label,val,status,cls)=>`<button class="tile tilebtn" data-act="${act}"><div class="tl">${label}</div><div class="tv">${numBig(String(val))}</div><span class="st ${cls}">${status}</span></button>`;
   return `<div class="tiles">${tile2('tileToday','오늘 수업 (건)',tl.length,`완료 ${done}${ns?' · 노쇼 '+ns:''} · 남음 ${tl.length-done-ns}`,'gray')}${tile2('tileDone','수업 완료 (회)',md.length,'이번 달 · 서명 '+md.filter(x=>x.kind==='sign').length,'green')}${tile2('tilePay','정산 대기',Math.round(pay/10000)+'만','이번 달 예정','orange')}</div>`;
 }
@@ -2929,18 +2946,18 @@ function tileSheet(kind){
   if(kind==='today'){ const tl=todayLessons();
     return `<div class="modal"><div class="sheet" role="dialog" aria-label="오늘 수업"><h2>오늘 수업</h2><p class="muted" style="margin:0 0 10px">${mdLabel(ymd(new Date()))} · ${tl.length}건</p>
       ${tl.length?tl.map(x=>`${rowLesson(x)}${x.state==='todo'?`<div class="row" style="margin:-2px 0 10px 64px;gap:6px"><button class="btn sm" data-act="signHere" data-m="${x.mid}">서명받기</button><button class="btn sm sec" data-act="nsMark" data-id="${x.id}" style="color:var(--red)">노쇼 처리</button></div>`:x.state==='noshow'?`<div class="row" style="margin:-2px 0 10px 64px"><button class="btn sm sec" data-act="nsUndo" data-id="${x.ns.id}">노쇼 취소</button></div>`:x.sg?`<div style="margin:-2px 0 10px 64px;max-width:180px">${sigSVG(x.sg.sig,38)}</div>`:''}`).join(''):'<p class="muted">오늘 잡힌 수업이 없어요.</p>'}${close}</div></div>`; }
-  const md=monthDone(), byM={}; md.forEach(x=>{ (byM[x.mid]=byM[x.mid]||{name:x.name,c:0,ns:0,pay:0}); byM[x.mid].c++; if(x.kind==='noshow') byM[x.mid].ns++; byM[x.mid].pay+=payOf(x.mid); });
+  const md=monthDone(), PR=payroll(md), byM={}; md.forEach(x=>{ (byM[x.mid]=byM[x.mid]||{name:x.name,c:0,ns:0,pay:0}); byM[x.mid].c++; if(x.kind==='noshow') byM[x.mid].ns++; byM[x.mid].pay+=PR.pay[x.id]||0; });
   if(kind==='done') return `<div class="modal"><div class="sheet" role="dialog" aria-label="수업 완료"><h2>이번 달 수업 완료</h2><p class="muted" style="margin:0 0 10px">${md.length}회 · 서명 ${md.filter(x=>x.kind==='sign').length} · 노쇼 ${md.filter(x=>x.kind==='noshow').length}</p>
       ${md.map(x=>`${rowLesson(x)}${x.sig?`<div style="margin:-2px 0 10px 64px;max-width:180px">${sigSVG(x.sig,38)}</div>`:''}`).join('')||'<p class="muted">이번 달 완료한 수업이 없어요.</p>'}${close}</div></div>`;
-  const total=md.reduce((a,x)=>a+payOf(x.mid),0);
-  return `<div class="modal"><div class="sheet" role="dialog" aria-label="정산 대기"><h2>정산 대기 · 이번 달</h2><p class="muted" style="margin:0 0 10px">서명 완료${policy().nsPay?' + 노쇼':''} 수업 기준 · 수당 ${S.settle.rate}%</p>
+  const total=PR.total;
+  return `<div class="modal"><div class="sheet" role="dialog" aria-label="정산 대기"><h2>정산 대기 · 이번 달</h2><p class="muted" style="margin:0 0 10px">서명 완료${policy().nsPay?' + 노쇼':''} 수업 기준 · ${PR.label}</p>
     <div class="big" style="color:var(--blue);margin-bottom:8px">${fmt(total)}원</div>
-    <table class="t"><tr><th>회원</th><th>완료</th><th>회당 단가</th><th>수당</th></tr>${Object.entries(byM).map(([mid,v])=>`<tr><td>${esc(v.name)}</td><td>${v.c}회${v.ns?` <span class="muted">(노쇼 ${v.ns})</span>`:''}</td><td>${fmt(unitPrice(mid))}</td><td><b>${fmt(v.pay)}</b></td></tr>`).join('')}</table>
+    <table class="t"><tr><th>회원</th><th>완료</th><th>회당 단가</th><th>수당</th></tr>${Object.entries(byM).map(([mid,v])=>`<tr><td>${esc(v.name)}</td><td>${v.c}회${v.ns?` <span class="muted">(노쇼 ${v.ns})</span>`:''}</td><td>${fmt(unitPriceC(mid,PR.cfg))}</td><td><b>${fmt(v.pay)}</b></td></tr>`).join('')}</table>
     <div class="secttl" style="margin-top:12px">수업별 내역</div>${md.map(rowLesson).join('')}
     <button class="btn full" data-act="copySettle2" style="margin-top:10px">센터 제출용 내역 복사</button>${close}</div></div>`;
 }
-function settleText(){ const md=monthDone(); const total=md.reduce((a,x)=>a+payOf(x.mid),0);
-  return `${new Date().getMonth()+1}월 수업 정산 내역\n완료 ${md.length}회 · 예상 수당 ${fmt(total)}원\n\n`+md.slice().reverse().map(x=>`${x.d} ${x.lt||''} ${x.name} ${x.n?x.n+'회차':''} · ${x.kind==='noshow'?'노쇼':'서명 '+x.at+(x.via==='member'?'(회원폰)':'(트레이너폰)')} · ${fmt(payOf(x.mid))}원`).join('\n'); }
+function settleText(){ const md=monthDone(), PR=payroll(md);
+  return `${new Date().getMonth()+1}월 수업 정산 내역\n완료 ${md.length}회 · 매출 ${fmt(PR.rev)}원 · 정산 방식 ${PR.label} · 예상 수당 ${fmt(PR.total)}원\n\n`+md.slice().reverse().map(x=>`${x.d} ${x.lt||''} ${x.name} ${x.n?x.n+'회차':''} · ${x.kind==='noshow'?'노쇼':'서명 '+x.at+(x.via==='member'?'(회원폰)':'(트레이너폰)')} · ${fmt(PR.pay[x.id]||0)}원`).join('\n'); }
 function noShow(lessonId){
   const l=sched().find(x=>x.id===lessonId); if(!l) return;
   const now=new Date(), m=members.find(x=>x.id===l.mid), P=policy();
@@ -2972,16 +2989,25 @@ function tileAct(act,a){
 // 정산 탭: 실제 서명·노쇼 기록으로 계산
 function tSettle(){
   renderTop(`정산 · ${new Date().getMonth()+1}월`,false);
-  const st=S.settle, md=monthDone(), total=md.reduce((a,x)=>a+payOf(x.mid),0), P=policy();
-  const byM={}; md.forEach(x=>{ (byM[x.mid]=byM[x.mid]||{name:x.name,c:0,s:0,ns:0,pay:0}); byM[x.mid].c++; x.kind==='sign'?byM[x.mid].s++:byM[x.mid].ns++; byM[x.mid].pay+=payOf(x.mid); });
+  const md=monthDone(), PR=payroll(md), c=PR.cfg, P=policy(), n=md.length;
+  const byM={}; md.forEach(x=>{ (byM[x.mid]=byM[x.mid]||{name:x.name,c:0,s:0,ns:0,pay:0}); byM[x.mid].c++; x.kind==='sign'?byM[x.mid].s++:byM[x.mid].ns++; byM[x.mid].pay+=PR.pay[x.id]||0; });
+  const help={fixed:'수업 1회를 하면 정해진 금액을 받아요. 회원이 낸 금액과 상관없어요. (예: 회당 3만 원)',rate:'회원이 낸 회당 금액(계약 금액 ÷ 횟수)의 몇 %를 받아요. (예: 7만 원 수업의 50% = 3.5만 원)',tier:'이번 달 수업 수가 많을수록 비율이 올라가요. (예: 40회까지 40%, 80회까지 50%, 그 이상 60%)'};
+  const cur=c.tiers.findIndex(t=>t.upto==null||n<=t.upto), nextT=c.tiers[cur];
   return `<div class="card"><h3>정산 방식</h3>
-    <div class="seg" role="group"><button class="${st.mode==='fixed'?'on':''}" data-act="settleMode" data-v="fixed">회당 수당</button><button class="${st.mode==='rate'?'on':''}" data-act="settleMode" data-v="rate">매출 비율</button></div>
-    <div class="grid2" style="margin-top:10px">
-      <label class="field"><span>기본 회당 단가 (원)</span><input type="number" id="stPrice" value="${st.price}"></label>
-      <label class="field"><span>${st.mode==='fixed'?'수당 비율 (%)':'배분 비율 (%)'}</span><input type="number" id="stRate" value="${st.rate}"></label></div>
-    <p class="muted" style="margin:0;font-size:12px">계약 금액을 넣은 회원은 그 회원의 회당 단가로 계산해요.</p></div>
-  <button class="card tilebtn" data-act="tilePay" style="width:100%;text-align:left"><div class="muted">완료 수업 (서명${P.nsPay?' + 노쇼':''})</div><div class="big">${md.length}회</div>
-    <div class="muted" style="margin-top:8px">예상 정산금</div><div class="big" style="color:var(--blue)">${fmt(total)}원</div><div class="muted" style="font-size:12px;margin-top:4px">눌러서 수업별 내역 보기 ›</div></button>
+    <div class="seg" role="group"><button class="${c.mode==='fixed'?'on':''}" data-act="stMode" data-v="fixed">회당 고정</button><button class="${c.mode==='rate'?'on':''}" data-act="stMode" data-v="rate">매출 비율</button><button class="${c.mode==='tier'?'on':''}" data-act="stMode" data-v="tier">구간별 비율</button></div>
+    <p class="muted" style="margin:8px 0 10px;font-size:12.5px;line-height:1.55">${help[c.mode]}</p>
+    ${c.mode==='fixed'?`<label class="field"><span>회당 수당 (원)</span><input type="number" inputmode="numeric" id="stFixed" value="${c.fixed}"></label>`:''}
+    ${c.mode!=='fixed'?`<label class="field"><span>기본 회당 매출 (원) · 계약 금액이 없는 회원에 적용</span><input type="number" inputmode="numeric" id="stPrice2" value="${c.price}"></label>`:''}
+    ${c.mode==='rate'?`<label class="field"><span>내 몫 비율 (%)</span><input type="number" inputmode="numeric" id="stRate2" value="${c.rate}"></label>`:''}
+    ${c.mode==='tier'?`<div class="secttl">구간 (이번 달 완료 수업 수 기준)</div>
+      ${c.tiers.map((t,i)=>`<div class="tierrow"><span>${i===0?1:(+c.tiers[i-1].upto||0)+1}회 ~</span>${t.upto==null?'<b>그 이상</b>':`<input type="number" inputmode="numeric" data-tier="${i}" data-k="upto" value="${t.upto}" aria-label="구간 ${i+1} 끝 횟수"><span>회</span>`}<input type="number" inputmode="numeric" data-tier="${i}" data-k="pct" value="${t.pct}" aria-label="구간 ${i+1} 비율"><span>%</span>${c.tiers.length>1&&t.upto!=null?`<button class="btn sm sec" data-act="tierDel" data-i="${i}" aria-label="구간 삭제" style="padding:2px 8px">×</button>`:''}</div>`).join('')}
+      <button class="btn sm sec full" data-act="tierAdd" style="margin:4px 0 10px">${I.plus} 구간 추가</button>
+      <div class="seg" role="group"><button class="${c.tierMode==='all'?'on':''}" data-act="tierMode" data-v="all">도달한 구간 비율을 전체에</button><button class="${c.tierMode==='progressive'?'on':''}" data-act="tierMode" data-v="progressive">구간별로 나눠 적용</button></div>
+      <p class="muted" style="margin:6px 0 0;font-size:12px">${c.tierMode==='all'?'예: 45회 하면 1~45회 모두 50%':'예: 45회 하면 1~40회는 40%, 41~45회는 50%'}</p>
+      <div class="alert b" style="margin:10px 0 0"><div>이번 달 <b>${n}회</b> · 지금 <b>${tierPct(c,n)}%</b> 구간${nextT&&nextT.upto!=null?` · 다음 구간까지 ${nextT.upto-n+1}회`:''}</div></div>`:''}
+    <button class="btn sm full" data-act="stSave" style="margin-top:10px">정산 방식 저장</button></div>
+  <button class="card tilebtn" data-act="tilePay" style="width:100%;text-align:left"><div class="muted">완료 수업 (서명${P.nsPay?' + 노쇼':''}) · ${PR.label}</div><div class="big">${n}회 <span class="muted" style="font-size:13px;font-weight:600">매출 ${fmt(PR.rev)}원</span></div>
+    <div class="muted" style="margin-top:8px">예상 정산금</div><div class="big" style="color:var(--blue)">${fmt(PR.total)}원</div><div class="muted" style="font-size:12px;margin-top:4px">눌러서 수업별 내역 보기 ›</div></button>
   <div class="card"><h3>회원별 완료 수업</h3><table class="t"><tr><th>회원</th><th>완료</th><th>서명</th><th>수당</th></tr>${Object.values(byM).map(v=>`<tr><td>${esc(v.name)}</td><td>${v.c}회</td><td><span class="pill p-green">${v.s}/${v.c}</span>${v.ns?` <span class="pill p-red">노쇼 ${v.ns}</span>`:''}</td><td>${fmt(v.pay)}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">이번 달 기록이 없어요</td></tr>'}</table></div>
   <div class="card"><h3>노쇼 처리 규칙</h3>
     <div class="row" style="align-items:center"><span class="sp" style="font-size:14px">노쇼하면 수강권 1회 차감</span><button class="toggle ${P.nsDeduct?'on':''}" data-act="nsPolicy" data-k="nsDeduct" aria-pressed="${P.nsDeduct}" aria-label="노쇼 수강권 차감"></button></div>
@@ -2990,6 +3016,21 @@ function tSettle(){
   <button class="btn sec full" data-act="copySettle2">센터 제출용 내역 복사</button>
   <p class="foot">계산과 내역 관리만 합니다 · 실제 지급은 센터에서</p>
   ${aiSettingsCard(false)}`;
+}
+
+function readSettleForm(){ const c=settleCfg(), v=id=>{ const e=$('#'+id); return e?parseFloat(e.value):NaN; };
+  if(isFinite(v('stFixed'))) c.fixed=Math.max(0,v('stFixed')); if(isFinite(v('stPrice2'))) c.price=Math.max(0,v('stPrice2')); if(isFinite(v('stRate2'))) c.rate=Math.min(100,Math.max(0,v('stRate2')));
+  document.querySelectorAll('[data-tier]').forEach(e=>{ const t=c.tiers[+e.dataset.tier]; if(!t) return; const x=parseFloat(e.value); if(isFinite(x)) t[e.dataset.k]=e.dataset.k==='pct'?Math.min(100,Math.max(0,x)):Math.max(1,Math.round(x)); });
+  return c; }
+function settleAct(act,a){
+  switch(act){
+    case 'stMode': { const c=readSettleForm(); c.mode=a.dataset.v; saveSettle(c); keepScroll(render); return true; }
+    case 'tierMode': { const c=readSettleForm(); c.tierMode=a.dataset.v; saveSettle(c); keepScroll(render); return true; }
+    case 'tierAdd': { const c=readSettleForm(), last=c.tiers[c.tiers.length-1], prev=c.tiers[c.tiers.length-2]; const start=prev?+prev.upto:0; c.tiers.splice(c.tiers.length-1,0,{upto:start+20,pct:Math.min(100,(+(prev||{pct:last.pct-10}).pct)+5)}); saveSettle(c); keepScroll(render); return true; }
+    case 'tierDel': { const c=readSettleForm(); c.tiers.splice(+a.dataset.i,1); saveSettle(c); keepScroll(render); return true; }
+    case 'stSave': { const c=readSettleForm(); for(let i=1;i<c.tiers.length;i++){ const p=c.tiers[i-1]; if(p.upto==null||(c.tiers[i].upto!=null&&c.tiers[i].upto<=p.upto)){ toast('구간 횟수는 위에서 아래로 커져야 해요'); return true; } } saveSettle(c); keepScroll(render); toast('정산 방식을 저장했어요'); return true; }
+  }
+  return false;
 }
 
 // ---------- 회원 영상 업로드 → 수업 때 기준 동작과 관절별 비교 → 피드백 ----------
@@ -3182,6 +3223,7 @@ document.addEventListener('click',e=>{
   if(parqAct(act,a)) return;
   if(tileAct(act,a)) return;
   if(uploadAct(act,a)) return;
+  if(settleAct(act,a)) return;
   switch(act){
     case 'back':
       if(S.role==='trainer'){ if(S.sub==='kakao') go('review'); else if(S.sub==='review') go(null); else go(null);} else go(null); break;

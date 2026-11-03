@@ -382,6 +382,10 @@ input.nm{font:inherit;font-weight:800;font-size:16px;border:none;border-bottom:1
 .notenew .chip{border:1px solid var(--line,#E5E7EB);background:#fff;border-radius:999px;padding:5px 10px;font:inherit;font-size:12.5px;color:var(--ink2,#374151);cursor:pointer}
 .notenew .chip.on{background:var(--blue,#2563EB);border-color:var(--blue,#2563EB);color:#fff}
 .notenew textarea{width:100%;font:inherit;font-size:14px;border:1px solid var(--line,#E5E7EB);border-radius:10px;padding:8px 10px;margin-bottom:6px;resize:vertical}
+.memres{display:grid;gap:4px;margin-bottom:6px}
+.memres:empty{display:none}
+.memres-it{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:9px 12px;border:1px solid var(--line,#E5E7EB);border-radius:10px;background:#fff;font:inherit;color:inherit;cursor:pointer}
+.memres-it .muted{font-size:12.5px;flex:1}
 
 .realbtn{display:flex;align-items:center;justify-content:center;gap:8px}
 </style>
@@ -2346,9 +2350,9 @@ function setupNotesCard(){ const all=LS.get('aiwm_setups',{}), L=Object.entries(
 
 if(window.APP_BUILD){ S.meals=loadMeals(); const _ib=LS.get('aiwm_inbody',null); if(_ib) S.inbody=_ib; const _g=LS.get('aiwm_goal',null); if(_g) Object.assign(S.goal,_g); }
 // 시연 회원 기본 정보 (수정하면 저장된 값이 우선)
-const DEMO_INFO={hw:{phone:'010-2345-6789',gender:'여',birth:'1992-05-14',height:'163',goal:'체지방 줄이기 · 바른 자세',start:'2026-10-01'},
-  mj:{phone:'010-3456-7890',gender:'남',birth:'1988-11-02',height:'177',goal:'허리 통증 없이 데드리프트',start:'2026-09-15'},
-  sy:{phone:'010-4567-8901',gender:'여',birth:'1999-03-21',height:'160',goal:'체력 · 근력 기초',start:'2026-10-25'}};
+const DEMO_INFO={hw:{phone:'010-2345-6789',gender:'여',birth:'1992-05-14',height:'163',goal:'다이어트 (체지방 감량)',start:'2026-10-01'},
+  mj:{phone:'010-3456-7890',gender:'남',birth:'1988-11-02',height:'177',goal:'통증 개선 · 재활',start:'2026-09-15'},
+  sy:{phone:'010-4567-8901',gender:'여',birth:'1999-03-21',height:'160',goal:'체력 · 지구력 향상',start:'2026-10-25'}};
 members.forEach(m=>{ const d=DEMO_INFO[m.id]; if(d) Object.keys(d).forEach(k=>{ if(m[k]==null||m[k]==='') m[k]=d[k]; }); });
 // ---------- 회원 추가 · 수정 (이 기기에 저장) ----------
 (function(){ const L=LS.get('aiwm_members',[]); L.forEach(m=>{ const ex=members.find(x=>x.id===m.id); if(ex) Object.assign(ex,m); else members.push(Object.assign({left:0,flag:null,last:'기록 없음',custom:true},m)); }); })();
@@ -2385,7 +2389,7 @@ function memberSheet(m){
     <p class="muted" id="cfUnit" style="margin:-2px 0 10px;font-size:12.5px">회당 단가는 금액을 넣으면 계산돼요</p>
     <label class="field"><span>이미 한 수업 (회)</span><input type="number" id="mfDone" inputmode="numeric" min="0" value="${f.done||0}"></label>`}
     <div class="secttl">운동</div>
-    <label class="field"><span>목표 (선택)</span><input type="text" id="mfGoal" value="${esc(f.goal||'')}" placeholder="예: 체지방 5kg 감량 · 스쿼트 자세"></label>
+    ${goalField(f.goal)}
     <label class="field"><span>메모 (선택)</span><input type="text" id="mfNote" value="${esc(f.note||'')}" placeholder="예: 허리 통증 이력 · 평일 저녁 가능"></label>
     <div class="row"><button class="btn" data-act="memSave" data-id="${m?m.id:''}" style="flex:1">${m?'저장':'추가'}</button><button class="btn sec" data-act="memClose">닫기</button></div>
   </div></div>`;
@@ -2444,7 +2448,7 @@ function memAct(act,a){
     case 'memClose': $('#modalRoot').innerHTML=''; return true;
     case 'memSave': { const name=($('#mfName').value||'').trim(); if(!name){ toast('이름을 넣어 주세요'); return true; }
       const val=id=>{ const e=$('#'+id); return e?(e.value||'').trim():''; };
-      const v={name,phone:val('mfPhone'),gender:val('mfGender'),birth:val('mfBirth')||(a.dataset.id&&(find(a.dataset.id)||{}).birth)||'',height:val('mfHeight'),goal:val('mfGoal'),note:val('mfNote')};
+      const v={name,phone:val('mfPhone'),gender:val('mfGender'),birth:val('mfBirth')||(a.dataset.id&&(find(a.dataset.id)||{}).birth)||'',height:val('mfHeight'),goal:readGoal(),note:val('mfNote')};
       let m=a.dataset.id&&find(a.dataset.id);
       if(m){ Object.assign(m,v); m.custom=true; if(!m.contracts) m.contracts=[{id:'c0',date:m.start||ymd(new Date()),count:m.total,amount:0,pay:'기타'}]; sched().forEach(x=>{ if(x.mid===m.id) x.name=m.name; }); saveSched(); }
       else { const c=readContract(); m=Object.assign({id:'u'+Date.now().toString(36),left:0,flag:null,last:'기록 없음',custom:true,start:c.date,contracts:[c],total:c.count+(+c.bonus||0),done:Math.min(c.count,Math.max(0,parseInt(val('mfDone'),10)||0))},v); members.push(m); ensureNext(m); }
@@ -2470,7 +2474,7 @@ function memberInfoCard(m){ if(!m) return '';
   return `<div class="card"><h3>회원 정보<button class="btn sm sec" data-act="memEdit" data-id="${m.id}" style="margin-left:auto">정보 수정</button></h3>
     ${m.phone?`<div class="phonebar"><div class="sp"><div class="muted" style="font-size:12px">휴대폰</div><b style="font-size:17px;letter-spacing:.01em">${esc(m.phone)}</b></div>
       <a class="btn sm" href="tel:${telHref(m.phone)}">전화</a><a class="btn sm sec" href="sms:${telHref(m.phone)}">문자</a><button class="btn sm sec" data-act="copyPhone" data-v="${esc(m.phone)}">복사</button></div>`:`<p class="muted" style="margin:0 0 8px;font-size:13px">휴대폰 번호가 없어요 · 정보 수정에서 넣어 주세요</p>`}
-    <div class="kv" style="margin-top:8px">${kv('성별 · 나이',[m.gender,age].filter(Boolean).map(esc).join(' · '))}${kv('생년월일',m.birth?esc(m.birth):'')}${kv('키',m.height?esc(m.height)+'cm':'')}${kv('목표',m.goal?esc(m.goal):'')}${kv('등록일',m.start?esc(m.start):'')}${kv('수강권',`${m.done}/${m.total}회 · 남은 ${left}회`)}</div></div>`; }
+    <div class="kv" style="margin-top:8px">${kv('성별 · 나이',[m.gender,age].filter(Boolean).map(esc).join(' · '))}${kv('생년월일',m.birth?esc(m.birth):'')}${kv('키',m.height?esc(m.height)+'cm':'')}${kv("운동 목적",m.goal?esc(m.goal):"")}${kv('등록일',m.start?esc(m.start):'')}${kv('수강권',`${m.done}/${m.total}회 · 남은 ${left}회`)}</div></div>`; }
 const NOTE_TAGS=[['injury','부상 · 통증','p-red'],['health','건강 · 약','p-orange'],['pref','성향 · 선호','p-blue'],['sched','일정 · 연락','p-gray'],['etc','기타','p-gray']];
 function memNotes(mid){ const all=LS.get('aiwm_memnotes',{}); let L=all[mid];
   if(!L){ const m=members.find(x=>x.id===mid); L=[]; if(m&&m.note) L.push({id:'n0',tag:'etc',t:m.note,d:m.start||ymd(new Date())});
@@ -2496,6 +2500,14 @@ function noteAct(act,a){
     case 'copyPhone': { try{ navigator.clipboard.writeText(a.dataset.v).then(()=>toast('번호를 복사했어요'),()=>toast(a.dataset.v)); }catch(e){ toast(a.dataset.v); } return true; }
   }
   return false; }
+
+// 운동 목적: 목록에서 고르거나 직접 입력
+const GOALS=['다이어트 (체지방 감량)','근력 향상','근육량 증가 (벌크업)','체력 · 지구력 향상','자세 교정','통증 개선 · 재활','바디프로필 준비','건강 유지 · 생활 습관','운동 습관 만들기','스포츠 경기력 (골프 · 테니스 등)','산전 · 산후 관리','시니어 근력 · 균형'];
+function goalField(g){ g=g||''; const custom=g&&!GOALS.includes(g);
+  return `<label class="field"><span>운동 목적</span><select id="mfGoalSel"><option value="">선택 안 함</option>${GOALS.map(x=>`<option ${x===g?'selected':''}>${esc(x)}</option>`).join('')}<option value="__custom" ${custom?'selected':''}>직접 입력</option></select></label>
+    <label class="field" id="mfGoalWrap" style="${custom?'':'display:none'}"><span>운동 목적 직접 입력</span><input type="text" id="mfGoal" value="${custom?esc(g):''}" placeholder="예: 결혼식 전 5kg 감량 · 등산 체력"></label>`; }
+function readGoal(){ const s=$('#mfGoalSel'); if(!s) return (($('#mfGoal')||{}).value||'').trim(); return s.value==='__custom'?(($('#mfGoal')||{}).value||'').trim():s.value; }
+document.addEventListener('change',e=>{ if(e.target&&e.target.id==='mfGoalSel'){ const w=$('#mfGoalWrap'); if(w){ const on=e.target.value==='__custom'; w.style.display=on?'':'none'; if(on){ const i=$('#mfGoal'); i&&i.focus(); } } } });
 
 // ---------- 트레이너 스케줄 (주간 · 월간 드롭다운 · 수업 중 예약) ----------
 const DOW='일월화수목금토';
@@ -2598,7 +2610,7 @@ function schedSheet(f){
   const left=mem?Math.max(0,mem.total-mem.done-sched().filter(x=>x.mid===mem.id&&x.date>=ymd(new Date())&&x.id!==f.id).length):null;
   return `<div class="modal" id="schedModal"><div class="sheet" role="dialog" aria-label="수업 잡기">
     <h2>${f.id?'수업 바꾸기':'수업 잡기'}</h2><p class="muted" style="margin:0 0 12px">${S.sub==='live'||S.sub==='review'||S.sub==='realReview'?'수업 중에 다음 수업을 바로 잡아요':'날짜·시간을 고르세요'}</p>
-    <label class="field"><span>회원</span><select id="sfM">${members.map(m=>`<option value="${m.id}" ${f.mid===m.id?'selected':''}>${m.name} · 남은 ${m.total-m.done}회</option>`).join('')}<option value="_" ${!f.mid?'selected':''}>직접 입력</option></select></label>
+    <label class="field"><span>회원</span><input type="search" id="sfMQ" placeholder="이름이나 전화번호로 검색" autocomplete="off" style="margin-bottom:6px"><div id="sfMRes" class="memres"></div><select id="sfM">${members.map(m=>`<option value="${m.id}" ${f.mid===m.id?'selected':''}>${m.name} · 남은 ${m.total-m.done}회</option>`).join('')}<option value="_" ${!f.mid?'selected':''}>직접 입력</option></select></label>
     <label class="field" id="sfNameWrap" style="${f.mid?'display:none':''}"><span>이름</span><input type="text" id="sfName" value="${f.mid?'':(f.name||'')}" placeholder="회원 이름"></label>
     <div class="grid2"><label class="field"><span>날짜</span><input type="date" id="sfD" value="${f.date}"></label><label class="field"><span>시간</span><input type="time" id="sfT" step="1800" value="${f.time}"></label></div>
     <div class="grid2"><label class="field"><span>수업 길이</span><select id="sfDur">${[30,50,60,90].map(v=>`<option value="${v}" ${+f.dur===v?'selected':''}>${v}분</option>`).join('')}</select></label>
@@ -2625,6 +2637,15 @@ function readSchedForm(){
 function bindSchedForm(){
   const upd=()=>{ const f=readSchedForm(); $('#sfNameWrap').style.display=f.mid?'none':''; $('#sfWarn').innerHTML=f.date&&f.time?warnHTML(f):''; };
   ['sfM','sfD','sfT','sfDur'].forEach(id=>{ const e=$('#'+id); if(e) e.addEventListener('change',upd); });
+  const q=$('#sfMQ'), res=$('#sfMRes'), sel=$('#sfM');
+  if(q&&sel){ const all=[...sel.options].map(o=>({v:o.value,t:o.textContent}));
+    const match=k=>{ k=k.trim().replace(/-/g,''); if(!k) return members; return members.filter(m=>m.name.includes(k)||String(m.phone||'').replace(/-/g,'').includes(k)); };
+    const pick=id=>{ sel.innerHTML=all.map(o=>`<option value="${o.v}" ${o.v===id?'selected':''}>${esc(o.t)}</option>`).join(''); sel.value=id; res.innerHTML=''; const m=members.find(x=>x.id===id); q.value=m?m.name:''; upd(); };
+    q.addEventListener('input',()=>{ const k=q.value, L=match(k);
+      if(!k.trim()){ res.innerHTML=''; sel.innerHTML=all.map(o=>`<option value="${o.v}" ${o.v===sel.value?'selected':''}>${esc(o.t)}</option>`).join(''); return; }
+      res.innerHTML=L.length?L.slice(0,8).map(m=>`<button type="button" class="memres-it" data-pick="${m.id}"><b>${esc(m.name)}</b><span class="muted">남은 ${Math.max(0,m.total-m.done)}회${m.phone?' · '+esc(String(m.phone).slice(-4)):''}</span>${typeof hasCaution==='function'&&hasCaution(m.id)?'<span class="pill p-red" style="font-size:10.5px;padding:1px 6px">특이사항</span>':''}</button>`).join(''):'<div class="muted" style="font-size:13px;padding:6px 2px">찾는 회원이 없어요 · 아래에서 ‘직접 입력’을 고르세요</div>';
+      const ids=L.map(m=>m.id); sel.innerHTML=all.filter(o=>o.v==='_'||ids.includes(o.v)).map(o=>`<option value="${o.v}">${esc(o.t)}</option>`).join(''); if(L.length){ sel.value=L[0].id; upd(); } });
+    res.addEventListener('click',e=>{ const b=e.target.closest('[data-pick]'); if(!b) return; e.stopPropagation(); pick(b.dataset.pick); }); }
 }
 function closeSched(){ S.schedForm=null; $('#modalRoot').innerHTML=''; }
 function afterSchedChange(msg){

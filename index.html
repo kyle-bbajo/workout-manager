@@ -2380,7 +2380,7 @@ function memberSheet(m){
     <div class="secttl">신상 정보</div>
     <label class="field"><span>이름</span><input type="text" id="mfName" value="${esc(f.name)}" placeholder="예: 김지훈" autocomplete="off"></label>
     <div class="grid2"><label class="field"><span>성별</span><select id="mfGender">${['','여','남'].map(g=>`<option value="${g}" ${f.gender===g?'selected':''}>${g||'선택 안 함'}</option>`).join('')}</select></label>
-      <label class="field"><span>생년월일</span><input type="date" id="mfBirth" value="${/^\d{4}-\d{2}-\d{2}$/.test(f.birth||'')?esc(f.birth):''}"></label></div>
+      <label class="field"><span>생년월일</span><input type="text" id="mfBirth" inputmode="numeric" maxlength="10" autocomplete="bday" placeholder="19920514" value="${esc(f.birth||'')}"></label></div>
     <div class="grid2"><label class="field"><span>연락처</span><input type="tel" id="mfPhone" value="${esc(f.phone||'')}" placeholder="010-0000-0000"></label>
       <label class="field"><span>키 (cm)</span><input type="number" id="mfHeight" inputmode="decimal" value="${esc(f.height||'')}" placeholder="선택"></label></div>
     ${m?'':`<div class="secttl">계약</div>
@@ -2449,7 +2449,7 @@ function memAct(act,a){
     case 'memClose': $('#modalRoot').innerHTML=''; return true;
     case 'memSave': { const name=($('#mfName').value||'').trim(); if(!name){ toast('이름을 넣어 주세요'); return true; }
       const val=id=>{ const e=$('#'+id); return e?(e.value||'').trim():''; };
-      const v={name,phone:val('mfPhone'),gender:val('mfGender'),birth:val('mfBirth')||(a.dataset.id&&(find(a.dataset.id)||{}).birth)||'',height:val('mfHeight'),goal:readGoal(),note:val('mfNote')};
+      const v={name,phone:val('mfPhone'),gender:val('mfGender'),birth:normBirth(val('mfBirth')),height:val('mfHeight'),goal:readGoal(),note:val('mfNote')};
       let m=a.dataset.id&&find(a.dataset.id);
       if(m){ Object.assign(m,v); m.custom=true; if(!m.contracts) m.contracts=[{id:'c0',date:m.start||ymd(new Date()),count:m.total,amount:0,pay:'기타'}]; sched().forEach(x=>{ if(x.mid===m.id) x.name=m.name; }); saveSched(); }
       else { const c=readContract(); m=Object.assign({id:'u'+Date.now().toString(36),left:0,flag:null,last:'기록 없음',custom:true,start:c.date,contracts:[c],total:c.count+(+c.bonus||0),done:Math.min(c.count,Math.max(0,parseInt(val('mfDone'),10)||0))},v); members.push(m); ensureNext(m); }
@@ -2517,6 +2517,13 @@ function contractCard(m){ const left=Math.max(0,m.total-m.done);
     ${(m.contracts||[]).length?`<table class="t" style="margin-top:10px"><tr><th>계약일</th><th>횟수</th><th>받은 금액</th><th>회당</th><th></th></tr>${m.contracts.map(c=>`<tr><td>${c.date.slice(2).replace(/-/g,'.')}</td><td>${c.count}회${+c.bonus?`<br><span class="muted" style="font-size:11px">+보너스 ${c.bonus}</span>`:''}</td><td>${c.amount?won(c.amount):'-'}${cDisc(c)?`<br><span class="muted" style="font-size:11px">할인 ${cDisc(c)}%</span>`:''}</td><td>${cUnit(c)?won(cUnit(c)):'-'}</td><td><button class="btn sm sec" data-act="cfDel" data-id="${m.id}" data-c="${c.id}" aria-label="이 계약 삭제" style="padding:2px 8px">×</button></td></tr>`).join('')}</table>
     <div class="kv" style="margin-top:8px"><span class="k">총 계약</span><span class="v">${contractTotal(m)}회 (보너스 ${m.contracts.reduce((x,c)=>x+(+c.bonus||0),0)}회) · ${won(m.contracts.reduce((x,c)=>x+(+c.amount||0),0))}</span><span class="k">지금 회차</span><span class="v">${(()=>{ const si=sessionInfo(m,m.done+1); return `${m.done+1}회차 · ${si.c?(si.bonus?'보너스 수업':'유료 · 회당 '+won(si.unit)):'계약 범위 밖'}`; })()}</span><span class="k">결제</span><span class="v">${[...new Set(m.contracts.map(c=>c.pay))].join(', ')}</span></div>`:'<p class="muted" style="margin:8px 0 0">계약 기록이 없어요.</p>'}
     <button class="btn sm ${left<=3?'':'sec'} full" data-act="cfNew" data-id="${m.id}" style="margin-top:10px">${I.plus} 계약 추가 (재등록)</button></div>`; }
+
+// 생년월일: 숫자만 쳐도 1992-05-14 로 (6자리 920514 도 됨)
+function normBirth(v){ const d=String(v||'').replace(/\D/g,''); if(d.length===8) return d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6);
+  if(d.length===6){ const yy=+d.slice(0,2), cy=new Date().getFullYear()%100; return (yy>cy?'19':'20')+d.slice(0,2)+'-'+d.slice(2,4)+'-'+d.slice(4); }
+  if(d.length===4) return d; return String(v||'').trim(); }
+document.addEventListener('input',e=>{ const t=e.target; if(!t||t.id!=='mfBirth') return; const d=t.value.replace(/\D/g,'').slice(0,8);
+  t.value=d.length>6?d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6):d.length>4&&d.length!==6?d.slice(0,4)+'-'+d.slice(4):d; });
 
 // ---------- 트레이너 스케줄 (주간 · 월간 드롭다운 · 수업 중 예약) ----------
 const DOW='일월화수목금토';

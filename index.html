@@ -273,6 +273,10 @@ input.nm{font:inherit;font-weight:800;font-size:16px;border:none;border-bottom:1
 .sigpad canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;border-radius:14px}
 .sighint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:14px;pointer-events:none}
 .sigclear{position:absolute;right:8px;bottom:8px;padding:4px 10px}
+.wkoff{position:absolute;width:calc((100% - 30px) / 7);background:repeating-linear-gradient(135deg,#F1F3F6 0 6px,#E7EAEF 6px 12px);z-index:1;pointer-events:none}
+.avrow{display:grid;grid-template-columns:76px 1fr 12px 1fr;gap:6px;align-items:center;margin-bottom:8px}
+.avrow input[type=time]{min-height:40px;border:1px solid var(--line);border-radius:10px;padding:0 8px;background:#fff;font:inherit;width:100%}
+.avday{display:flex;align-items:center;gap:8px;font-size:14px}.avday input{width:18px;height:18px}
 
 .realbtn{display:flex;align-items:center;justify-content:center;gap:8px}
 </style>
@@ -2258,6 +2262,25 @@ function lessonsOn(ds){ return sched().filter(x=>x.date===ds).sort((a,b)=>a.time
 function nextOf(mid){ const now=ymd(new Date())+' '+min2hm(new Date().getHours()*60+new Date().getMinutes()); const x=sched().find(l=>l.mid===mid&&(l.date+' '+l.time)>=now); return x?(x.date===ymd(new Date())?'오늘 ':mdLabel(x.date)+' ')+x.time:'예약 없음'; }
 // 회원 목록의 '다음 수업'을 스케줄에서 계산
 members.forEach(m=>{ try{ Object.defineProperty(m,'next',{get(){ return nextOf(m.id); },configurable:true}); }catch(e){} });
+// 수업 가능 시간 (요일별 시작·끝 + 공통 휴게 시간)
+const AVAIL_DEF={1:{on:true,s:'09:00',e:'21:00'},2:{on:true,s:'09:00',e:'21:00'},3:{on:true,s:'09:00',e:'21:00'},4:{on:true,s:'09:00',e:'21:00'},5:{on:true,s:'09:00',e:'21:00'},6:{on:true,s:'10:00',e:'14:00'},0:{on:false,s:'10:00',e:'14:00'},brk:{on:false,s:'12:00',e:'13:00'}};
+function avail(){ return Object.assign(JSON.parse(JSON.stringify(AVAIL_DEF)),LS.get('aiwm_avail',{})); }
+function outOfHours(f){ const A=avail(), d=A[parseYmd(f.date).getDay()], a=hm2min(f.time), b=a+(+f.dur||60);
+  if(!d||!d.on) return '이 요일은 수업을 받지 않는 날이에요';
+  if(a<hm2min(d.s)||b>hm2min(d.e)) return `수업 가능 시간(${d.s}–${d.e}) 밖이에요`;
+  if(A.brk&&A.brk.on&&a<hm2min(A.brk.e)&&b>hm2min(A.brk.s)) return `휴게 시간(${A.brk.s}–${A.brk.e})과 겹쳐요`;
+  return ''; }
+function availSummary(){ const A=avail(), order=[1,2,3,4,5,6,0], groups=[];
+  order.forEach(k=>{ const d=A[k], key=d.on?d.s+'–'+d.e:'휴무', last=groups[groups.length-1]; if(last&&last.key===key) last.days.push(k); else groups.push({key,days:[k]}); });
+  const nm=ds=>ds.length>2?DOW[ds[0]]+'–'+DOW[ds[ds.length-1]]:ds.map(x=>DOW[x]).join('·');
+  return groups.map(g=>`${nm(g.days)} ${g.key}`).join(' · ')+(A.brk&&A.brk.on?` · 휴게 ${A.brk.s}–${A.brk.e}`:''); }
+function availSheet(){ const A=avail(), order=[1,2,3,4,5,6,0];
+  return `<div class="modal" id="availModal"><div class="sheet" role="dialog" aria-label="수업 가능 시간 설정">
+    <h2>수업 가능 시간</h2><p class="muted" style="margin:0 0 12px">요일마다 수업할 수 있는 시간을 정해요. 이 시간 밖은 시간표에서 회색으로 보이고, 잡을 때 알려 줘요.</p>
+    ${order.map(k=>`<div class="avrow"><label class="avday"><input type="checkbox" id="av_on_${k}" ${A[k].on?'checked':''}><b>${DOW[k]}</b></label><input type="time" step="1800" id="av_s_${k}" value="${A[k].s}" aria-label="${DOW[k]}요일 시작"><span>–</span><input type="time" step="1800" id="av_e_${k}" value="${A[k].e}" aria-label="${DOW[k]}요일 끝"></div>`).join('')}
+    <div class="avrow" style="margin-top:6px;border-top:1px solid var(--line);padding-top:10px"><label class="avday"><input type="checkbox" id="av_on_brk" ${A.brk.on?'checked':''}><b>휴게</b></label><input type="time" step="1800" id="av_s_brk" value="${A.brk.s}" aria-label="휴게 시작"><span>–</span><input type="time" step="1800" id="av_e_brk" value="${A.brk.e}" aria-label="휴게 끝"></div>
+    <div class="row" style="margin:6px 0 12px"><button class="btn sm sec" data-act="availCopy" style="flex:1">월요일 시간을 평일에 복사</button></div>
+    <div class="row"><button class="btn" data-act="availSave" style="flex:1">저장</button><button class="btn sec" data-act="availClose">닫기</button></div></div></div>`; }
 function conflicts(f){ const a=hm2min(f.time), b=a+(+f.dur||60); return sched().filter(x=>x.id!==f.id&&x.date===f.date&&hm2min(x.time)<b&&hm2min(x.time)+x.dur>a); }
 
 function tSchedule(){
@@ -2280,6 +2303,9 @@ function tSchedule(){
     <div class="wkg" id="wkGrid" data-h0="${H0}" data-row="${ROW}" data-wk="${wk}" style="height:${(H1-H0)*ROW}px">
       ${Array.from({length:H1-H0},(_,h)=>`<div class="wkl" style="top:${h*ROW}px"><span>${H0+h}</span></div>`).join('')}
       ${days.map((d,i)=>`<div class="wkc${d===sel?' on':''}" style="left:calc(30px + ${i} * (100% - 30px) / 7)" data-col="${d}"></div>`).join('')}
+      ${(()=>{ const A=avail(); return days.map((d,i)=>{ const a=A[parseYmd(d).getDay()], L=`left:calc(30px + ${i} * (100% - 30px) / 7)`; const blk=(m0,m1)=>{ m0=Math.max(m0,H0*60); m1=Math.min(m1,H1*60); return m1>m0?`<div class="wkoff" style="${L};top:${(m0-H0*60)/60*ROW}px;height:${(m1-m0)/60*ROW}px"></div>`:''; };
+        if(!a.on) return blk(H0*60,H1*60);
+        return blk(H0*60,hm2min(a.s))+blk(hm2min(a.e),H1*60)+(A.brk.on?blk(hm2min(A.brk.s),hm2min(A.brk.e)):''); }).join(''); })()}
       ${days.map((d,i)=>lessonsOn(d).map(x=>{ const top=(hm2min(x.time)-H0*60)/60*ROW, h=Math.max(18,x.dur/60*ROW-2); return `<button class="wkb${x.mid==='hw'?' c1':x.mid==='mj'?' c2':x.mid==='sy'?' c3':''}" data-act="schedEdit" data-id="${x.id}" style="left:calc(30px + ${i} * (100% - 30px) / 7 + 1px);top:${top}px;height:${h}px" aria-label="${mdLabel(d)} ${x.time} ${x.name}"><b>${x.name}</b><span>${x.time}</span></button>`; }).join('')).join('')}
       ${days.includes(today)?(()=>{ const nm=new Date().getHours()*60+new Date().getMinutes(); const i=days.indexOf(today); return nm>=H0*60&&nm<=H1*60?`<div class="wknow" style="left:calc(30px + ${i} * (100% - 30px) / 7);top:${(nm-H0*60)/60*ROW}px"></div>`:''; })():''}
     </div>
@@ -2289,7 +2315,7 @@ function tSchedule(){
     ${selList.length?selList.map(x=>`<button class="list-item" data-act="schedEdit" data-id="${x.id}"><b style="width:52px">${x.time}</b><div class="av" style="width:30px;height:30px;font-size:13px">${x.name[0]}</div><div class="sp"><b style="font-size:14px">${x.name}</b><div class="muted">${x.dur}분${x.note?' · '+x.note:''}</div></div><span class="muted">›</span></button>`).join(''):'<p class="muted" style="margin:0">수업이 없어요.</p>'}
   </div>
   <button class="btn full" data-act="schedNew" data-d="${sel}">${I.plus} 수업 잡기</button>
-  <div class="card" style="margin-top:12px"><h3>수업 가능 시간</h3><div class="muted">평일 09:00–21:00 · 토 10:00–14:00 · 회원은 이 시간 안에서만 예약 요청할 수 있습니다.</div></div>`;
+  <div class="card" style="margin-top:12px"><h3>수업 가능 시간<button class="btn sm sec" data-act="availOpen" style="margin-left:auto">설정</button></h3><div class="muted" style="line-height:1.6">${availSummary()}</div><p class="muted" style="margin:6px 0 0;font-size:12px">시간표의 회색 칸은 수업을 받지 않는 시간이에요.</p></div>`;
 }
 function monthGrid(sel){
   const cur=S.monthCur||sel.slice(0,7), [y,m]=cur.split('-').map(Number);
@@ -2313,11 +2339,13 @@ function schedSheet(f){
     <div class="grid2"><label class="field"><span>수업 길이</span><select id="sfDur">${[30,50,60,90].map(v=>`<option value="${v}" ${+f.dur===v?'selected':''}>${v}분</option>`).join('')}</select></label>
       ${f.id?'<div></div>':`<label class="field"><span>반복</span><select id="sfRep"><option value="1">한 번</option><option value="4">매주 4회</option><option value="8">매주 8회</option>${left?`<option value="${left}">남은 횟수만큼 (${left}회)</option>`:''}</select></label>`}</div>
     <label class="field"><span>메모 (선택)</span><input type="text" id="sfNote" value="${f.note||''}" placeholder="예: 하체 · 스쿼트 무게 올리기"></label>
-    <div id="sfWarn">${cf.length?`<div class="alert o" style="margin:0 0 10px"><div><b>시간이 겹쳐요</b><br>${cf.map(x=>x.time+' '+x.name).join(', ')}</div></div>`:''}</div>
+    <div id="sfWarn">${warnHTML(f)}</div>
     ${mem?`<p class="muted" style="margin:0 0 10px;font-size:12.5px">${mem.name} 다음 수업: ${nextOf(mem.id)}${left!=null?` · 남은 수강권 ${left}회 (예약 제외)`:''}</p>`:''}
     <div class="row"><button class="btn" data-act="schedSave" style="flex:1">${f.id?'저장':'잡기'}</button>${f.id?'<button class="btn sec" data-act="schedDel" style="background:var(--red-soft);color:var(--red)">취소하기</button>':''}<button class="btn sec" data-act="schedClose">닫기</button></div>
   </div></div>`;
 }
+function warnHTML(f){ const cf=conflicts(f), oh=outOfHours(f);
+  return (cf.length?`<div class="alert o" style="margin:0 0 10px"><div><b>시간이 겹쳐요</b><br>${cf.map(x=>x.time+' '+x.name).join(', ')}</div></div>`:'')+(oh?`<div class="alert o" style="margin:0 0 10px"><div><b>${oh}</b><br>그래도 잡을 수는 있어요.</div></div>`:''); }
 function openSched(f){
   S.schedForm=Object.assign({date:ymd(new Date()),time:'18:00',dur:60,mid:'hw',name:'혜원',note:''},f);
   const root=$('#modalRoot'); root.innerHTML=schedSheet(S.schedForm); bindSchedForm();
@@ -2329,7 +2357,7 @@ function readSchedForm(){
   return f;
 }
 function bindSchedForm(){
-  const upd=()=>{ const f=readSchedForm(); $('#sfNameWrap').style.display=f.mid?'none':''; const cf=f.date&&f.time?conflicts(f):[]; $('#sfWarn').innerHTML=cf.length?`<div class="alert o" style="margin:0 0 10px"><div><b>시간이 겹쳐요</b><br>${cf.map(x=>x.time+' '+x.name).join(', ')}</div></div>`:''; };
+  const upd=()=>{ const f=readSchedForm(); $('#sfNameWrap').style.display=f.mid?'none':''; $('#sfWarn').innerHTML=f.date&&f.time?warnHTML(f):''; };
   ['sfM','sfD','sfT','sfDur'].forEach(id=>{ const e=$('#'+id); if(e) e.addEventListener('change',upd); });
 }
 function closeSched(){ S.schedForm=null; $('#modalRoot').innerHTML=''; }
@@ -2342,6 +2370,13 @@ function nextLessonHTML(){ return `다음 수업 <b>${nextOf('hw')}</b>`; }
 function nextLessonBar(){ return `<div class="nextbar"><span id="nextLesson">${nextLessonHTML()}</span><button class="btn sm sec" data-act="schedNew" data-m="hw">다음 수업 잡기</button></div>`; }
 function schedAct(act,a){
   switch(act){
+    case 'availOpen': $('#modalRoot').innerHTML=availSheet(); return true;
+    case 'availClose': $('#modalRoot').innerHTML=''; return true;
+    case 'availCopy': { const on=$('#av_on_1').checked, st=$('#av_s_1').value, en=$('#av_e_1').value; [2,3,4,5].forEach(k=>{ $('#av_on_'+k).checked=on; $('#av_s_'+k).value=st; $('#av_e_'+k).value=en; }); return true; }
+    case 'availSave': { const A={}; let bad='';
+      [1,2,3,4,5,6,0,'brk'].forEach(k=>{ const v={on:$('#av_on_'+k).checked,s:$('#av_s_'+k).value||'09:00',e:$('#av_e_'+k).value||'21:00'}; if(v.on&&hm2min(v.e)<=hm2min(v.s)) bad=(k==='brk'?'휴게':DOW[k]+'요일')+' 끝 시간이 시작보다 빨라요'; A[k]=v; });
+      if(bad){ toast(bad); return true; }
+      LS.set('aiwm_avail',A); $('#modalRoot').innerHTML=''; keepScroll(render); toast('수업 가능 시간을 저장했어요'); return true; }
     case 'wkPrev': S.wkStart=addDays(S.wkStart,-7); S.wkSel=S.wkStart; S.monthCur=null; keepScroll(render); return true;
     case 'wkNext': S.wkStart=addDays(S.wkStart,7); S.wkSel=S.wkStart; S.monthCur=null; keepScroll(render); return true;
     case 'wkDay': S.wkSel=a.dataset.d; keepScroll(render); return true;

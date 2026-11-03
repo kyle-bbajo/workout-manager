@@ -1,0 +1,17 @@
+{
+  "name": "AI 운동 매니저 — 마커리스 운동 기록",
+  "short_name": "AI 운동 매니저",
+  "description": "카메라 한 대로 수업 전체를 자동 기록하고, 트레이너 기준으로 혼자 연습까지",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F2F4F7",
+  "theme_color": "#1D4ED8",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

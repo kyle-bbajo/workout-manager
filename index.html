@@ -501,6 +501,12 @@ input.nm{font:inherit;font-weight:800;font-size:16px;border:none;border-bottom:1
 .sheet:not(.wlog) .fblock{background:#F8FAFC;border-color:var(--line,#E5E7EB)}
 .sheet.wlog .wl-bigfig{background:#16161A}
 .wl-set.on{outline:none}.wl-set.on i{outline:2px solid #fff;outline-offset:4px}
+/* 관리자 · 기능 켜기/끄기 */
+.flagrow{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line,#E5E7EB)}
+.flagrow:not(.on) b{color:var(--muted,#6B7280)}
+.corehero{border:1.5px solid var(--blue,#2563EB)}
+body.off-coach [data-act="reReport"],body.off-schedule [data-act="schedNew"],body.off-schedule [data-act="goTab2"],body.off-members [data-act="goTab"],body.off-sign [data-act="signHere"],body.off-sign [data-act="signSend"]{display:none!important}
+.role button{white-space:nowrap}
 
 .realbtn{display:flex;align-items:center;justify-content:center;gap:8px}
 </style>
@@ -3865,12 +3871,110 @@ async function soloAnalyze(id,i,file,k){ const rec=wlogGet(id); if(!rec) return;
   }catch(e){ const m=String(e&&e.message||''); g.ana={err:/fetch|import|network|load/i.test(m)?'골격 모델을 불러오지 못했어요 · 인터넷 연결을 확인하고 다시 올려 주세요':(m||'분석하지 못했어요')}; }
   S.wlUp=null; wlogSave(rec); S.wlEdit={id,i,k}; if(document.querySelector('.wlog')) wlOpen(id); toast(L[k].form?`${k+1}세트 자세 ${L[k].form.s}점`:'영상을 저장했어요'); }
 
+// ---------- 관리자 · 개발자 : 기능 켜기/끄기 (기본은 마커리스 운동 추적만 켬) ----------
+const FEATURES=[
+  {k:'core',n:'마커리스 운동 추적',d:'촬영 · 골격 인식 · 반복/세트 · 자세 점수 · 운동일지 · 혼자 운동 영상 평가',lock:true},
+  {k:'voice',n:'음성 자막 · 운동 기록 요약',d:'수업 영상 말소리 → 자막, 운동 이름·기구 세팅·방법·키워드 정리 (AI)'},
+  {k:'coach',n:'코칭 기록',d:'운동별·회차별 배운 내용, 성과 요약(재등록) 리포트'},
+  {k:'schedule',n:'스케줄',d:'주간·월간 시간표, 수업 가능 시간, 다음 수업 잡기, 노쇼'},
+  {k:'request',n:'회원 수업 요청',d:'회원이 수업 요청 → 트레이너 승인 (스케줄이 켜져 있어야 함)'},
+  {k:'members',n:'회원 관리',d:'회원 정보 · 특이사항 · 계약(유료·보너스·할인)'},
+  {k:'sign',n:'수업 완료 서명',d:'트레이너 폰 서명 / 회원 폰 서명 링크, 수강권 차감'},
+  {k:'settle',n:'정산',d:'정산 방식, 월별 매출·정산, 미정산, 남은 수업'},
+  {k:'parq',n:'PAR-Q+ 건강 확인',d:'회원 작성·서명, 트레이너 확인'},
+  {k:'goal',n:'체지방 목표 · 인바디',d:'목표 체지방률 → 목표 체중·하루 칼로리, 인바디 결과지 읽기'},
+  {k:'diet',n:'식단',d:'음식 사진 칼로리 추정, 끼니별 기록'}];
+const FLAG_DEFAULT={core:true};
+function flags(){ return Object.assign({},FLAG_DEFAULT,LS.get('aiwm_flags',{})||{},{core:true}); }
+function ON(k){ return !!flags()[k]; }
+function setFlag(k,v){ const f=Object.assign({},LS.get('aiwm_flags',{})||{}); f[k]=!!v; LS.set('aiwm_flags',f); }
+function applyFlagClasses(){ const f=flags(); FEATURES.forEach(x=>document.body.classList.toggle('off-'+x.k,!f[x.k])); document.body.classList.toggle('role-admin',S.role==='admin'); }
+
+// 꺼진 기능은 화면에서 빼기 (원래 함수를 감싸서)
+const _gate=(fn,k,empty)=>function(...a){ return ON(k)?fn.apply(this,a):(empty===undefined?'':empty); };
+signCard=_gate(signCard,'sign'); signHistory=_gate(signHistory,'sign');
+nextLessonBar=_gate(nextLessonBar,'schedule');
+memberBookCard=_gate(memberBookCard,'schedule'); reqListHTML=_gate(reqListHTML,'request');
+parqTrainerCard=_gate(parqTrainerCard,'parq'); parqSignCard=_gate(parqSignCard,'parq');
+focusCard=_gate(focusCard,'coach');
+memberInfoCard=_gate(memberInfoCard,'members'); noteCard=_gate(noteCard,'members'); contractCard=_gate(contractCard,'members');
+goalCard=_gate(goalCard,'goal');
+if(typeof setupNotesCard==='function') setupNotesCard=_gate(setupNotesCard,'voice');
+{ const _ps=processSession; processSession=async function(R){ if(!ON('voice')){ R.ai={state:'off'}; if(S.sub==='realReview') keepScroll(render); return; } return _ps(R); }; }
+{ const _rt=renderTop; renderTop=function(title,back,home){ _rt(title,back,home); const g=document.querySelector('#top .role'); if(g&&!g.querySelector('[data-role="admin"]')) g.insertAdjacentHTML('beforeend',`<button class="${S.role==='admin'?'on':''}" data-role="admin" aria-label="관리자·개발자">관리</button>`); }; }
+{ const _tabs=renderTabs; renderTabs=function(){ _tabs();
+    const el=$('#tabs'); if(!el) return;
+    if(S.role==='admin'){ const T=[['home','기능 관리',I.lock],['dev','개발자',I.note]]; el.style.display='flex'; el.innerHTML=T.map(([k,l,ic])=>`<button class="${S.tab===k?'on':''}" data-tab="${k}">${ic}<span>${l}</span></button>`).join(''); }
+    else { const hide={schedule:!ON('schedule'),members:!ON('members'),settle:!ON('settle'),diet:!ON('diet'),me:!ON('goal')&&!ON('diet')&&!ON('parq')};
+      el.querySelectorAll('[data-tab]').forEach(b=>{ if(hide[b.dataset.tab]) b.remove(); }); }
+    applyFlagClasses(); }; }
+// 꺼진 탭에 머물러 있으면 홈으로
+function tabAllowed(t){ return !({schedule:!ON('schedule'),members:!ON('members'),settle:!ON('settle'),diet:!ON('diet'),me:!ON('goal')&&!ON('diet')&&!ON('parq')})[t]; }
+
+// 기본(마커리스만) 홈 화면
+function coreMode(){ return !ON('schedule')&&!ON('settle')&&!ON('members'); }
+{ const _th=tHome; tHome=function(){ if(!coreMode()) return _th(); renderTop('',false,true);
+    return `<div class="card corehero"><h3>마커리스 운동 추적</h3><p class="muted" style="margin:-4px 0 10px;font-size:13px">카메라를 옆쪽 2~3m에 세우고 회원을 고른 뒤 촬영을 시작하세요. 반복·세트·자세 점수가 자동으로 기록돼요.</p>
+      ${members.map(m=>`<button class="list-item" data-act="startClass" data-id="${m.id}"><div class="av">${esc(m.name[0]||'?')}</div><div class="sp"><b>${esc(m.name)}</b><div class="muted">${m.done+1}회차 촬영</div></div><span class="pill p-blue">촬영</span></button>`).join('')}</div>
+      ${savedSessionsCard()}${wlogListCard('hw','운동일지 · 혜원')}
+      <p class="foot">다른 기능은 오른쪽 위 ‘관리’에서 켤 수 있어요</p>`; }; }
+{ const _mh=mHome; mHome=function(){ if(!coreMode()) return _mh(); renderTop('',false,true);
+    return `<div class="card corehero"><h3>혼자 연습 · 자세 평가</h3><p class="muted" style="margin:-4px 0 10px;font-size:13px">옆모습 전신이 나오게 세우고 카메라로 연습하거나, 찍은 영상을 운동일지 세트에 올리면 자세 점수를 받아요.</p>
+      <button class="btn full" data-go="m-practice">카메라로 스쿼트 연습</button></div>
+      ${wlogListCard('hw','운동일지',true)}`; }; }
+
+// ---- 관리자: 기능 관리 ----
+function tFlags(){ renderTop('관리자',false); const f=flags(), n=FEATURES.filter(x=>f[x.k]).length;
+  return `<div class="card"><h3>기능 켜기 · 끄기<span class="r">${n}/${FEATURES.length} 켜짐</span></h3>
+    <p class="muted" style="margin:-4px 0 8px;font-size:12.5px">꺼진 기능은 트레이너·회원 화면에서 보이지 않아요. 기록은 지워지지 않고, 다시 켜면 그대로 나와요.</p>
+    ${FEATURES.map(x=>`<div class="flagrow ${f[x.k]?'on':''}"><div class="sp"><b>${x.n}${x.lock?' <span class="pill p-blue" style="font-size:10.5px">항상 켬</span>':''}</b><div class="muted" style="font-size:12px;line-height:1.45">${x.d}</div></div>${x.lock?'':`<button class="toggle ${f[x.k]?'on':''}" data-act="flagT" data-k="${x.k}" aria-pressed="${!!f[x.k]}" aria-label="${x.n} 켜기"></button>`}</div>`).join('')}
+    <div class="row" style="margin-top:12px;gap:8px"><button class="btn sm sec" data-act="flagCore" style="flex:1">마커리스만 (기본)</button><button class="btn sm sec" data-act="flagAll" style="flex:1">모두 켜기</button></div></div>
+  <div class="card"><h3>바로 가기</h3><div class="row" style="gap:8px"><button class="btn sm" data-role="trainer" style="flex:1">트레이너 화면</button><button class="btn sm sec" data-role="member" style="flex:1">회원 화면</button></div></div>`; }
+
+// ---- 개발자 ----
+const DEVLOG=[]; window.addEventListener('error',e=>{ DEVLOG.unshift(`${new Date().toLocaleTimeString('ko-KR')} ${e.message} (${(e.filename||'').split('/').pop()}:${e.lineno})`); DEVLOG.length=Math.min(DEVLOG.length,30); });
+window.addEventListener('unhandledrejection',e=>{ DEVLOG.unshift(`${new Date().toLocaleTimeString('ko-KR')} ${String(e.reason&&e.reason.message||e.reason)}`); DEVLOG.length=Math.min(DEVLOG.length,30); });
+function aiwmKeys(){ const L=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.startsWith('aiwm_')) L.push(k); } return L.sort(); }
+function tDev(){ renderTop('개발자',false); const C=window.APP_CONFIG||{}, keys=aiwmKeys(), size=keys.reduce((a,k)=>a+(localStorage.getItem(k)||'').length,0);
+  return `<div class="card"><h3>앱 정보</h3><div class="kv">
+      <span class="k">빌드</span><span class="v">${window.APP_BUILD===true?'휴대폰 웹앱 (GitHub Pages)':esc(String(window.APP_BUILD||'-'))} · ${new Date(document.lastModified).toLocaleString('ko-KR')}</span>
+      <span class="k">AI</span><span class="v">${C.aiProxy?'중계 서버':C.aiKey?'앱에 포함된 키 (시험판)':'없음'} · ${esc(C.aiModel||'')}</span>
+      <span class="k">골격 모델</span><span class="v">${esc(localStorage.getItem('aiwm_pose')||'full')}</span>
+      <span class="k">기기 저장</span><span class="v">${keys.length}개 항목 · ${Math.round(size/1024)}KB <span id="devIdb"></span></span>
+      <span class="k">화면</span><span class="v">${innerWidth}×${innerHeight} · ${esc(navigator.userAgent.match(/(iPhone|iPad|Android|Windows|Mac OS X)[^;)]*/)?.[0]||'')}</span></div>
+    ${typeof poseSettingHTML==='function'?poseSettingHTML():''}</div>
+  <div class="card"><h3>데이터</h3>
+    <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn sm sec" data-act="devExport" style="flex:1">기기 데이터 내보내기 (JSON)</button><label class="btn sm sec" style="flex:1;text-align:center">가져오기<input type="file" accept="application/json,.json" id="devImport" hidden></label></div>
+    <p class="muted" style="font-size:12px;margin:6px 0 0">영상(IndexedDB)은 내보내기에 포함되지 않아요.</p>
+    <details style="margin-top:8px"><summary class="muted" style="font-size:13px">저장 항목 보기 (${keys.length})</summary>${keys.map(k=>`<div class="row" style="align-items:center;font-size:12.5px;padding:3px 0"><code class="sp">${esc(k)}</code><span class="muted">${Math.round((localStorage.getItem(k)||'').length/102.4)/10}KB</span><button class="btn sm ghost" data-act="devDelKey" data-k="${esc(k)}" style="padding:2px 8px;color:var(--red)">×</button></div>`).join('')}</details>
+    <div class="row" style="gap:8px;margin-top:10px"><button class="btn sm ghost" data-act="devReset" style="flex:1;color:var(--red)">전체 초기화 (예시 데이터로)</button></div></div>
+  <div class="card"><h3>오류 기록<span class="r">${DEVLOG.length}건</span></h3>${DEVLOG.length?DEVLOG.map(x=>`<div class="muted" style="font-size:12px;font-family:ui-monospace,monospace;padding:3px 0;border-bottom:1px solid var(--line)">${esc(x)}</div>`).join(''):'<p class="muted" style="margin:0;font-size:13px">이번에 앱을 연 뒤 오류가 없어요.</p>'}
+    <div class="row" style="gap:8px;margin-top:8px"><button class="btn sm sec" data-act="devReload" style="flex:1">새로고침</button><button class="btn sm sec" data-act="devSW" style="flex:1">캐시 지우고 새로고침</button></div></div>`; }
+async function devIdbSize(){ const e=$('#devIdb'); if(!e||!navigator.storage||!navigator.storage.estimate) return; try{ const q=await navigator.storage.estimate(); e.textContent=`· 전체 ${Math.round((q.usage||0)/1048576)}MB (영상 포함)`; }catch(err){} }
+function adminAct(act,a){
+  switch(act){
+    case 'flagT': { const k=a.dataset.k; setFlag(k,!ON(k)); keepScroll(render); toast(`${FEATURES.find(x=>x.k===k).n} ${ON(k)?'켬':'끔'}`); return true; }
+    case 'flagCore': LS.set('aiwm_flags',{}); keepScroll(render); toast('마커리스 운동 추적만 켰어요'); return true;
+    case 'flagAll': { const f={}; FEATURES.forEach(x=>f[x.k]=true); LS.set('aiwm_flags',f); keepScroll(render); toast('모든 기능을 켰어요'); return true; }
+    case 'devExport': { const o={app:'aiwm',at:new Date().toISOString(),data:{}}; aiwmKeys().forEach(k=>o.data[k]=localStorage.getItem(k));
+      const b=new Blob([JSON.stringify(o)],{type:'application/json'}), u=URL.createObjectURL(b), l=document.createElement('a'); l.href=u; l.download=`aiwm-backup-${ymd(new Date())}.json`; document.body.appendChild(l); l.click(); l.remove(); setTimeout(()=>URL.revokeObjectURL(u),2000); toast('기기 데이터를 내보냈어요'); return true; }
+    case 'devDelKey': { const k=a.dataset.k; if(!confirm(`${k} 항목을 지울까요?`)) return true; localStorage.removeItem(k); keepScroll(render); return true; }
+    case 'devReset': { if(!confirm('이 기기의 앱 기록을 모두 지우고 예시 데이터로 되돌릴까요? 영상도 지워져요.')) return true; aiwmKeys().forEach(k=>localStorage.removeItem(k)); try{ indexedDB.deleteDatabase('aiwm'); }catch(e){} location.reload(); return true; }
+    case 'devReload': location.reload(); return true;
+    case 'devSW': (async()=>{ try{ const r=await navigator.serviceWorker?.getRegistrations(); for(const x of r||[]) await x.unregister(); const ks=await caches.keys(); for(const k of ks) await caches.delete(k); }catch(e){} location.reload(); })(); return true;
+  }
+  return false; }
+document.addEventListener('change',e=>{ const t=e.target; if(!t||t.id!=='devImport') return; const f=t.files&&t.files[0]; if(!f) return; f.text().then(txt=>{ try{ const o=JSON.parse(txt); if(o.app!=='aiwm'||!o.data) throw new Error('형식이 달라요');
+  if(!confirm(`백업(${o.at||''})으로 덮어쓸까요?`)) return; Object.entries(o.data).forEach(([k,v])=>{ if(k.startsWith('aiwm_')) localStorage.setItem(k,v); }); location.reload(); }catch(err){ toast('가져오지 못했어요 · '+err.message); } }); });
+
 // ---------- render ----------
 let modal=null;
 function render(){
   let html='';
+  if(S.role&&S.role!=='admin'&&!S.sub&&typeof tabAllowed==='function'&&!tabAllowed(S.tab)) S.tab='home';
   if(S.signReq){html=signScreen();}
   else if(!S.role){html=welcome();}
+  else if(S.role==='admin'){html=S.tab==='dev'?tDev():tFlags();}
   else if(S.role==='trainer'){
     if(S.sub==='live') html=S.realOn?realLive():tLive();
     else if(S.sub==='realReview') html=realReview();
@@ -3893,6 +3997,7 @@ function afterRender(){
   if(S.role==='trainer' && S.sub==='live' && S.recOn) startClassSim();
   if(S.role==='trainer' && S.sub==='live' && S.realOn) startRealClass();
   else if(window.APP_BUILD && S.role==='trainer' && S.sub==='live' && !S.recOn) startPreview();
+  if(S.role==='admin'&&S.tab==='dev') devIdbSize();
   bindWeekGrid(); bindUpload(); bindExSheet(); updateStoreUse(); bindMemberSearch(); { const sc=document.getElementById('sigCanvas'); if(sc&&!document.getElementById('modalRoot').contains(sc)) setTimeout(bindSigPad,30); }
   if(S.role==='member' && S.sub==='solo' && S.soloReal) startRealSolo(S.subArg);
   if(S.role==='trainer' && S.sub==='review'){
@@ -3941,6 +4046,7 @@ document.addEventListener('click',e=>{
   if(noteAct(act,a)) return;
   if(wlogAct(act,a)) return;
   if(goalAct(act,a)) return;
+  if(adminAct(act,a)) return;
   switch(act){
     case 'back':
       if(S.role==='trainer'){ if(S.sub==='kakao') go('review'); else if(S.sub==='review') go(null); else go(null);} else go(null); break;

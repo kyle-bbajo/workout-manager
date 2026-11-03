@@ -482,6 +482,25 @@ input.nm{font:inherit;font-weight:800;font-size:16px;border:none;border-bottom:1
 .goalres span{display:block;font-size:11.5px;color:var(--muted,#6B7280)}
 .goalres b{display:block;font-size:18px;letter-spacing:-.02em}
 .goalres i{display:block;font-style:normal;font-size:11px;color:var(--muted,#6B7280)}
+/* 세트별 자세 점수 */
+.wl-set em.fs{font-style:normal;font-size:10px;font-weight:800;border-radius:999px;padding:0 6px;line-height:15px;margin-top:1px}
+.fs.g,.ft.g{color:#22C55E} .fs.o,.ft.o{color:#F59E0B} .fs.r,.ft.r{color:#FB7185}
+.wl-set em.fs.g{background:rgba(34,197,94,.16)} .wl-set em.fs.o{background:rgba(245,158,11,.18)} .wl-set em.fs.r{background:rgba(251,113,133,.18)}
+.wl-set.f-g i{box-shadow:0 0 0 3px #22C55E} .wl-set.f-o i{box-shadow:0 0 0 3px #F59E0B} .wl-set.f-r i{box-shadow:0 0 0 3px #FB7185}
+.wl-tip{margin-top:8px;font-size:12.5px;padding:6px 10px;border-radius:10px;line-height:1.45}
+.wl-tip.g{background:rgba(34,197,94,.14);color:#86EFAC} .wl-tip.o{background:rgba(245,158,11,.14);color:#FCD34D} .wl-tip.r{background:rgba(251,113,133,.14);color:#FDA4AF}
+.wl-setform{margin-top:8px}
+.fblock{border-radius:12px;padding:10px;background:#16161A;border:1px solid #27272A}
+.fblock.g{border-color:rgba(34,197,94,.5)} .fblock.o{border-color:rgba(245,158,11,.5)} .fblock.r{border-color:rgba(251,113,133,.5)}
+.fhead{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.fhead b{font-size:16px}
+.fblock.g .fhead .pill{background:rgba(34,197,94,.2);color:#86EFAC} .fblock.o .fhead .pill{background:rgba(245,158,11,.2);color:#FCD34D} .fblock.r .fhead .pill{background:rgba(251,113,133,.2);color:#FDA4AF}
+.frep{display:flex;flex-wrap:wrap;gap:4px;margin:8px 0 2px}
+.frep i{font-style:normal;font-size:11px;font-weight:700;min-width:28px;text-align:center;border-radius:6px;padding:2px 4px}
+.frep i.g{background:rgba(34,197,94,.18);color:#86EFAC} .frep i.o{background:rgba(245,158,11,.2);color:#FCD34D} .frep i.r{background:rgba(251,113,133,.2);color:#FDA4AF}
+.sheet:not(.wlog) .fblock{background:#F8FAFC;border-color:var(--line,#E5E7EB)}
+.sheet.wlog .wl-bigfig{background:#16161A}
+.wl-set.on{outline:none}.wl-set.on i{outline:2px solid #fff;outline-offset:4px}
 
 .realbtn{display:flex;align-items:center;justify-content:center;gap:8px}
 </style>
@@ -2031,7 +2050,7 @@ function saveSession(R){
   if(!R.id) R.id='s'+Date.now();
   const rec={id:R.id,ts:R.ts||Date.now(),date:R.date,duration:R.duration,aspect:R.aspect,mime:R.mime,crit:R.crit,captions:R.captions||[],transcript:R.transcript||[],
     segs:R.segs.map(g=>{ const b=bestRep(g); return {cls:g.cls,name:g.name,label:g.label,title:g.title,type:g.type,setup:g.setup,speech:g.speech,sets:g.sets,w:g.w,kws:g.kws,aiKws:g.aiKws,lines:g.lines,judged:g.judged,start:g.start,end:g.end,best:g.best||(b&&b.lm)||null,
-      reps:g.reps.map(r=>({set:r.set,ok:r.ok,txt:r.txt,hipPk:r.hipPk}))}; })};
+      reps:g.reps.map(r=>({set:r.set,ok:r.ok,txt:r.txt,hipPk:r.hipPk,ang:r.ang||(r.lm&&window.LiveCamAngles?window.LiveCamAngles(r.lm,R.aspect||4/3):null)}))}; })};
   let list=LS.get('aiwm_sessions',[]).filter(x=>x.id!==R.id); list.unshift(rec);
   list=list.slice(0,40); let ok=LS.set('aiwm_sessions',list);
   while(!ok && list.length>1){ list=list.slice(0,Math.max(1,Math.floor(list.length/2))); ok=LS.set('aiwm_sessions',list); }
@@ -3560,6 +3579,20 @@ const GOLD={squat:[
     {k:'hipBack',l:'엉덩이 뒤로',range:'발목보다 충분히 뒤',ok:a=>a.hipBack>=0.2,t:a=>'엉덩이를 더 뒤로 빼세요',s:a=>'벽을 엉덩이로 민다는 느낌'}]};
 function goldFeedback(cls,a){ return (GOLD[cls]||[]).filter(r=>!r.ok(a)).map(r=>({k:r.k,t:r.t(a),s:r.s(a)})); }
 function goldTable(cls,me){ return `<table class="t" style="font-size:12.5px"><tr><th>항목</th><th>일반 기준</th><th>나</th></tr>${(GOLD[cls]||[]).map(r=>{ const ok=r.ok(me), v=r.k==='hipBack'?Math.round(me.hipBack*100)+'%':cls==='squat'&&r.k==='trunk'?`${Math.round(me.trunk)}° <span style="font-weight:500;color:var(--muted)">/ 정강이 ${Math.round(me.ankle)}°</span>`:Math.round(me[r.k.replace('2','')])+'°'; return `<tr><td>${r.l}</td><td>${r.range}</td><td><b style="color:${ok?'var(--green)':'var(--orange)'}">${v}</b></td></tr>`; }).join('')}</table>`; }
+// ---------- 자세 점수 (0~100) : 반복마다 기준에서 벗어난 만큼 감점 → 세트 평균 ----------
+const FORM_PEN={squat:a=>[['depth',Math.min(35,Math.max(0,a.thigh-5)*3)],['trunk',Math.min(30,Math.max(0,a.trunk-a.ankle-15)*2)],['trunk2',Math.min(25,Math.max(0,a.trunk-55)*2)],['ankle',Math.min(20,(a.ankle<20?20-a.ankle:a.ankle>40?a.ankle-40:0)*1.5)]],
+  hinge:a=>[['knee',Math.min(35,Math.max(0,a.knee-35)*2)],['trunk',Math.min(35,Math.max(0,50-a.trunk)*1.5)],['hip',Math.min(30,Math.max(0,0.2-a.hipBack)*150)]]};
+const ISSUE_TXT={depth:'깊이',trunk:'상체',trunk2:'상체',ankle:'무릎·발목',knee:'무릎',hip:'엉덩이',thigh:'깊이',hipBack:'엉덩이'};
+function repScore(cls,a,ref){ if(!a) return null; let P;
+  if(ref&&!ref.gold&&ref.ang){ const r=ref.ang; P=['thigh','trunk','ankle','knee','hipBack'].filter(k=>r[k]!=null&&a[k]!=null).map(k=>{ const d=Math.abs(a[k]-r[k]), tol=k==='hipBack'?0.06:8, sc=k==='hipBack'?150:2; return [k,Math.min(30,Math.max(0,d-tol)*sc)]; }); }
+  else P=(FORM_PEN[cls]||(()=>[]))(a);
+  const pen=P.reduce((s,x)=>s+x[1],0); return {score:Math.max(0,Math.round(100-pen)),issues:P.filter(x=>x[1]>=6).sort((x,y)=>y[1]-x[1]).map(x=>x[0])}; }
+function setForm(cls,angs,ref){ const A=angs.filter(Boolean); if(!A.length||!cls) return null; const R=A.map(a=>repScore(cls,a,ref));
+  const cnt={}; R.forEach(x=>x.issues.forEach(k=>cnt[k]=(cnt[k]||0)+1)); const me=avgAng(A);
+  const fb=(ref&&!ref.gold?feedbackFor(cls,me,ref.ang):goldFeedback(cls,me)).map(f=>({t:f.t,s:f.s}));
+  return {s:Math.round(R.reduce((t,x)=>t+x.score,0)/R.length),n:R.length,min:Math.min(...R.map(x=>x.score)),reps:R.map(x=>x.score),issues:Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]),fb,src:ref?ref.src:'일반 기준',cls}; }
+function formTone(s){ return s==null?'':s>=85?'g':s>=70?'o':'r'; }
+function formWord(s){ return s>=85?'좋음':s>=70?'주의':'교정'; }
 
 // ---------- 기본 운동 라이브러리 (헬스장에서 흔히 하는 운동 전체) ----------
 // [이름, 도구, 주로 쓰는 부위]
@@ -3668,15 +3701,18 @@ function figSVG(name,lm,label){
 function parseW(s){ if(s==null) return null; if(typeof s==='number') return s; const m=String(s).match(/(\d+(?:\.\d+)?)/); return m?+m[1]:(/맨몸|BW/i.test(s)?0:null); }
 function segSets(g){ if(Array.isArray(g.log)) return g.log;
   const w=parseW(g.w!=null&&g.w!==''?g.w:(g.setup&&g.setup.weight)); const by={};
-  (g.reps||[]).forEach(r=>{ const k=r.set||1; by[k]=(by[k]||0)+1; });
-  const ks=Object.keys(by).sort((a,b)=>a-b); if(ks.length) return ks.map(k=>({w,r:by[k]}));
+  const angBy={}; (g.reps||[]).forEach(r=>{ const k=r.set||1; by[k]=(by[k]||0)+1; (angBy[k]=angBy[k]||[]).push(r.ang); });
+  const cls=g.cls==='squat'||g.cls==='hinge'?g.cls:anaCls(segTitle(g)), ref=cls&&typeof refFor==='function'?refFor(cls):null;
+  const ks=Object.keys(by).sort((a,b)=>a-b); if(ks.length) return ks.map(k=>{ const f=cls&&typeof setForm==='function'?setForm(cls,angBy[k]||[],ref):null; return f?{w,r:by[k],form:f}:{w,r:by[k]}; });
   const n=+g.sets||0; return n?[...Array(n)].map(()=>({w,r:null})):[]; }
 function est1RM(L){ let b=0; L.forEach(x=>{ if(+x.w>0&&+x.r>0) b=Math.max(b,x.w*(1+x.r/30)); }); return b?Math.round(b*2)/2:0; }
 function fmtKg(v){ return v==null?'':(Math.round(v*10)/10).toLocaleString('ko-KR'); }
 const SKIP_LOG=/평가|몸풀기|스트레칭|휴식|쿨다운|말로 나눈/;
+function DF(cls,s,reps,issues){ const T={depth:{t:'허벅지가 바닥과 평행할 때까지 더 앉으세요',s:'뒤쪽 반복에서 깊이가 얕아졌어요'},trunk:{t:'상체가 정강이보다 더 숙여졌어요',s:'가슴을 세우고 무릎을 발끝 방향으로'},knee:{t:'무릎이 조금 더 굽었어요',s:'무릎은 살짝만, 엉덩이로 접기'}};
+  return {s,n:reps.length,min:Math.min(...reps),reps,issues:issues||[],fb:(issues||[]).map(k=>T[k]).filter(Boolean),src:'일반적인 '+(cls==='squat'?'스쿼트':'힙힌지')+' 기준(골드 스탠다드) · 예시',cls}; }
 const DEMO_WLOG={id:'demo-hw-16',mid:'hw',demo:true,date:'2026-11-01',n:16,segs:[
-  {title:'스쿼트',log:[{w:40,r:12},{w:50,r:10},{w:55,r:8},{w:60,r:6}],point:'흉추 펴고 앉기 · 무릎은 발끝 방향'},
-  {title:'루마니안 데드리프트',log:[{w:20,r:12},{w:20,r:12},{w:30,r:10},{w:30,r:10}],point:'바를 허벅지에 붙여서 내리기'},
+  {title:'스쿼트',log:[{w:40,r:12,form:DF('squat',93,[95,94,92,93,94,92,93,91,94,93,92,92])},{w:50,r:10,form:DF('squat',90,[92,91,90,91,89,90,90,88,89,90])},{w:55,r:8,form:DF('squat',81,[88,86,84,82,80,78,77,73],['trunk'])},{w:60,r:6,form:DF('squat',66,[78,72,66,63,60,57],['depth','trunk'])}],point:'흉추 펴고 앉기 · 무릎은 발끝 방향'},
+  {title:'루마니안 데드리프트',log:[{w:20,r:12,form:DF('hinge',91,[92,91,90,92,91,90,91,92,90,91,90,92])},{w:20,r:12,form:DF('hinge',89,[90,90,89,88,89,90,88,89,88,89,90,88])},{w:30,r:10,form:DF('hinge',86,[89,88,87,86,86,85,85,84,85,86])},{w:30,r:10,form:DF('hinge',84,[87,86,85,84,84,83,82,83,84,82],['knee'])}],point:'바를 허벅지에 붙여서 내리기'},
   {title:'레그 프레스',log:[{w:60,r:15},{w:80,r:12},{w:80,r:12}],point:'발은 어깨너비 · 무릎 안으로 모이지 않게',setup:{seat:'등받이 3칸'}},
   {title:'힙 어브덕션',log:[{w:25,r:12},{w:25,r:15},{w:25,r:15},{w:25,r:15}],point:'상체 살짝 숙여 엉덩이 바깥쪽에 집중'},
   {title:'덤벨 로우',log:[{w:10,r:12},{w:12,r:10},{w:12,r:10}],point:'팔꿈치를 엉덩이 쪽으로 당기기'}]};
@@ -3702,9 +3738,10 @@ function wlogSheet(id){ const rec=wlogGet(id); if(!rec) return '';
     ${rec.demo?'<p class="muted" style="font-size:12px;margin:6px 0 0">예시 기록이에요 · 수업을 촬영하면 실제 기록과 내 영상이 여기에 쌓여요</p>':''}
     <div class="wl-list">${wlogSegs(rec).map(({g,i,name})=>{ const L=segSets(g), mx=L.reduce((a,x)=>Math.max(a,+x.w||0),0), rm=est1RM(L), hasVid=hasVid0||rec.solo&&g.vid;
       return `<div class="wl-ex"><div class="wl-main"><b class="wl-name">${esc(name)}</b>
-        <div class="wl-meta">${mx?`최고 무게 ${fmtKg(mx)}kg`:''}${rm?` | 1RM ${fmtKg(rm)}kg`:''}${g.setup&&g.setup.seat?` · ${esc(g.setup.seat)}`:''}${g.setup&&g.setup.pin?` · ${esc(g.setup.pin)}`:''}</div>
-        <div class="wl-sets">${L.map((x,k)=>`<button class="wl-set ${ed&&ed.i===i&&ed.k===k?'on':''}" data-act="wlSet" data-id="${id}" data-i="${i}" data-k="${k}" aria-label="${k+1}세트 ${x.w!=null?x.w+'kg':''} ${x.r||''}회 고치기"><i>${x.w==null?'–':+x.w===0?'맨몸':fmtKg(x.w)}</i><span>${x.r?x.r+'회':'–'}</span></button>`).join('')}<button class="wl-set add" data-act="wlAdd" data-id="${id}" data-i="${i}" aria-label="세트 추가"><i>+</i><span>세트</span></button></div>
-        ${ed&&ed.i===i?`<div class="wl-edit"><label><span>무게 kg</span><input type="number" inputmode="decimal" id="wlW" value="${L[ed.k]&&L[ed.k].w!=null?L[ed.k].w:''}" placeholder="맨몸 0"></label><label><span>횟수</span><input type="number" inputmode="numeric" id="wlR" value="${L[ed.k]&&L[ed.k].r!=null?L[ed.k].r:''}"></label><button class="btn sm" data-act="wlSetSave" data-id="${id}">저장</button><button class="btn sm ghost" data-act="wlSetDel" data-id="${id}" style="color:var(--red)">삭제</button></div>`:''}
+        <div class="wl-meta">${mx?`최고 무게 ${fmtKg(mx)}kg`:''}${rm?` | 1RM ${fmtKg(rm)}kg`:''}${formAvg(L)!=null?` | <b class="ft ${formTone(formAvg(L))}">자세 ${formAvg(L)}점</b>`:''}${g.setup&&g.setup.seat?` · ${esc(g.setup.seat)}`:''}${g.setup&&g.setup.pin?` · ${esc(g.setup.pin)}`:''}</div>
+        <div class="wl-sets">${L.map((x,k)=>`<button class="wl-set ${x.form?'f-'+formTone(x.form.s):''} ${ed&&ed.i===i&&ed.k===k?'on':''}" data-act="wlSet" data-id="${id}" data-i="${i}" data-k="${k}" aria-label="${k+1}세트 ${x.w!=null?x.w+'kg':''} ${x.r||''}회 고치기"><i>${x.w==null?'–':+x.w===0?'맨몸':fmtKg(x.w)}</i><span>${x.r?x.r+'회':'–'}</span>${x.form?`<em class="fs ${formTone(x.form.s)}">${x.form.s}</em>`:''}</button>`).join('')}<button class="wl-set add" data-act="wlAdd" data-id="${id}" data-i="${i}" aria-label="세트 추가"><i>+</i><span>세트</span></button></div>
+        ${wlTip(name,L)}
+        ${ed&&ed.i===i?`<div class="wl-edit"><label><span>무게 kg</span><input type="number" inputmode="decimal" id="wlW" value="${L[ed.k]&&L[ed.k].w!=null?L[ed.k].w:''}" placeholder="맨몸 0"></label><label><span>횟수</span><input type="number" inputmode="numeric" id="wlR" value="${L[ed.k]&&L[ed.k].r!=null?L[ed.k].r:''}"></label><button class="btn sm" data-act="wlSetSave" data-id="${id}">저장</button><button class="btn sm ghost" data-act="wlSetDel" data-id="${id}" style="color:var(--red)">삭제</button></div>${setFormHTML(rec,g,i,ed.k)}`:''}
         ${rec.solo?soloSegHTML(rec,g,i):''}
         <input class="wl-memo" data-wlmemo="${i}" data-id="${id}" value="${esc(g.memo!=null?g.memo:(g.point||''))}" placeholder="메모 (예: 외전할 때 엉덩이 자극 좋음)">
       </div>
@@ -3716,7 +3753,7 @@ function wlogSheet(id){ const rec=wlogGet(id); if(!rec) return '';
 async function wlVideoURL(id){ if(String(id).includes(':')){ try{ const b=await IDB.get(id); return b?URL.createObjectURL(b):null; }catch(e){ return null; } } if(WL.id===id&&WL.url) return WL.url; try{ const b=await IDB.get(id); if(!b) return null; if(WL.url) URL.revokeObjectURL(WL.url); WL.url=URL.createObjectURL(b); WL.id=id; return WL.url; }catch(e){ return null; } }
 function wlRange(rec,i){ try{ if(typeof segRange==='function') return segRange(rec,i); }catch(e){} const g=rec.segs[i]; return [+g.start||0,+g.end||((+g.start||0)+30)]; }
 // 수업 영상에서 운동마다 한 장면을 뽑아 썸네일로
-async function wlThumbs(id){ const rec=wlogGet(id); if(!rec||rec.demo||rec.noVideo) return; if(rec.solo){ for(const {g,i} of wlogSegs(rec)) if(g.vid) await wlThumbOne(id,i,id+':'+i); return; } const url=await wlVideoURL(id); if(!url) return;
+async function wlThumbs(id){ const rec=wlogGet(id); if(!rec||rec.demo||rec.noVideo) return; if(rec.solo){ for(const {g,i} of wlogSegs(rec)) if(g.vid) await wlThumbOne(id,i,g.vidKey||id+':'+i); return; } const url=await wlVideoURL(id); if(!url) return;
   const v=document.createElement('video'); v.muted=true; v.playsInline=true; v.preload='auto'; v.src=url;
   await new Promise(r=>{ v.onloadeddata=r; v.onerror=r; setTimeout(r,4000); });
   for(const {i} of wlogSegs(rec)){ if(!document.querySelector(`.wl-thumb[data-th="${i}"]`)) continue;
@@ -3724,11 +3761,11 @@ async function wlThumbs(id){ const rec=wlogGet(id); if(!rec||rec.demo||rec.noVid
     const [t0,t1]=wlRange(rec,i); try{ await new Promise((r,j)=>{ v.onseeked=r; v.onerror=j; v.currentTime=Math.max(0,(t0+t1)/2); setTimeout(r,2500); });
       const c=document.createElement('canvas'), W=240, H=Math.round(W*(v.videoHeight||3)/(v.videoWidth||4)); c.width=W; c.height=H; c.getContext('2d').drawImage(v,0,0,W,H);
       const u=c.toDataURL('image/jpeg',.7); WL.thumbs[id+':'+i]=u; wlSetThumb(i,u); }catch(e){} } }
-async function wlClip(id,i){ const rec=wlogGet(id); if(!rec) return; const g=rec.segs[i], name=segTitle(g)||'운동', L=segSets(g);
-  const url=rec.solo?(g.vid?await wlVideoURL(id+':'+i):null):rec.demo||rec.noVideo?null:await wlVideoURL(id), [t0,t1]=rec.solo?[0,9999]:wlRange(rec,i);
-  $('#modalRoot').innerHTML=`<div class="modal"><div class="sheet" role="dialog" aria-label="${esc(name)} 영상"><h2>${esc(name)}</h2><p class="muted" style="margin:0 0 10px">${mdLabel(rec.date)} · ${L.map(x=>`${x.w==null?'':+x.w===0?'맨몸 ':fmtKg(x.w)+'kg '}${x.r?x.r+'회':''}`).join(' / ')}</p>
+async function wlClip(id,i,k){ const rec=wlogGet(id); if(!rec) return; const g=rec.segs[i], name=segTitle(g)||'운동', L=segSets(g), sk=k!=null&&L[k]?L[k]:null;
+  const url=rec.solo?(sk&&sk.vid?await wlVideoURL(sk.vid):g.vid?await wlVideoURL(g.vidKey||id+':'+i):null):rec.demo||rec.noVideo?null:await wlVideoURL(id), [t0,t1]=rec.solo?[0,9999]:wlRange(rec,i);
+  $('#modalRoot').innerHTML=`<div class="modal"><div class="sheet wlog" role="dialog" aria-label="${esc(name)} 영상"><h2>${esc(name)}</h2><p class="muted" style="margin:0 0 10px">${mdLabel(rec.date)} · ${L.map(x=>`${x.w==null?'':+x.w===0?'맨몸 ':fmtKg(x.w)+'kg '}${x.r?x.r+'회':''}`).join(' / ')}</p>
     ${url?`<video src="${url}#t=${t0.toFixed(1)},${t1.toFixed(1)}" controls autoplay playsinline muted style="width:100%;border-radius:12px;background:#000;display:block;max-height:52vh"></video><p class="muted" style="font-size:12px;margin:6px 0 10px">${rec.solo?'내가 올린 영상이에요':`이 수업에서 ${esc(name)} 하던 부분만 재생돼요`}</p>`:`<p class="muted" style="font-size:13px;margin:0 0 10px">${rec.solo?'아직 올린 영상이 없어요.':rec.demo?'예시 기록이라 영상이 없어요.':'영상을 지운 기록이에요.'} 수업을 촬영하면 이 자리에 내 영상이 나와요.</p>`}
-    <div class="wl-bigrow"><div class="wl-bigfig"><div class="cap">동작</div>${figHTML(name)}</div>${g.best?`<div class="wl-bigfig dark"><div class="cap">내 골격 (마커리스)</div>${figSVG(name,g.best)}</div>`:''}</div>${g.ana?anaHTML(g.ana,true):''}${g.point||g.memo?`<div class="alert b" style="margin-top:10px"><div>${esc(g.memo!=null?g.memo:g.point)}</div></div>`:''}
+    <div class="wl-bigrow"><div class="wl-bigfig"><div class="cap">동작</div>${figHTML(name)}</div>${g.best?`<div class="wl-bigfig dark"><div class="cap">내 골격 (마커리스)</div>${figSVG(name,g.best)}</div>`:''}</div>${sk&&sk.form?`<div style="margin-top:10px">${formBlock(sk.form,true)}</div>`:g.ana?anaHTML(g.ana,true):''}${g.point||g.memo?`<div class="alert b" style="margin-top:10px"><div>${esc(g.memo!=null?g.memo:g.point)}</div></div>`:''}
     <button class="btn sec full" data-act="wlogOpen" data-id="${id}" style="margin-top:10px">← 일지로</button></div></div>`; }
 function wlText(rec){ return `[운동일지] ${mdLabel(rec.date)}${rec.n?' · '+rec.n+'회차':''}\n`+wlogSegs(rec).map(({g,name})=>{ const L=segSets(g), rm=est1RM(L); return `\n${name}${rm?` (추정 1RM ${fmtKg(rm)}kg)`:''}\n`+L.map((x,k)=>`${k+1}세트 ${x.w==null?'':+x.w===0?'맨몸 ':fmtKg(x.w)+'kg × '}${x.r||'-'}회`).join('\n')+((g.memo!=null?g.memo:g.point)?`\n· ${g.memo!=null?g.memo:g.point}`:''); }).join('\n'); }
 function wlOpen(id){ $('#modalRoot').innerHTML=wlogSheet(id); wlThumbs(id); }
@@ -3739,7 +3776,7 @@ function wlogAct(act,a){
     case 'wlogOpen': S.wlEdit=null; wlOpen(id); return true;
     case 'wlAll': S.wlAll=true; keepScroll(render); return true;
     case 'wlClose': S.wlEdit=null; $('#modalRoot').innerHTML=''; keepScroll(render); return true;
-    case 'wlClip': wlClip(id,+a.dataset.i); return true;
+    case 'wlClip': wlClip(id,+a.dataset.i,a.dataset.k!=null?+a.dataset.k:null); return true;
     case 'wlSet': { const i=+a.dataset.i,k=+a.dataset.k; S.wlEdit=S.wlEdit&&S.wlEdit.id===id&&S.wlEdit.i===i&&S.wlEdit.k===k?null:{id,i,k}; wlOpen(id); const w=$('#wlW'); w&&w.focus(); return true; }
     case 'wlAdd': { const rec=wlogGet(id), i=+a.dataset.i, g=rec.segs[i], L=segSets(g).map(x=>Object.assign({},x)); const last=L[L.length-1]||{w:null,r:10}; L.push({w:last.w,r:last.r}); g.log=L; wlogSave(rec); S.wlEdit={id,i,k:L.length-1}; wlOpen(id); const w=$('#wlW'); w&&w.focus(); return true; }
     case 'wlSetSave': { const e=S.wlEdit; if(!e) return true; const rec=wlogGet(id), g=rec.segs[e.i], L=segSets(g).map(x=>Object.assign({},x)); const w=$('#wlW').value, r=$('#wlR').value;
@@ -3757,8 +3794,8 @@ function anaHTML(A,full){ if(!A) return ''; if(A.err) return `<div class="feedba
   return `<div class="wl-ana ${A.fb.length?'o':'g'}"><b>${A.reps}회 분석 · ${A.fb.length?`고칠 점 ${A.fb.length}가지`:'좋은 자세예요'}</b>${A.fb.map((f,k)=>`<div class="wl-fb"><span>${k+1}</span><div>${esc(f.t)}<div class="muted" style="font-size:12px">${esc(f.s)}</div></div></div>`).join('')}${full&&A.me&&A.cls&&/골드|일반/.test(A.src||'')&&typeof goldTable==='function'?`<div style="margin-top:8px">${goldTable(A.cls,A.me)}</div>`:''}<div class="muted" style="font-size:11.5px;margin-top:4px">기준: ${esc(A.src)} · 의학적 판단이 아니에요</div></div>`; }
 function soloSegHTML(rec,g,i){ const up=S.wlUp&&S.wlUp.id===rec.id&&S.wlUp.i===i?S.wlUp:null, cls=anaCls(segTitle(g));
   if(up) return `<div class="wl-up"><div class="upbar"><i id="wlUpBar" style="width:${Math.round((up.pct||0)*100)}%"></i></div><div class="muted" id="wlUpMsg" style="font-size:12px;margin-top:4px">${esc(up.msg||'영상 준비 중…')}</div></div>`;
-  return `${g.ana?anaHTML(g.ana):''}<div class="wl-uprow"><label class="btn sm sec">${g.vid?'영상 다시 올리기':'내 영상 올리기'}${cls?' · 자세 평가':''}<input type="file" accept="video/*" class="wlFile" data-id="${rec.id}" data-i="${i}" hidden></label>${!cls?'<span class="muted" style="font-size:11.5px">자세 평가는 스쿼트·런지·데드리프트류부터 · 이 운동은 영상만 저장</span>':'<span class="muted" style="font-size:11.5px">옆모습 · 전신이 나오게</span>'}</div>`; }
-async function soloAnalyze(id,i,file){ const rec=wlogGet(id); if(!rec) return; const g=rec.segs[i], cls=anaCls(segTitle(g));
+  return `${g.ana&&g.ana.err?anaHTML(g.ana):''}<div class="wl-uprow"><label class="btn sm sec">${segSets(g).some(x=>!x.form&&!x.vid)?'다음 세트 영상 올리기':'세트 영상 올리기'}${cls?' · 자세 평가':''}<input type="file" accept="video/*" class="wlFile" data-id="${rec.id}" data-i="${i}" hidden></label>${!cls?'<span class="muted" style="font-size:11.5px">자세 평가는 스쿼트·런지·데드리프트류부터 · 이 운동은 영상만 저장</span>':'<span class="muted" style="font-size:11.5px">옆모습 · 전신이 나오게</span>'}</div>`; }
+async function soloAnalyzeOld(id,i,file){ const rec=wlogGet(id); if(!rec) return; const g=rec.segs[i], cls=anaCls(segTitle(g));
   try{ await IDB.put(id+':'+i,file); g.vid=true; delete WL.thumbs[id+':'+i]; }catch(e){ toast('영상을 저장하지 못했어요 · 저장 공간을 확인해 주세요'); }
   if(!cls||!window.LiveCam||!window.LiveCam.analyzeVideo){ if(cls) g.ana={err:'분석 모듈을 불러오는 중이에요. 잠시 뒤 다시 올려 주세요'}; wlogSave(rec); wlOpen(id); return; }
   S.wlUp={id,i,pct:0,msg:'골격 모델 준비 중…'}; wlogSave(rec); wlOpen(id);
@@ -3790,7 +3827,43 @@ function soloAct(act,a){
     case 'soloDel': { if(!confirm('이 혼자 운동 기록을 지울까요?')) return true; const id=a.dataset.id, rec=wlogGet(id); (rec&&rec.segs||[]).forEach((g,i)=>{ try{ IDB.del(id+':'+i); }catch(e){} }); LS.set('aiwm_sololog',soloLogs().filter(x=>x.id!==id)); $('#modalRoot').innerHTML=''; keepScroll(render); return true; }
   }
   return false; }
-document.addEventListener('change',e=>{ const t=e.target; if(!t||!t.classList||!t.classList.contains('wlFile')) return; const f=t.files&&t.files[0]; if(f) soloAnalyze(t.dataset.id,+t.dataset.i,f); });
+document.addEventListener('change',e=>{ const t=e.target; if(!t||!t.classList||!t.classList.contains('wlFile')) return; const f=t.files&&t.files[0]; if(f) soloAnalyze(t.dataset.id,+t.dataset.i,f,t.dataset.k!=null&&t.dataset.k!==''?+t.dataset.k:null); });
+
+// ---------- 세트별 자세 점수 ----------
+function formAvg(L){ const F=L.filter(x=>x.form); return F.length?Math.round(F.reduce((t,x)=>t+x.form.s,0)/F.length):null; }
+function formBlock(f,full){ const tone=formTone(f.s);
+  return `<div class="fblock ${tone}"><div class="fhead"><b>자세 ${f.s}점</b><span class="pill">${formWord(f.s)}</span><span class="muted" style="font-size:11.5px">${f.n}회 · 가장 낮은 반복 ${f.min}점</span></div>
+    ${full||f.reps?`<div class="frep">${(f.reps||[]).map((v,k)=>`<i class="${formTone(v)}" title="${k+1}회 ${v}점">${v}</i>`).join('')}</div>`:''}
+    ${(f.fb||[]).map((x,k)=>`<div class="wl-fb"><span>${k+1}</span><div>${esc(x.t)}<div class="muted" style="font-size:12px">${esc(x.s)}</div></div></div>`).join('')||(()=>{ const low=(f.reps||[]).map((v,k)=>[v,k]).filter(x=>x[0]<70).map(x=>x[1]+1); return low.length?`<div class="muted" style="font-size:12.5px;margin-top:4px">평균은 괜찮지만 ${low.join(', ')}번째 반복이 흔들렸어요${f.issues&&f.issues.length?` (${[...new Set(f.issues.map(k=>ISSUE_TXT[k]||k))].join('·')})`:''} · 영상에서 그 반복을 확인해 보세요</div>`:'<div class="muted" style="font-size:12.5px;margin-top:4px">기준에서 크게 벗어난 반복이 없어요</div>'; })()}
+    <div class="muted" style="font-size:11px;margin-top:4px">기준: ${esc(f.src||'')} · 의학적 판단이 아니에요</div></div>`; }
+function setFormHTML(rec,g,i,k){ const L=segSets(g), x=L[k]; if(!x) return ''; const cls=anaCls(segTitle(g));
+  let h=x.form?formBlock(x.form,true):'';
+  if(rec.solo) h+=`<div class="wl-uprow">${x.vid?`<button class="btn sm sec" data-act="wlClip" data-id="${rec.id}" data-i="${i}" data-k="${k}">▶ 이 세트 영상</button>`:''}<label class="btn sm ${x.form?'sec':''}">${x.vid?'다시 올리기':'이 세트 영상 올리기'}${cls?' · 자세 평가':''}<input type="file" accept="video/*" class="wlFile" data-id="${rec.id}" data-i="${i}" data-k="${k}" hidden></label></div>`;
+  return h?`<div class="wl-setform">${h}</div>`:''; }
+// 다음 세트·다음 운동 제안: 자세 점수 + 무게를 같이 봄
+function wlTip(name,L){ const F=L.map((x,k)=>Object.assign({k},x)).filter(x=>x.form&&x.w!=null); if(!F.length) return '';
+  const lower=['squat','seat','lunge','hinge','bridge'].includes(poseKind(name)), inc=lower?5:2.5;
+  const bad=F.filter(x=>x.form.s<70).sort((a,b)=>a.w-b.w)[0], good=F.filter(x=>x.form.s>=80), maxW=Math.max(...F.map(x=>+x.w||0));
+  let t,c;
+  if(bad){ const safe=good.filter(x=>x.w<bad.w).sort((a,b)=>b.w-a.w)[0]; c='r'; t=`${fmtKg(bad.w)}kg에서 자세가 무너졌어요 (${bad.form.s}점) → 다음엔 ${safe?fmtKg(safe.w)+'kg에서 자세 먼저':'무게를 낮춰서'}`; }
+  else if(F.every(x=>x.form.s>=85)){ c='g'; t=`모든 세트 자세 좋음 → 다음엔 ${fmtKg(maxW+inc)}kg 도전`; }
+  else { c='o'; t=`자세 주의 세트가 있어요 → 다음에도 ${fmtKg(maxW)}kg 유지`; }
+  return `<div class="wl-tip ${c}">${t}</div>`; }
+async function soloAnalyze(id,i,file,k){ const rec=wlogGet(id); if(!rec) return; const g=rec.segs[i], cls=anaCls(segTitle(g));
+  let L=segSets(g).map(x=>Object.assign({},x)); if(k==null){ k=L.findIndex(x=>!x.form&&!x.vid); if(k<0){ L.push({w:L.length?L[L.length-1].w:null,r:null}); k=L.length-1; } } g.log=L;
+  const key=`${id}:${i}:${k}`;
+  try{ await IDB.put(key,file); L[k].vid=key; g.vid=true; g.vidKey=key; delete WL.thumbs[key]; }catch(e){ toast('영상을 저장하지 못했어요 · 저장 공간을 확인해 주세요'); }
+  if(!cls||!window.LiveCam||!window.LiveCam.analyzeVideo){ wlogSave(rec); S.wlEdit={id,i,k}; wlOpen(id); toast(cls?'분석 모듈을 불러오는 중이에요 · 잠시 뒤 다시 올려 주세요':'영상을 저장했어요'); return; }
+  S.wlUp={id,i,pct:0,msg:`${k+1}세트 · 골격 모델 준비 중…`}; wlogSave(rec); S.wlEdit=null; wlOpen(id);
+  const set=(p,m)=>{ if(!S.wlUp) return; if(p!=null) S.wlUp.pct=p; if(m) S.wlUp.msg=m; const b=$('#wlUpBar'), t=$('#wlUpMsg'); if(b&&p!=null) b.style.width=Math.round(p*100)+'%'; if(t&&m) t.textContent=m; };
+  try{ const res=await window.LiveCam.analyzeVideo(file,{canvas:document.createElement('canvas'),fps:15,onStatus:t=>set(null,t),onProgress:p=>set(p,`${k+1}세트 영상 분석 중… ${Math.round(p*100)}%`),onRep:(r,n)=>set(null,`${k+1}세트 · 반복 ${n}회 찾음`)});
+    const reps=res.reps.filter(r=>r.cls===cls||r.cls==='squat'||r.cls==='hinge');
+    if(!reps.length){ g.ana={err:res.reps.length?'이 운동과 다른 동작으로 보여요. 옆모습 전신이 나오게 다시 찍어 주세요.':'반복을 찾지 못했어요. 옆에서 2~3m 떨어져 머리부터 발까지 나오게 찍어 주세요.'}; }
+    else { const ref=refFor(cls), f=setForm(cls,reps.map(r=>r.ang),ref); L[k].form=f; if(!L[k].r) L[k].r=reps.length;
+      const best=reps.slice().sort((a,b)=>repScore(cls,b.ang,ref).score-repScore(cls,a.ang,ref).score)[0]; g.best=best&&best.lm||g.best||null;
+      g.ana={reps:reps.length,fb:f.fb,src:f.src,cls,me:avgAng(reps.map(r=>r.ang))}; }
+  }catch(e){ const m=String(e&&e.message||''); g.ana={err:/fetch|import|network|load/i.test(m)?'골격 모델을 불러오지 못했어요 · 인터넷 연결을 확인하고 다시 올려 주세요':(m||'분석하지 못했어요')}; }
+  S.wlUp=null; wlogSave(rec); S.wlEdit={id,i,k}; if(document.querySelector('.wlog')) wlOpen(id); toast(L[k].form?`${k+1}세트 자세 ${L[k].form.s}점`:'영상을 저장했어요'); }
 
 // ---------- render ----------
 let modal=null;

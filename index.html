@@ -360,6 +360,17 @@ function judge(cls, r, crit){
 }
 
 // ---------- voice ----------
+// 트레이너가 말한 운동 이름 (긴 이름부터 찾음)
+const EX_NAMES = [
+  ['루마니안 데드리프트', /루마니안|RDL|알디엘/i], ['스티프 데드리프트', /스티프/], ['데드리프트', /데드\s?리프트|데드/],
+  ['불가리안 스플릿 스쿼트', /불가리안/], ['스플릿 스쿼트', /스플릿\s?스쿼트/], ['고블릿 스쿼트', /고블릿/], ['프론트 스쿼트', /프론트\s?스쿼트/], ['스쿼트', /스쿼트|스쿼드/],
+  ['런지', /런지/], ['힙 쓰러스트', /힙\s?(쓰|스|뜨)러스트|힙\s?트러스트/], ['글루트 브릿지', /브릿지|브리지/], ['레그 프레스', /레그\s?프레스/], ['레그 컬', /레그\s?컬/], ['레그 익스텐션', /레그\s?익스텐션/],
+  ['인클라인 벤치프레스', /인클라인/], ['벤치프레스', /벤치\s?프레스|벤치/], ['덤벨 프레스', /덤벨\s?프레스/], ['푸시업', /푸시\s?업|팔굽혀/],
+  ['오버헤드 프레스', /오버헤드|숄더\s?프레스|밀리터리/], ['사이드 레터럴 레이즈', /레터럴|사레레|사이드\s?레이즈/],
+  ['바벨 로우', /바벨\s?로우/], ['덤벨 로우', /덤벨\s?로우|원암\s?로우/], ['시티드 로우', /시티드|케이블\s?로우/], ['랫풀다운', /랫\s?풀\s?다운|렛\s?풀\s?다운/], ['풀업', /풀\s?업|턱걸이/],
+  ['케틀벨 스윙', /스윙/], ['바이셉 컬', /바이셉|이두\s?컬|덤벨\s?컬/], ['트라이셉 익스텐션', /트라이셉|삼두/], ['플랭크', /플랭크/], ['카프 레이즈', /카프/],
+];
+function detectName(t){ const hit = EX_NAMES.find(([, re]) => re.test(t)); return hit ? hit[0] : null; }
 const KW = [[/힙\s?힌지|힙\s?인지/, '힙힌지'], [/더\s?앉/, '더 앉기'], [/가슴/, '가슴 들기'], [/반동/, '반동 금지'], [/허리/, '허리 중립'], [/무릎/, '무릎 정렬'], [/엉덩이/, '엉덩이 뒤로'], [/흉추/, '흉추 들기'], [/견갑|어깨\s?뼈/, '견갑 고정'], [/복압|배에\s?힘/, '복압 유지'], [/호흡|숨\s/, '호흡'], [/천천히/, '천천히'], [/발\s?(위치|너비)/, '발 위치']];
 function parseVoice(t){
   const kws = KW.filter(([re]) => re.test(t)).map(([, k]) => k);
@@ -412,6 +423,11 @@ const LiveCam = {
     o.onStatus && o.onStatus('카메라를 켜는 중…');
     S.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 960 }, height: { ideal: 720 } }, audio: false });
     if (!S.running){ S.stream.getTracks().forEach(t => t.stop()); return; }
+    if (o.record){ // 자막을 뽑기 위해 소리도 녹음
+      try { S.audio = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } }); }
+      catch (e) { S.audio = null; this._emit('voice', { txt: '마이크 권한이 없어 소리 없이 촬영해요 (자막 추출 불가)', kws: [] }); }
+      if (!S.running){ [S.stream, S.audio].forEach(st => st && st.getTracks().forEach(t => t.stop())); return; }
+    }
     video.srcObject = S.stream; await video.play();
     await loadModel(o.onStatus);
     if (!S.running) return;
@@ -492,12 +508,17 @@ const LiveCam = {
     const S = this.s;
     // segment & set bookkeeping
     let seg = S.segs[S.segs.length - 1];
-    if (!seg || seg.cls !== r.cls || r.t - S.lastRepT > 25000){
-      seg = { cls: r.cls, name: CLASS_NAME[r.cls], reps: [], sets: 1, kws: [], w: null, lines: [], judged: 0, start: (r.t - S.t0) / 1000 };
+    const named = S.pendingName && (!seg || S.pendingName !== seg.label);
+    // 트레이너가 운동 이름을 말했으면 그 이름으로 나누고, 이름이 붙은 구간은 동작 패턴이 조금 달라도 그대로 이어감
+    if (!seg || named || r.t - S.lastRepT > 25000 || (!seg.label && seg.cls !== r.cls)){
+      seg = { cls: r.cls, name: CLASS_NAME[r.cls], label: S.pendingName || null, reps: [], sets: 1, kws: [], w: null, lines: [], judged: 0,
+        start: Math.max(0, (r.t0 - S.t0) / 1000 - 2), end: 0 };
+      S.pendingName = null;
       S.segs.push(seg); this._emit('segment', seg);
       // 운동을 시작하기 전(쉬는 시간)에 한 말은 다음 운동에 붙임
       (S.pending || []).forEach(p => this._applyVoice(seg, p)); S.pending = [];
     } else if (r.t - S.lastRepT > 8000) seg.sets++;
+    seg.end = (r.t - S.t0) / 1000 + 2;
     r.set = seg.sets; seg.reps.push(r); S.reps.push(r); S.lastRep = r; S.lastRepT = r.t;
     this._emit('rep', { r, seg });
     if (S.o.mode === 'solo'){
@@ -512,9 +533,14 @@ const LiveCam = {
       for (let i = e.resultIndex; i < e.results.length; i++){
         if (!e.results[i].isFinal) continue;
         const txt = e.results[i][0].transcript.trim(); if (!txt) continue;
-        const p = parseVoice(txt); p.txt = txt; S.transcript.push(txt);
+        const p = parseVoice(txt); p.txt = txt; S.transcript.push({ t: (performance.now() - S.t0) / 1000, txt });
         let seg = S.segs[S.segs.length - 1];
         const resting = !seg || (performance.now() - S.lastRepT > 5000 && S.det && S.det.hip.state !== 'high' && S.det.elbow.state !== 'high');
+        const nm = detectName(txt);
+        if (nm){
+          if (seg && !resting && !seg.label){ seg.label = nm; this._emit('segment', seg); }
+          else if (!seg || seg.label !== nm) S.pendingName = nm;
+        }
         if (resting && !p.deeper){ (S.pending = S.pending || []).push(p); seg = null; }
         else if (seg) this._applyVoice(seg, p);
         // trainer judgment: "더 앉아" right after a rep → that rep was too shallow
@@ -525,7 +551,7 @@ const LiveCam = {
           last.judged = true; if (seg) seg.judged++;
           this._emit('rep', { r: last, seg });
         }
-        this._emit('voice', { txt, kws: p.kws, w: p.w, pending: !seg });
+        this._emit('voice', { txt, kws: p.kws, w: p.w, pending: !seg, name: nm });
       }
     };
     rec.onend = () => { if (S.running) { try { rec.start(); } catch (e) {} } };
@@ -541,12 +567,19 @@ const LiveCam = {
     const S = this.s;
     try {
       const stream = S.canvas.captureStream(24);
+      if (S.audio) S.audio.getAudioTracks().forEach(t => stream.addTrack(t));
       const types = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
       const mimeType = types.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t));
       const mr = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       S.chunks = []; mr.ondataavailable = e => { if (e.data && e.data.size) S.chunks.push(e.data); };
       mr.start(1000); S.mr = mr; S.mime = mimeType || 'video/webm';
     } catch (e) { S.mr = null; }
+    if (S.audio) try { // 자막 추출용 소리만 따로 (작은 파일)
+      const at = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t));
+      const amr = new MediaRecorder(new MediaStream(S.audio.getAudioTracks()), Object.assign({ audioBitsPerSecond: 32000 }, at ? { mimeType: at } : {}));
+      S.achunks = []; amr.ondataavailable = e => { if (e.data && e.data.size) S.achunks.push(e.data); };
+      amr.start(1000); S.amr = amr; S.amime = at || 'audio/webm';
+    } catch (e) { S.amr = null; }
   },
   async stop(){
     const S = this.s; if (!S) return null;
@@ -554,14 +587,17 @@ const LiveCam = {
     try { S.rec && S.rec.stop(); } catch (e) {}
     (S.stream ? S.stream.getTracks() : []).forEach(t => t.stop());
     if (this.s === S) this.s = null;
-    let url = null;
-    if (S.mr && S.mr.state !== 'inactive'){
-      await new Promise(res => { S.mr.onstop = res; S.mr.stop(); });
-      if (S.chunks.length) url = URL.createObjectURL(new Blob(S.chunks, { type: S.mime }));
-    }
+    let url = null, videoBlob = null, audioBlob = null;
+    const dur = (performance.now() - S.t0) / 1000;
+    const stopRec = (mr) => new Promise(res => { if (!mr || mr.state === 'inactive') return res(); mr.onstop = res; mr.stop(); });
+    await Promise.all([stopRec(S.mr), stopRec(S.amr)]);
+    (S.audio ? S.audio.getTracks() : []).forEach(t => t.stop());
+    if (S.chunks && S.chunks.length){ videoBlob = new Blob(S.chunks, { type: S.mime }); url = URL.createObjectURL(videoBlob); }
+    if (S.achunks && S.achunks.length) audioBlob = new Blob(S.achunks, { type: S.amime });
     const lastSeg = S.segs[S.segs.length - 1];
     if (lastSeg) (S.pending || []).forEach(p => this._applyVoice(lastSeg, p));
-    return { segs: S.segs, reps: S.reps, transcript: S.transcript, videoURL: url, mime: S.mime, crit: S.crit };
+    if (S.segs.length) S.segs[S.segs.length - 1].end = Math.max(S.segs[S.segs.length - 1].end, dur);
+    return { segs: S.segs, reps: S.reps, transcript: S.transcript, videoURL: url, videoBlob, audioBlob, mime: S.mime, crit: S.crit, duration: dur };
   },
   _emit(type, data){ const S = this.s; S && S.o.on && S.o.on(type, data); },
 };
@@ -569,6 +605,7 @@ const LiveCam = {
 window.LiveCam = LiveCam;
 window.LiveCamNames = CLASS_NAME;
 window.LiveCamCue = CUE;
+window.LiveCamDetectName = detectName;
 window.dispatchEvent(new Event('livecam-ready'));
 
 </script>
@@ -1116,7 +1153,7 @@ function tMemberDetail(id){
 }
 function tSession(){
   renderTop('수업',false);
-  return `<div class="card"><h3>수업 시작할 회원</h3>${members.map(m=>`<button class="list-item" data-act="startClass" data-id="${m.id}"><div class="av">${m.name[0]}</div><div class="sp"><b>${m.name}</b><div class="muted">${m.next} · ${m.done+1}회차</div></div><span class="pill p-blue">시작</span></button>`).join('')}</div>
+  return `${savedSessionsCard()}<div class="card"><h3>수업 시작할 회원</h3>${members.map(m=>`<button class="list-item" data-act="startClass" data-id="${m.id}"><div class="av">${m.name[0]}</div><div class="sp"><b>${m.name}</b><div class="muted">${m.next} · ${m.done+1}회차</div></div><span class="pill p-blue">시작</span></button>`).join('')}</div>
   <div class="card"><h3>촬영 준비</h3><div class="muted" style="line-height:1.7">· 기기를 옆쪽 2~3m 거리에 세우고 전신이 화면에 들어오게 합니다.<br>· 시작하면 앱이 촬영 각도와 전신 노출을 먼저 점검합니다.<br>· 무릎 너비는 정면 세트에서 따로 측정합니다.</div></div>`;
 }
 function tLive(){
@@ -1463,7 +1500,7 @@ function realLive(){
     <div class="feedback idle" id="fb" style="margin-top:8px">측면 2~3m에서 전신이 보이게 서 주세요</div>
     <div id="repList" style="margin-top:8px"></div></div>
   <div class="card" style="padding:12px"><h3 style="margin-bottom:8px">${I.mic.replace('class="mic"','class="mic" style="width:18px;height:18px;color:var(--blue)"')} 코칭 키워드</h3>
-    <div id="kwBox"><span class="muted">말하면 키워드·중량이 운동별로 쌓여요 (예: “60킬로, 더 앉아요”)</span></div>
+    <div id="kwBox"><span class="muted">운동 이름을 말하면 그 이름으로 나눠요 (예: “스쿼트 60킬로”, “다음은 데드리프트”)</span></div>
     <div id="voiceTxt" class="muted" style="margin-top:8px;font-size:12px"></div></div>
   <div class="row"><button class="btn sec" data-act="camFlip" style="flex:1">카메라 전환</button><button class="btn" data-act="realEnd" style="flex:1;background:#B42318">촬영 종료</button></div>
   <p class="foot">얼굴과 다른 사람은 촬영 중에 모자이크 처리됩니다 · 영상은 이 기기에만 남아요</p>`;
@@ -1480,7 +1517,7 @@ function startRealClass(){
   const refs=LS.get('aiwm_refs',{});
   let lastChart=0;
   const set=(id,h)=>{const e=$('#'+id); if(e) e.innerHTML=h;};
-  const segHTML=segs=>segs.map((g,i)=>`<span class="segc${i===segs.length-1?' on':''}">${i+1}. ${g.name} · ${g.reps.length}회</span>`).join('');
+  const segHTML=segs=>segs.map((g,i)=>`<span class="segc${i===segs.length-1?' on':''}">${i+1}. ${g.label||g.name} · ${g.reps.length}회</span>`).join('');
   window.LiveCam.start({ box, facing:REAL.facing, record:true, voice:true, mode:'class',
     criteria:{depth:(refs.squat&&refs.squat.crit&&refs.squat.crit.depth)||S.criteria.depth},
     onStatus:t=>set('camStatus',t),
@@ -1488,17 +1525,17 @@ function startRealClass(){
       if(type==='status') set('camStatus',d);
       else if(type==='phase') set('phaseChip',d);
       else if(type==='chart'){ const now=performance.now(); if(now-lastChart>250){lastChart=now; set('chart',miniChart(d));} }
-      else if(type==='segment'){ set('exChip',d.name+' 인식'); }
+      else if(type==='segment'){ set('exChip',(d.label||d.name)+(d.label?'':' 인식')); const L=window.LiveCam.s; if(L) set('segStrip',segHTML(L.segs)); }
       else if(type==='rep'){
         const segs=window.LiveCam.s?window.LiveCam.s.segs:[d.seg];
         set('segStrip',segHTML(segs));
         set('setInfo',`${d.seg.sets}세트 · ${d.seg.reps.length}회`);
         const fb=$('#fb'); if(fb){fb.className='feedback '+(d.r.ok?'ok':'warn'); fb.textContent=d.r.txt;}
         const last=d.seg.reps.slice(-4).reverse();
-        set('repList',last.map(r=>`<div class="fd"><span>${d.seg.name} ${d.seg.reps.indexOf(r)+1}회</span><b class="${r.ok?'ok':'warn'}">${r.txt}</b></div>`).join(''));
+        set('repList',last.map(r=>`<div class="fd"><span>${d.seg.label||d.seg.name} ${d.seg.reps.indexOf(r)+1}회</span><b class="${r.ok?'ok':'warn'}">${r.txt}</b></div>`).join(''));
       }
       else if(type==='voice'){
-        set('voiceTxt','“'+d.txt+'”');
+        set('voiceTxt','“'+d.txt+'”'+(d.name?` → 운동 이름 <b>${d.name}</b>`:''));
         const g=window.LiveCam.s&&window.LiveCam.s.segs.slice(-1)[0];
         if(d.pending){ if(d.kws.length||d.w) set('kwBox',`<div class="muted" style="font-size:12px;margin-bottom:4px">다음 운동에 붙일 메모</div>`+(d.w?`<span class="kw w">${d.w}</span>`:'')+d.kws.map(k=>`<span class="kw">#${k}</span>`).join('')); }
         else if(g) set('kwBox',(g.w?`<span class="kw w">${g.w}</span>`:'')+g.kws.map(k=>`<span class="kw">#${k}</span>`).join('')||'<span class="muted">키워드 없음</span>');
@@ -1507,33 +1544,80 @@ function startRealClass(){
     }
   }).catch(err=>{ stopReal(); set('camStatus',''); const fb=$('#fb'); if(fb){fb.className='feedback warn';fb.textContent=camFail(err);} set('repList','<button class="btn sec full" data-act="recStart" style="margin-top:4px">카메라 없이 시연 보기</button>'); });
 }
+function segTitle(g){ return g.title||g.label||g.name; }
+function segRange(R,i){ const g=R.segs[i]; const from=i===0?0:R.segs[i-1].end; const to=i===R.segs.length-1?Math.max(g.end,R.duration||0):g.end; return [Math.max(0,from),to]; }
+function capsOf(R,i){ const [a,b]=segRange(R,i); return (R.captions||[]).filter(c=>c.start>=a-0.5&&c.start<b); }
+function fmtT(s){ s=Math.max(0,Math.round(s)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+function bestRep(g){ const ok=g.reps.filter(r=>r.ok); return (ok.length?ok:g.reps).slice().sort((a,b)=>(b.hipPk||0)-(a.hipPk||0))[0]; }
+function esc(t){ return String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function realReview(){
-  renderTop('수업 정리 · 실제 촬영',true);
+  renderTop('수업 정리',true);
   const R=REAL.result;
   if(!R) return `<div class="card">촬영 기록이 없어요.</div>`;
-  const refs=LS.get('aiwm_refs',{});
+  const refs=LS.get('aiwm_refs',{}), ai=R.ai||{};
   const total=R.segs.reduce((a,g)=>a+g.reps.length,0);
-  const head=`<div class="alert g"><div><b>자동 정리 완료</b><br>운동 ${R.segs.length}개 · 반복 ${total}회 · 음성 ${R.transcript.length}문장</div></div>
-    ${R.videoURL?`<div class="card"><h3>촬영 영상 <span class="r muted">얼굴 모자이크</span></h3><video src="${R.videoURL}" controls playsinline style="width:100%;border-radius:12px;background:#000"></video><a class="btn sec full" style="margin-top:8px;text-align:center;text-decoration:none" href="${R.videoURL}" download="수업영상.${(R.videoURL&&R.mime||'').includes('mp4')?'mp4':'webm'}">영상 저장</a></div>`:''}`;
-  if(!R.segs.length) return head+`<div class="card"><h3>인식된 반복이 없어요</h3><div class="muted" style="line-height:1.7">· 기기를 옆쪽 2~3m에 세워 전신(머리~발)이 나오게 해 주세요.<br>· 밝은 곳에서, 한 명만 화면 중앙에 서면 더 잘 잡혀요.<br>· 반복은 천천히 끝까지 움직여야 1회로 셉니다.</div></div><button class="btn full" data-act="realAgain">다시 촬영</button>`;
-  return head+R.segs.map((g,i)=>{
-    const ok=g.reps.filter(r=>r.ok), best=(ok.length?ok:g.reps).slice().sort((a,b)=>b.hipPk-a.hipPk)[0];
-    const saved=refs[g.cls];
-    return `<div class="card"><h3>${i+1}. <input class="nm" data-seg="${i}" value="${g.label||g.name}" aria-label="운동 이름"> ${g.w?`<span class="kw w" style="margin-left:auto">${g.w}</span>`:''}</h3>
-      <div class="muted" style="margin:-4px 0 10px">${g.sets}세트 · ${g.reps.length}회 · 좋은 반복 ${ok.length}회${g.judged?` · 트레이너 판단 ${g.judged}회 반영`:''}</div>
-      <div class="anal"><div class="clip" style="aspect-ratio:auto">${lmSVG(best&&best.lm, saved&&saved.lm)}<span>${saved?'점선: 저장된 기준 동작':'가장 깊은 반복'}</span></div>
-      <div>${g.reps.slice(0,6).map((r,j)=>`<div class="fd"><span>${r.set}세트 ${j+1}회</span><b class="${r.ok?'ok':'warn'}">${r.txt}</b></div>`).join('')}${g.reps.length>6?`<div class="muted" style="font-size:12px">외 ${g.reps.length-6}회</div>`:''}</div></div>
-      <div class="muted" style="font-size:12px;margin:10px 0 6px">코칭 키워드 · 음성에서 추출</div>
-      <div>${g.kws.length?g.kws.map(k=>`<span class="kw">#${k}</span>`).join(''):'<span class="muted">없음</span>'}</div>
-      <button class="btn ${saved?'sec':''} full" data-act="saveRef" data-seg="${i}" style="margin-top:10px">${saved?'기준 동작 다시 저장':'이 운동의 좋은 반복을 기준 동작으로 저장'}</button>
+  const status = ai.state==='run' ? `<div class="alert b"><div><b>${esc(ai.msg)}</b><br>영상 속 말소리를 자막으로 옮기고, 운동마다 이름·중량·특징을 키워드로 정리하고 있어요.</div></div>`
+    : ai.state==='nokey' ? `<div class="alert o"><div><b>AI를 연결하면 자막과 키워드가 자동으로 정리돼요</b><br>지금은 촬영 중 받아쓴 말로만 정리했어요. 내 정보 → AI 연결(Gemini 권장) 후 ‘다시 정리’를 눌러 주세요.</div><button class="btn sm sec" data-act="realAI" style="align-self:center">다시 정리</button></div>`
+    : ai.state==='error' ? `<div class="alert o"><div><b>자동 정리를 끝내지 못했어요</b><br>${esc(ai.msg)}</div><button class="btn sm sec" data-act="realAI" style="align-self:center">다시 정리</button></div>`
+    : ai.state==='done' ? `<div class="alert g"><div><b>정리 완료</b><br>운동 ${R.segs.length}개 · 반복 ${total}회 · 자막 ${(R.captions||[]).length}줄${ai.warn?`<br><span style="font-size:12px">${esc(ai.warn)}</span>`:''}</div></div>` : '';
+  const dl = R.videoURL?`<a class="btn sec full" style="margin-top:8px;text-align:center;text-decoration:none" href="${R.videoURL}" download="수업영상_${(R.date||'').replace(/[^0-9]/g,'')}.${(R.mime||'').includes('mp4')?'mp4':'webm'}">전체 영상 저장</a>`:'';
+  if(!R.segs.length) return status+`<div class="card"><h3>인식된 반복이 없어요</h3><div class="muted" style="line-height:1.7">· 기기를 옆쪽 2~3m에 세워 전신(머리~발)이 나오게 해 주세요.<br>· 밝은 곳에서, 한 명만 화면 중앙에 서면 더 잘 잡혀요.<br>· 반복은 천천히 끝까지 움직여야 1회로 셉니다.</div>${dl}</div><button class="btn full" data-act="realAgain">다시 촬영</button>`;
+  return status+R.segs.map((g,i)=>{
+    const [t0,t1]=segRange(R,i), caps=capsOf(R,i), best=bestRep(g), lm=g.best||(best&&best.lm), saved=refs[g.cls];
+    const kws=(g.aiKws||g.kws||[]);
+    const okN=g.reps.filter(r=>r.ok).length;
+    return `<div class="card">
+      <h3 style="gap:8px">${i+1}. ${esc(segTitle(g))}${g.w?`<span class="kw w" style="margin-left:auto">${esc(g.w)}</span>`:''}</h3>
+      <div class="muted" style="margin:-4px 0 10px">${g.sets}세트 · ${g.reps.length}회 · ${fmtT(t0)}–${fmtT(t1)}${g.label?'':' · 이름은 동작으로 추정'}</div>
+      ${R.videoURL?`<video src="${R.videoURL}#t=${t0.toFixed(1)},${t1.toFixed(1)}" controls playsinline preload="metadata" style="width:100%;border-radius:12px;background:#000;display:block">${R.vttURL?`<track kind="captions" srclang="ko" label="자막" src="${R.vttURL}" default>`:''}</video>`:'<div class="muted" style="font-size:12px">영상 없음 (이 기기에 저장된 영상이 없어요)</div>'}
+      <div class="muted" style="font-size:12px;margin:10px 0 6px">키워드 요약 · 자막에서 추출</div>
+      <div>${kws.length?kws.map(k=>`<button class="kw" data-act="segKw" data-seg="${i}" data-k="${esc(k)}" aria-label="${esc(k)} 키워드 빼기">#${esc(k)} <span aria-hidden="true">×</span></button>`).join(''):'<span class="muted">아직 키워드가 없어요</span>'}</div>
+      <details style="margin-top:10px"><summary class="muted" style="font-size:13px;cursor:pointer">자막 ${caps.length}줄</summary>
+        <div style="font-size:13px;line-height:1.7;margin-top:6px">${caps.length?caps.map(c=>`<div><span class="muted" style="font-variant-numeric:tabular-nums">${fmtT(c.start)}</span> ${esc(c.text)}</div>`).join(''):'<span class="muted">이 구간에 들린 말이 없어요</span>'}</div></details>
+      <details style="margin-top:6px"><summary class="muted" style="font-size:13px;cursor:pointer">동작 분석 · 좋은 반복 ${okN}/${g.reps.length}</summary>
+        <div class="anal" style="margin-top:8px"><div class="clip" style="aspect-ratio:auto">${lmSVG(lm, saved&&saved.lm)}<span>${saved?'점선: 저장된 기준 동작':'대표 반복'}</span></div>
+        <div>${g.reps.slice(0,6).map((r,j)=>`<div class="fd"><span>${r.set}세트 ${j+1}회</span><b class="${r.ok?'ok':'warn'}">${esc(r.txt)}</b></div>`).join('')}${g.reps.length>6?`<div class="muted" style="font-size:12px">외 ${g.reps.length-6}회</div>`:''}</div></div>
+        <div class="muted" style="font-size:12px;margin-top:6px">분석 패턴: ${g.name}</div></details>
+      ${lm?`<button class="btn ${saved?'sec':''} full" data-act="saveRef" data-seg="${i}" style="margin-top:10px">${saved?'기준 동작 다시 저장':'좋은 반복을 회원 기준 동작으로 저장'}</button>`:''}
     </div>`;}).join('')+
-  (R.transcript.length?`<div class="card"><h3>음성 원문 <span class="r muted">요약 전</span></h3><div class="muted" style="font-size:12.5px;line-height:1.7">${R.transcript.map(t=>'· '+t).join('<br>')}</div></div>`:'')+
-  `<button class="btn full" data-act="realShare">카카오톡으로 보낼 요약 복사</button><button class="btn sec full" data-act="realAgain" style="margin-top:8px">다시 촬영</button>`;
+  `<div class="card"><h3>전체 영상 <span class="r muted">얼굴 모자이크</span></h3>${R.videoURL?`<video src="${R.videoURL}" controls playsinline preload="metadata" style="width:100%;border-radius:12px;background:#000">${R.vttURL?`<track kind="captions" srclang="ko" label="자막" src="${R.vttURL}" default>`:''}</video>`:''}${dl}</div>
+  <button class="btn full" data-act="realShare">카카오톡으로 보낼 요약 복사</button><button class="btn sec full" data-act="realAgain" style="margin-top:8px">새 수업 촬영</button>`;
 }
 function realSummary(){
   const R=REAL.result; if(!R) return '';
-  const d=new Date(), md=(d.getMonth()+1)+'/'+d.getDate();
-  return `[${md} 수업 기록]\n`+R.segs.map((g,i)=>{const ok=g.reps.filter(r=>r.ok).length; return `${i+1}. ${g.label||g.name}${g.w?' '+g.w:''} · ${g.sets}세트 ${g.reps.length}회 (좋은 반복 ${ok}회)\n${g.kws.map(k=>'#'+k).join(' ')}`;}).join('\n\n');
+  const d=R.ts?new Date(R.ts):new Date(), md=(d.getMonth()+1)+'/'+d.getDate();
+  return `[${md} 수업 기록]\n`+R.segs.map((g,i)=>`${i+1}. ${segTitle(g)}${g.w?' '+g.w:''} · ${g.sets}세트 ${g.reps.length}회\n${(g.aiKws||g.kws||[]).map(k=>'#'+k.replace(/\s+/g,'_')).join(' ')}`).join('\n\n');
+}
+// ---------- 수업 기록 저장 (기록: 기기 저장소 · 영상: IndexedDB) ----------
+const IDB={ open(){ return this.p||(this.p=new Promise((res,rej)=>{ const q=indexedDB.open('aiwm',1); q.onupgradeneeded=()=>q.result.createObjectStore('videos'); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); })); },
+  async put(k,v){ const db=await this.open(); return new Promise((res,rej)=>{ const t=db.transaction('videos','readwrite'); t.objectStore('videos').put(v,k); t.oncomplete=res; t.onerror=()=>rej(t.error); }); },
+  async get(k){ const db=await this.open(); return new Promise((res,rej)=>{ const q=db.transaction('videos').objectStore('videos').get(k); q.onsuccess=()=>res(q.result||null); q.onerror=()=>rej(q.error); }); },
+  async del(k){ const db=await this.open(); return new Promise(res=>{ const t=db.transaction('videos','readwrite'); t.objectStore('videos').delete(k); t.oncomplete=res; t.onerror=res; }); } };
+function saveSession(R){
+  if(!R.id) R.id='s'+Date.now();
+  const rec={id:R.id,ts:R.ts||Date.now(),date:R.date,duration:R.duration,mime:R.mime,crit:R.crit,captions:R.captions||[],transcript:R.transcript||[],
+    segs:R.segs.map(g=>{ const b=bestRep(g); return {cls:g.cls,name:g.name,label:g.label,title:g.title,sets:g.sets,w:g.w,kws:g.kws,aiKws:g.aiKws,lines:g.lines,judged:g.judged,start:g.start,end:g.end,best:g.best||(b&&b.lm)||null,
+      reps:g.reps.map(r=>({set:r.set,ok:r.ok,txt:r.txt,hipPk:r.hipPk}))}; })};
+  let list=LS.get('aiwm_sessions',[]).filter(x=>x.id!==R.id); list.unshift(rec);
+  list=list.slice(0,40); let ok=LS.set('aiwm_sessions',list);
+  while(!ok && list.length>1){ list=list.slice(0,Math.max(1,Math.floor(list.length/2))); ok=LS.set('aiwm_sessions',list); }
+  if(R.videoBlob && !R.videoSaved){ R.videoSaved=true; IDB.put(R.id,R.videoBlob).catch(()=>{ R.videoSaved=false; }); }
+}
+function buildVTT(R){
+  const t=s=>{ s=Math.max(0,s); const h=Math.floor(s/3600), m=Math.floor(s%3600/60), x=(s%60).toFixed(3).padStart(6,'0'); return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+x; };
+  const body='WEBVTT\n\n'+(R.captions||[]).map((c,i)=>`${i+1}\n${t(c.start)} --> ${t(Math.max(c.end,c.start+1))}\n${String(c.text).replace(/-->/g,'→')}\n`).join('\n');
+  if(R.vttURL) URL.revokeObjectURL(R.vttURL);
+  R.vttURL=URL.createObjectURL(new Blob([body],{type:'text/vtt'}));
+}
+async function openSession(id){
+  const rec=LS.get('aiwm_sessions',[]).find(x=>x.id===id); if(!rec) return toast('기록을 찾지 못했어요');
+  const R=Object.assign({},rec,{videoSaved:true,ai:{state:'done'}}); 
+  try{ const blob=await IDB.get(id); if(blob){ R.videoBlob=blob; R.videoURL=URL.createObjectURL(blob); } }catch(e){}
+  buildVTT(R); REAL.result=R; go('realReview');
+}
+function savedSessionsCard(){
+  const list=LS.get('aiwm_sessions',[]); if(!list.length) return '';
+  return `<div class="card"><h3>저장된 수업 <span class="r muted">이 기기</span></h3>${list.slice(0,8).map(x=>{ const d=new Date(x.ts); return `<button class="list-item" data-act="openSession" data-id="${x.id}"><div class="sp"><b style="font-size:14px">${d.getMonth()+1}월 ${d.getDate()}일 ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}</b><div class="muted">${x.segs.map(segTitle).join(' · ')||'반복 없음'}</div></div><span class="muted">›</span></button>`; }).join('')}</div>`;
 }
 function soloRealView(name){
   const key=N2K[name]||'squat', cls=K2C[key], ref=LS.get('aiwm_refs',{})[cls];
@@ -1574,15 +1658,17 @@ function realAct(act,a){
     case 'realStart': if(!camReady()){toast(window.isSecureContext?'카메라 모듈을 불러오는 중이에요. 잠시 후 다시 눌러 주세요':'https 주소에서만 카메라를 쓸 수 있어요');return true;} S.recOn=false; S.realOn=true; render(); return true;
     case 'camFlip': { REAL.facing=REAL.facing==='environment'?'user':'environment'; stopReal(); render(); return true; }
     case 'realEnd': { const L=window.LiveCam; const p=L&&L.s?L.stop():Promise.resolve(null);
-      p.then(res=>{ S.realOn=false; if(res){ REAL.result=res; REAL.result.date=new Date().toLocaleDateString('ko-KR'); } go('realReview'); }); return true; }
+      p.then(res=>{ S.realOn=false; if(res){ res.ts=Date.now(); res.date=new Date().toLocaleDateString('ko-KR'); REAL.result=res; saveSession(res); } go('realReview'); if(res) processSession(res); }); return true; }
+    case 'realAI': if(REAL.result) processSession(REAL.result); return true;
+    case 'openSession': openSession(a.dataset.id); return true;
+    case 'segKw': { const R=REAL.result, g=R&&R.segs[+a.dataset.seg]; if(!g) return true; const k=a.dataset.k; if(g.aiKws) g.aiKws=g.aiKws.filter(x=>x!==k); g.kws=(g.kws||[]).filter(x=>x!==k); saveSession(R); keepScroll(render); return true; }
     case 'realAgain': S.realOn=true; go('live'); return true;
     case 'saveRef': { const R=REAL.result, g=R&&R.segs[+a.dataset.seg]; if(!g) return true;
-      const inp=document.querySelector(`input.nm[data-seg="${a.dataset.seg}"]`); if(inp) g.label=inp.value.trim()||g.name;
-      const ok=g.reps.filter(r=>r.ok), best=(ok.length?ok:g.reps).slice().sort((x,y)=>y.hipPk-x.hipPk)[0];
+      const best=bestRep(g), lm=g.best||(best&&best.lm); if(!lm) return true;
       const PRI={squat:/더\s?앉/,hinge:/무릎|힙\s?힌지/,pull:/반동/,press:/허리/}, L=g.lines||[];
       const pick=L.find(t=>PRI[g.cls]&&PRI[g.cls].test(t))||L.find(t=>/더\s?앉|무릎|반동|허리|힙|가슴|엉덩이/.test(t));
       const cueLine=pick?pick.replace(/\d+(\.\d+)?\s*(킬로|키로|kg|KG|㎏)\s*/,'').trim():null;
-      const refs=LS.get('aiwm_refs',{}); refs[g.cls]={name:g.label||g.name, lm:best.lm, crit:R.crit, cue:cueLine, date:R.date||'오늘'};
+      const refs=LS.get('aiwm_refs',{}); refs[g.cls]={name:segTitle(g), lm, crit:R.crit, cue:cueLine, date:R.date||'오늘'};
       if(LS.set('aiwm_refs',refs)) toast('기준 동작 저장 · 회원 혼자 연습에서 이 동작과 비교해요'); else toast('이 브라우저에서는 저장이 막혀 있어요');
       keepScroll(render); return true; }
     case 'realShare': { const t=realSummary(); if(navigator.share){ navigator.share({text:t}).catch(()=>{}); } else { try{navigator.clipboard.writeText(t).then(()=>toast('복사했어요 · 카카오톡에 붙여 넣으세요'),()=>toast('복사가 막혀 있어요'));}catch(e){toast('복사가 막혀 있어요');} } return true; }
@@ -1615,18 +1701,20 @@ function imgToJpeg(file,max){
 }
 function thumbOf(dataURL){ return new Promise(res=>{ const im=new Image(); im.onload=()=>{ const c=document.createElement('canvas'); c.width=c.height=120; const s=Math.min(im.width,im.height); c.getContext('2d').drawImage(im,(im.width-s)/2,(im.height-s)/2,s,s,0,0,120,120); res(c.toDataURL('image/jpeg',0.7)); }; im.onerror=()=>res(null); im.src=dataURL; }); }
 function parseJSON(t){ t=String(t||'').replace(/```json|```/g,''); const a=t.indexOf('{'), b=t.lastIndexOf('}'); if(a<0||b<a) throw new Error('AI 답을 읽지 못했어요'); return JSON.parse(t.slice(a,b+1)); }
-async function aiCall(prompt,b64){
+async function aiCall(prompt,b64,mime){
+  mime=mime||'image/jpeg';
   const c=aiCfg(); if(!c.key) throw new Error('NOKEY');
   let r, j;
   try{
     if(c.model.startsWith('gemini')){
-      const parts=[]; if(b64) parts.push({inline_data:{mime_type:'image/jpeg',data:b64}}); parts.push({text:prompt});
+      const parts=[]; if(b64) parts.push({inline_data:{mime_type:mime,data:b64}}); parts.push({text:prompt});
       r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(c.model)}:generateContent`,{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':c.key},
         body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{temperature:0.2,responseMimeType:'application/json'}})});
       j=await r.json().catch(()=>({}));
       if(!r.ok) throw new Error(aiErr(r.status,(j.error&&j.error.message)||''));
       return ((j.candidates||[])[0]?.content?.parts||[]).map(p=>p.text||'').join('');
     }
+    if(b64&&!mime.startsWith('image/')) throw new Error('Claude는 소리를 받지 못해요. 자막 추출은 Gemini를 골라 주세요.');
     const content=[]; if(b64) content.push({type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}}); content.push({type:'text',text:prompt});
     r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':c.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body:JSON.stringify({model:c.model,max_tokens:1200,messages:[{role:'user',content}]})});
@@ -1761,6 +1849,74 @@ function aiAct(act,a){
   return false;
 }
 function rollCakeDataURL(){ return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 170"><rect width="320" height="170" fill="#2B2118"/><rect x="20" y="118" width="280" height="14" rx="7" fill="#E5E7EB" opacity=".9"/><rect x="40" y="60" width="240" height="62" rx="28" fill="#E8C08A" stroke="#B9864A" stroke-width="3"/><ellipse cx="280" cy="91" rx="16" ry="31" fill="#F6E7CF" stroke="#B9864A" stroke-width="3"/></svg>`); }
+
+// ---------- 수업 영상 → 자막 → 운동별 키워드 ----------
+const CAPTION_PROMPT=`PT 수업을 녹음한 소리입니다(트레이너와 회원, 한국어). 들리는 말을 자막으로 받아 적어 JSON 하나만 답하세요.
+{"captions":[{"start":초,"end":초,"text":"말한 내용"}]}
+시간은 이 오디오 시작부터의 초(소수 1자리). 문장 단위로 끊고, 운동 이름·중량·횟수·자세 지시는 들린 그대로 적으세요. 음악·잡음·기계음은 빼고, 말이 없으면 빈 배열.`;
+function summaryPrompt(R){
+  const segs=R.segs.map((g,i)=>{ const [a,b]=segRange(R,i); const ok=g.reps.filter(r=>r.ok).length;
+    return {i, 시간:`${fmtT(a)}-${fmtT(b)}`, 말한_운동이름:g.label||'', 동작_분석_패턴:g.name, 세트:g.sets, 반복:g.reps.length, 좋은_반복:ok,
+      판정:[...new Set(g.reps.filter(r=>!r.ok).map(r=>r.txt))].slice(0,3), 자막:capsOf(R,i).map(c=>c.text).slice(0,60)}; });
+  return `PT 수업 촬영 기록입니다. 카메라가 동작으로 나눈 운동 구간과, 그 시간에 들린 말(자막)이 있습니다.
+구간마다 정리하세요.
+- name: 운동 이름. 말에서 나온 이름을 우선, 없으면 동작 분석 패턴과 자막으로 가장 그럴듯한 한국어 운동 이름.
+- weight: 말한 중량(예: "60kg"), 없으면 "".
+- keywords: 트레이너 코칭과 동작 특징을 짧은 키워드로 3~6개. 명사형, 2~10자 (예: "깊이 수평 아래", "무릎 바깥", "가슴 들기", "반동 금지"). 판정 결과도 반영. 인사·잡담은 빼세요.
+JSON 하나만: {"segments":[{"i":0,"name":"","weight":"","keywords":[]}]}
+기록: ${JSON.stringify(segs)}`;
+}
+function localSummary(R){ R.segs.forEach(g=>{ g.title=g.title||g.label||null; if(!g.aiKws) g.aiKws=null; }); }
+function b64OfBytes(u8){ let s=''; for(let i=0;i<u8.length;i+=0x8000) s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000)); return btoa(s); }
+async function audioToWavChunks(blob,sec){
+  const AC=window.AudioContext||window.webkitAudioContext; const ac=new AC();
+  const buf=await blob.arrayBuffer();
+  const audio=await new Promise((res,rej)=>{ const pr=ac.decodeAudioData(buf,res,rej); if(pr&&pr.catch) pr.catch(rej); });
+  try{ ac.close(); }catch(e){}
+  const sr=16000, len=Math.max(1,Math.ceil(audio.duration*sr));
+  const OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext; const off=new OAC(1,len,sr);
+  const src=off.createBufferSource(); src.buffer=audio; src.connect(off.destination); src.start(0);
+  const pcm=(await off.startRendering()).getChannelData(0);
+  const out=[], step=sec*sr;
+  for(let o=0;o<pcm.length;o+=step){
+    const seg=pcm.subarray(o,Math.min(pcm.length,o+step)), n=seg.length;
+    const wav=new DataView(new ArrayBuffer(44+n*2)); const w=(p,t)=>{ for(let i=0;i<t.length;i++) wav.setUint8(p+i,t.charCodeAt(i)); };
+    w(0,'RIFF'); wav.setUint32(4,36+n*2,true); w(8,'WAVE'); w(12,'fmt '); wav.setUint32(16,16,true); wav.setUint16(20,1,true); wav.setUint16(22,1,true);
+    wav.setUint32(24,sr,true); wav.setUint32(28,sr*2,true); wav.setUint16(32,2,true); wav.setUint16(34,16,true); w(36,'data'); wav.setUint32(40,n*2,true);
+    for(let i=0;i<n;i++){ const v=Math.max(-1,Math.min(1,seg[i])); wav.setInt16(44+i*2,v<0?v*0x8000:v*0x7FFF,true); }
+    out.push({offset:o/sr, b64:b64OfBytes(new Uint8Array(wav.buffer))});
+  }
+  return out;
+}
+function rerenderReview(){ if(S.sub==='realReview') keepScroll(render); }
+async function processSession(R){
+  if(R.busy) return; R.busy=true;
+  const c=aiCfg(); let caps=null, warn='';
+  R.ai={state:'run',msg:'자막 추출 준비 중…'}; rerenderReview();
+  if(c.key && c.model.startsWith('gemini') && R.audioBlob){
+    try{
+      const chunks=await audioToWavChunks(R.audioBlob,240); caps=[];
+      for(let k=0;k<chunks.length;k++){
+        R.ai.msg=`영상에서 자막 추출 중… (${k+1}/${chunks.length})`; rerenderReview();
+        const j=parseJSON(await aiCall(CAPTION_PROMPT,chunks[k].b64,'audio/wav'));
+        (j.captions||[]).forEach(x=>{ if(x&&x.text&&isFinite(+x.start)) caps.push({start:+x.start+chunks[k].offset,end:(isFinite(+x.end)?+x.end:+x.start+2)+chunks[k].offset,text:String(x.text).trim()}); });
+      }
+    }catch(e){ caps=null; warn='소리에서 자막을 뽑지 못해 촬영 중 받아쓴 말로 대신했어요 ('+e.message+')'; }
+  } else if(c.key && !c.model.startsWith('gemini')) warn='Claude는 소리를 받지 못해 촬영 중 받아쓴 말로 자막을 만들었어요. 영상에서 바로 자막을 뽑으려면 Gemini를 고르세요.';
+  else if(c.key && !R.audioBlob) warn='녹음된 소리가 없어 촬영 중 받아쓴 말로 자막을 만들었어요.';
+  if(!caps) caps=(R.transcript||[]).map(x=>({start:Math.max(0,x.t-2),end:x.t+1,text:x.txt}));
+  R.captions=caps.sort((a,b)=>a.start-b.start); buildVTT(R);
+  // 자막에서 운동 이름이 나오면 그 구간 이름으로
+  R.segs.forEach((g,i)=>{ if(!g.label){ const nm=capsOf(R,i).map(x=>x.text).join(' '); const hit=(window.LiveCamDetectName||(()=>null))(nm); if(hit) g.label=hit; } });
+  if(!c.key){ localSummary(R); R.ai={state:'nokey'}; R.busy=false; saveSession(R); rerenderReview(); return; }
+  R.ai.msg='운동별 키워드로 정리 중…'; rerenderReview();
+  try{
+    const j=parseJSON(await aiCall(summaryPrompt(R)));
+    (j.segments||[]).forEach(x=>{ const g=R.segs[+x.i]; if(!g) return; if(x.name) g.title=String(x.name).trim(); if(x.weight) g.w=String(x.weight).trim(); if(Array.isArray(x.keywords)) g.aiKws=x.keywords.map(k=>String(k).replace(/^#/,'').trim()).filter(Boolean).slice(0,8); });
+    R.ai={state:'done',warn};
+  }catch(e){ localSummary(R); R.ai={state:'error',msg:e.message}; }
+  R.busy=false; saveSession(R); rerenderReview();
+}
 
 if(window.APP_BUILD){ S.meals=loadMeals(); const _ib=LS.get('aiwm_inbody',null); if(_ib) S.inbody=_ib; const _g=LS.get('aiwm_goal',null); if(_g) Object.assign(S.goal,_g); }
 // ---------- render ----------

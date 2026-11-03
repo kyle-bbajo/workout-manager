@@ -1,0 +1,2 @@
+# 파일이름 원본주소  (GitHub Actions 'fetch-pose-model'가 받아서 이 폴더에 넣음)
+rtmpose-m_halpe26_256x192.onnx https://huggingface.co/pocketpose/onnx-models/resolve/main/pose_estimation-halpe26/halpe26_td-cc_rtmpose-m_body7_256x192.onnx

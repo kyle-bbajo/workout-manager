@@ -1,0 +1,30 @@
+# 정밀 골격 모델(RTMPose-m, Halpe26)을 Hugging Face에서 받아 저장소 models/ 에 넣음
+# → 앱이 같은 주소(GitHub Pages)에서 받으므로 외부 서버·CORS 문제 없이 동작
+name: fetch-pose-model
+on:
+  workflow_dispatch:
+  push:
+    paths: ['models/MODELS.txt']
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download models listed in models/MODELS.txt
+        run: |
+          set -e
+          while read -r name url; do
+            [ -z "$name" ] && continue; case "$name" in \#*) continue;; esac
+            if [ ! -s "models/$name" ]; then
+              echo "download $name"; curl -fL --retry 3 -o "models/$name" "$url"
+            fi
+            ls -la "models/$name"
+          done < models/MODELS.txt
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add models
+          git diff --cached --quiet || (git commit -m "정밀 골격 모델 추가 (자동)" && git push)

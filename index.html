@@ -572,17 +572,23 @@ async function loadModel(onStatus){
 
 // ---------- 정밀 골격: RTMPose-m (Halpe26, 발뒤꿈치·발끝 포함) · 녹화 영상 분석용 ----------
 // MediaPipe가 사람 위치를 잡으면, 그 영역을 잘라 RTMPose로 관절을 다시 찾아 더 정확한 좌표로 바꿔 넣음
-const ORT_VER = '1.22.0', ORT_URL = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VER}/dist/`;
+const ORT_VER = '1.22.0', ORT_CDN = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VER}/dist/`;
+const ORT_LOCAL = new URL('vendor/ort/', location.href).href;   // 저장소에 같이 올린 실행 파일 (같은 주소라 막힘 없음)
+const RTM_LOCAL = new URL('models/rtmpose-m_halpe26_256x192.onnx', location.href).href;
 const RTM_URL_DEFAULT = 'https://huggingface.co/pocketpose/onnx-models/resolve/main/pose_estimation-halpe26/halpe26_td-cc_rtmpose-m_body7_256x192.onnx';
 const RTM_IN_W = 192, RTM_IN_H = 256;
 // Halpe26 → MediaPipe 33 번호 (같은 자리에 넣어서 이후 계산은 그대로)
 const H26_TO_MP = { 0: 0, 1: 2, 2: 5, 3: 7, 4: 8, 5: 11, 6: 12, 7: 13, 8: 14, 9: 15, 10: 16, 11: 23, 12: 24, 13: 25, 14: 26, 15: 27, 16: 28, 20: 31, 21: 32, 24: 29, 25: 30 };
 const RTM = { session: null, loading: null, ep: '', norm: null, failed: '', ms: 0, n: 0 };
 function preciseOn(){ try { return localStorage.getItem('aiwm_precise') !== '0'; } catch (e) { return true; } }
-function rtmModelURL(){ const c = window.APP_CONFIG || {}; return c.rtmModel || RTM_URL_DEFAULT; }
+function rtmModelURL(){ const c = window.APP_CONFIG || {}; return c.rtmModel || RTM.url || RTM_LOCAL; }
+async function fetchModelAny(urls, onStatus){ const errs = [];
+  for (const u of urls){ try { const b = await fetchModel(u, onStatus); RTM.url = u; return b; } catch (e) { errs.push((/huggingface/.test(u) ? '원본' : '앱 폴더') + ': ' + (e && e.message || e)); } }
+  throw new Error('모델 파일 · ' + errs.join(' / ')); }
 async function fetchModel(url, onStatus){
   let cache = null; try { cache = await caches.open('aiwm-models-v1'); const hit = await cache.match(url); if (hit) return await hit.arrayBuffer(); } catch (e) {}
-  const r = await fetch(url); if (!r.ok) throw new Error('정밀 모델을 받지 못했어요 (' + r.status + ')');
+  let r; try { r = await fetch(url, { mode: 'cors' }); } catch (e) { throw new Error('연결 안 됨'); }
+  if (!r.ok) throw new Error('응답 ' + r.status);
   const total = +r.headers.get('content-length') || 0, rd = r.body && r.body.getReader ? r.body.getReader() : null;
   let buf;
   if (rd){ const parts = []; let got = 0, last = 0;
@@ -596,16 +602,18 @@ async function fetchModel(url, onStatus){
 async function loadRTM(onStatus){
   if (RTM.session) return RTM.session; if (RTM.loading) return RTM.loading;
   RTM.loading = (async () => {
-    const gpu = 'gpu' in navigator;
-    const ort = await import(ORT_URL + (gpu ? 'ort.webgpu.min.mjs' : 'ort.wasm.min.mjs'));
-    ort.env.wasm.wasmPaths = ORT_URL; ort.env.wasm.numThreads = (self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 2) : 1);
-    const buf = await fetchModel(rtmModelURL(), onStatus);
+    const gpu = 'gpu' in navigator; let ort = null, base = '', ierr = '';
+    for (const b of [ORT_LOCAL, ORT_CDN]){ try { ort = await import(b + (gpu ? 'ort.webgpu.min.mjs' : 'ort.wasm.min.mjs')); base = b; break; } catch (e) { ierr = String(e && e.message || e); } }
+    if (!ort) throw new Error('실행 파일 · ' + ierr);
+    ort.env.wasm.wasmPaths = base; ort.env.wasm.numThreads = (self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 2) : 1);
+    const c = window.APP_CONFIG || {};
+    const buf = await fetchModelAny(c.rtmModel ? [c.rtmModel] : [RTM_LOCAL, RTM_URL_DEFAULT], onStatus);
     onStatus && onStatus('정밀 골격 모델 준비 중…');
     let s = null, err = null;
     for (const ep of (gpu ? ['webgpu', 'wasm'] : ['wasm'])){
       try { s = await ort.InferenceSession.create(buf, { executionProviders: [ep], graphOptimizationLevel: 'all' }); RTM.ep = ep; break; } catch (e) { err = e; }
     }
-    if (!s) throw err || new Error('정밀 모델을 열지 못했어요');
+    if (!s) throw new Error('모델 열기 · ' + String(err && err.message || err || '알 수 없음').slice(0, 160));
     RTM.ort = ort; RTM.session = s; RTM.inName = s.inputNames[0]; RTM.out = s.outputNames; RTM.failed = '';
     window.dispatchEvent(new Event('livecam-model'));
     return s;

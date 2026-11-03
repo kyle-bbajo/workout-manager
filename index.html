@@ -320,6 +320,11 @@ input.nm{font:inherit;font-weight:800;font-size:16px;border:none;border-bottom:1
 .tierrow{display:grid;grid-template-columns:64px 72px 18px 64px 18px auto;gap:6px;align-items:center;margin-bottom:8px;font-size:13px}
 .tierrow input{min-height:38px;border:1px solid var(--line);border-radius:10px;padding:0 8px;font:inherit;width:100%;background:#fff}
 .tierrow b{grid-column:span 2;font-size:13px}
+.exblk{border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin-bottom:8px}
+.exhd{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}.exhd b{font-size:14.5px}
+.tline{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:6px 0;border-top:1px dashed #EEF0F3;font-size:13px}
+.tline:first-of-type{border-top:none}
+.tline .tn{width:44px;flex:none;font-size:12px;color:var(--blue);font-weight:800}
 
 .realbtn{display:flex;align-items:center;justify-content:center;gap:8px}
 </style>
@@ -1376,17 +1381,7 @@ function tMemberDetail(id){
     <div class="row" style="margin-top:12px"><button class="btn sm" data-act="reReport">재등록 리포트</button><button class="btn sm sec" data-act="startClass" data-id="hw">수업 시작</button></div></div>
   ${parqTrainerCard('hw')}
   <div class="card" style="display:none"><h3>PAR-Q+ · 건강 확인</h3>${needMedical()?'<span class="pill p-red">의료 확인 필요</span><p class="muted" style="margin:8px 0 0">추가 문항 ‘예’. 혼자 연습·루틴 추천 잠김. 의사 소견서를 올리면 풀립니다.</p>':parqYes()&&!S.parqFollow?'<span class="pill p-orange">추가 문항 확인 중</span>':'<span class="pill p-green">통과 · 10월 1일 작성</span>'}</div>
-  <div class="card"><h3>스쿼트 · 회원 기준<span class="r">측면 촬영</span></h3>
-    <table class="t"><tr><th>항목</th><th>기준</th><th>최근</th></tr>
-      <tr><td>깊이 (허벅지 각도)</td><td>수평 +${S.criteria.depth}° 이하</td><td><b>−2°</b> <span class="pill p-green">충족</span></td></tr>
-      <tr><td>상체 기울기</td><td>${S.criteria.trunk[0]}–${S.criteria.trunk[1]}°</td><td><b>41°</b> <span class="pill p-green">충족</span></td></tr>
-      <tr><td>무릎 너비 (정면)</td><td>엉덩이 너비 ${S.criteria.knee}</td><td><b>1.08×</b> <span class="pill p-green">충족</span></td></tr>
-    </table>
-    <div class="row" style="margin-top:12px"><button class="btn sm ghost" data-act="recalib">정답 동작으로 기준 다시 잡기</button></div>
-    <div id="calibMsg" class="muted" style="margin-top:8px"></div>
-  </div>
-
-  <div class="card"><h3>운동별 코칭 누적 · 스쿼트</h3><div class="timeline">${squatNotes.map(n=>`<div class="it"><b>${n.s}</b><span class="muted">${n.t}</span></div>`).join('')}</div></div>
+  ${focusCard('hw')}
   <div class="card"><h3>혼자 해도 됨 (승인)</h3>${Object.keys(S.soloOk).map(k=>`<div class="row" style="padding:4px 0"><span class="sp">${k}</span><button class="toggle ${S.soloOk[k]?'on':''}" data-act="soloToggle" data-k="${k}" aria-label="${k} 혼자 연습 승인" aria-pressed="${S.soloOk[k]}"></button></div>`).join('')}<p class="muted" style="margin:8px 0 0">승인한 운동만, 지난 수업 중량 범위 안에서 회원에게 추천합니다.</p></div>
   <div class="card"><h3>식단 확인</h3>
     <div class="kcal-row"><div class="thumb">${meal.img?`<img src="${meal.img}" alt="">`:I.food}</div><div class="sp"><b style="font-size:13.5px">${meal.time} · ${meal.name}</b><div class="muted">AI 추정 ${fmt(meal.ai)}kcal</div></div><input class="small-input" id="trKcal" type="number" value="${meal.tr??meal.ai}" aria-label="트레이너 수정 칼로리"><button class="btn sm" data-act="saveKcal" data-id="${meal.id}">수정</button></div>
@@ -2178,10 +2173,11 @@ function summaryPrompt(R){
 - name: 운동 이름. 말에서 나온 이름을 우선, 없으면 동작 분석 패턴과 자막으로 가장 그럴듯한 한국어 운동 이름.
 - weight: 말한 중량(예: "60kg"), 없으면 "".
 - type: "평가" | "몸풀기" | "맨몸·프리웨이트" | "기구" | "버티기(플랭크 등)" 중 하나.
+- point: 이 구간에서 트레이너가 가르친 핵심 한 가지를 짧게 (예: "힙힌지", "무게중심 이동", "흉추 펴기"). 없으면 "".
 - keywords: 트레이너 코칭과 동작 특징을 짧은 키워드로 3~6개. 명사형, 2~10자 (예: "깊이 수평 아래", "무릎 바깥", "가슴 들기", "반동 금지"). 판정 결과도 반영. 인사·잡담은 빼세요.
 - setup: 회원이 혼자서도 똑같이 할 수 있게, 말에서 나온 세팅만 짧게 적으세요(말하지 않은 칸은 ""). 
   machine(기구 이름), seat(의자·시트·등받이·패드 위치, 예 "의자 4번"), pin(무게 핀 위치·칸, 예 "핀 7번"), weight(무게), range(가동범위, 예 "무릎 90도까지"), tempo(속도·템포·버티는 시간, 예 "3초 내려가기", "30초 버티기"), sets(세트·횟수), cue(주의할 점 한 줄).
-JSON 하나만: {"segments":[{"i":0,"name":"","type":"","weight":"","keywords":[],"setup":{"machine":"","seat":"","pin":"","weight":"","range":"","tempo":"","sets":"","cue":""}}]}
+JSON 하나만: {"segments":[{"i":0,"name":"","type":"","point":"","weight":"","keywords":[],"setup":{"machine":"","seat":"","pin":"","weight":"","range":"","tempo":"","sets":"","cue":""}}]}
 기록: ${JSON.stringify(segs)}`;
 }
 function mkSpeechSeg(label,start,end){ return {cls:'other',name:'말로 나눈 구간',label,reps:[],sets:0,kws:[],w:null,lines:[],judged:0,start,end,speech:true}; }
@@ -2272,11 +2268,11 @@ async function processSession(R){
   R.ai.msg='운동별 키워드로 정리 중…'; rerenderReview();
   try{
     const j=parseJSON(await aiCall(summaryPrompt(R)));
-    (j.segments||[]).forEach(x=>{ const g=R.segs[+x.i]; if(!g) return; if(x.name) g.title=String(x.name).trim(); if(x.weight) g.w=String(x.weight).trim(); if(Array.isArray(x.keywords)) g.aiKws=x.keywords.map(k=>String(k).replace(/^#/,'').trim()).filter(Boolean).slice(0,8); if(x.type) g.type=String(x.type); if(x.setup&&typeof x.setup==='object'){ const st={}; SETUP_KEYS.forEach(([k])=>{ if(x.setup[k]&&String(x.setup[k]).trim()) st[k]=String(x.setup[k]).trim(); }); if(Object.keys(st).length) g.setup=st; } });
+    (j.segments||[]).forEach(x=>{ const g=R.segs[+x.i]; if(!g) return; if(x.name) g.title=String(x.name).trim(); if(x.weight) g.w=String(x.weight).trim(); if(Array.isArray(x.keywords)) g.aiKws=x.keywords.map(k=>String(k).replace(/^#/,'').trim()).filter(Boolean).slice(0,8); if(x.type) g.type=String(x.type); if(x.point) g.point=String(x.point).trim(); if(x.setup&&typeof x.setup==='object'){ const st={}; SETUP_KEYS.forEach(([k])=>{ if(x.setup[k]&&String(x.setup[k]).trim()) st[k]=String(x.setup[k]).trim(); }); if(Object.keys(st).length) g.setup=st; } });
     R.ai={state:'done',warn};
   }catch(e){ localSummary(R); R.ai={state:'error',msg:e.message}; }
   R.segs.forEach((g,i)=>{ if(!g.setup){ const st=parseSetup(capsOf(R,i).map(c=>c.text).join(' ')); if(Object.keys(st).length) g.setup=st; } });
-  saveSetups(R); R.busy=false; saveSession(R); rerenderReview();
+  saveSetups(R); try{ addTeachFromSession(R,'hw'); }catch(e){} R.busy=false; saveSession(R); rerenderReview();
 }
 // 시험판 초대 링크: 주소 끝 #k=키 로 열면 이 기기에 키를 저장하고 주소에서 지움
 // (# 뒤 내용은 서버로 전송되지 않고, 키는 저장소에 들어가지 않음)
@@ -2750,37 +2746,51 @@ window.addEventListener('hashchange',()=>{ if(handleReqHash()) render(); });
 // ---------- 수업 핵심 포인트(커리큘럼) · 가동범위 · 재등록 리포트(수정 가능) ----------
 const LEVELS=['','처음 배움','익히는 중','혼자 가능','무게 올려도 유지','숙련'];
 const FOCUS_DEF={hw:[
-  {n:1,focus:'힙힌지',level:4,note:'엉덩이를 뒤로 빼며 앉는 순서가 자리 잡음'},
-  {n:2,focus:'무게중심 이동',level:3,note:'발 중앙에 무게 두기 · 뒤꿈치 들림 줄어듦'},
-  {n:3,focus:'스쿼트 종류 다양화',level:3,note:'고블릿 → 박스 → 스플릿 스쿼트로 확장'},
-  {n:4,focus:'흉추 가동성에 따른 스쿼트 변화',level:2,note:'흉추를 펴면 상체가 덜 숙여짐 · 계속 연습'},
+  {id:'f1',ex:'스쿼트',n:1,focus:'힙힌지',level:4,note:'엉덩이를 뒤로 빼며 앉는 순서가 자리 잡음'},
+  {id:'f2',ex:'스쿼트',n:2,focus:'무게중심 이동',level:3,note:'발 중앙에 무게 두기 · 뒤꿈치 들림 줄어듦'},
+  {id:'f3',ex:'스쿼트',n:3,focus:'스쿼트 종류 다양화',level:3,note:'고블릿 → 박스 → 스플릿 스쿼트로 확장'},
+  {id:'f4',ex:'스쿼트',n:4,focus:'흉추 가동성에 따른 스쿼트 변화',level:2,note:'흉추를 펴면 상체가 덜 숙여짐 · 계속 연습'},
+  {id:'f5',ex:'루마니안 데드리프트',n:3,focus:'엉덩이로 접기',level:3,note:'무릎은 살짝만'},
+  {id:'f6',ex:'루마니안 데드리프트',n:5,focus:'바를 몸에 붙여 내리기',level:2,note:''},
+  {id:'f7',ex:'벤치프레스',n:2,focus:'견갑 고정',level:3,note:'어깨뼈를 모으고 내린 채'},
 ]};
 function focusAll(){ return Object.assign({},FOCUS_DEF,LS.get('aiwm_focus',{})); }
-function focusOf(mid){ return (focusAll()[mid]||[]).slice().sort((a,b)=>a.n-b.n); }
+function focusOf(mid){ return (focusAll()[mid]||[]).map((x,i)=>Object.assign({id:'x'+i,ex:'스쿼트'},x)).sort((a,b)=>a.n-b.n); }
+function focusByEx(mid){ const g={}; focusOf(mid).forEach(x=>{ (g[x.ex]=g[x.ex]||[]).push(x); }); return g; }
+// 수업 영상 정리에서 나온 '오늘 가르친 핵심'을 회원의 운동별 기록에 자동으로 쌓음
+function lessonNo(mid){ const m=members.find(x=>x.id===mid); if(!m) return 1; const today=ymd(new Date()); return signs().some(s=>s.mid===mid&&s.d===today)?m.done:m.done+1; }
+function addTeachFromSession(R,mid){ const n=lessonNo(mid); let L=focusOf(mid).filter(x=>x.sid!==R.id);
+  R.segs.forEach((g,i)=>{ const pt=g.point||(g.aiKws&&g.aiKws[0]); if(!pt||/평가|몸풀기|웜업/.test((g.type||'')+' '+segTitle(g))) return;
+    L.push({id:'a'+Date.now().toString(36)+i,sid:R.id,ex:segTitle(g),n,focus:pt,level:2,note:(g.aiKws||g.kws||[]).filter(k=>k!==pt).slice(0,3).join(' · ')}); });
+  saveFocus(mid,L); }
 function saveFocus(mid,L){ const all=LS.get('aiwm_focus',{}); all[mid]=L; LS.set('aiwm_focus',all); }
 function dots(l){ return `<span class="lvdots" aria-label="${LEVELS[l]||''}">${[1,2,3,4,5].map(i=>`<i class="${i<=l?'on':''}"></i>`).join('')}</span>`; }
 // 스쿼트 스킬 종합: 핵심 포인트 단계의 평균
-function skillOf(mid){ const L=focusOf(mid); if(!L.length) return null; const avg=L.reduce((a,x)=>a+(+x.level||0),0)/L.length; return {avg:Math.round(avg*10)/10,label:LEVELS[Math.round(avg)]||''}; }
+function skillOf(mid,ex){ const L=focusOf(mid).filter(x=>x.ex===(ex||'스쿼트')); if(!L.length) return null; const avg=L.reduce((a,x)=>a+(+x.level||0),0)/L.length; return {avg:Math.round(avg*10)/10,label:LEVELS[Math.round(avg)]||''}; }
 // 가동범위: 허벅지가 내려간 정도(서 있을 때 0 → 허벅지 수평 90)를 1회차 대비 %로
 function romOf(v){ return 90-v; }
 function romGain(){ const f=romOf(depthHist[0].v), l=romOf(depthHist[depthHist.length-1].v), p=romOf(depthHist[depthHist.length-2].v);
   return {total:Math.round((l/f-1)*100), week:Math.round((l/p-1)*100), firstS:depthHist[0].s, lastS:depthHist[depthHist.length-1].s}; }
 function focusCard(mid){
-  const L=focusOf(mid), sk=skillOf(mid);
-  return `<div class="card"><h3>수업 핵심 포인트<span class="r">${sk?'스킬 종합 '+sk.label:''}</span></h3>
-    ${L.length?`<div class="timeline">${L.map(x=>`<button class="it focusit" data-act="focusEdit" data-m="${mid}" data-n="${x.n}"><b>${x.n}회차 · ${esc(x.focus)}</b><span class="row" style="align-items:center;gap:8px">${dots(x.level)}<span class="muted" style="font-size:12px">${LEVELS[x.level]||''}</span></span>${x.note?`<span class="muted">${esc(x.note)}</span>`:''}</button>`).join('')}</div>`:'<p class="muted" style="margin:0 0 8px">회차마다 가르친 핵심을 남기면 리포트에 단계별로 들어가요.</p>'}
-    <button class="btn sm sec full" data-act="focusNew" data-m="${mid}" style="margin-top:8px">${I.plus} 핵심 포인트 추가</button></div>`;
+  const G=focusByEx(mid), exs=Object.keys(G);
+  return `<div class="card"><h3>운동별 배운 내용<span class="r">회차순</span></h3>
+    <p class="muted" style="margin:-4px 0 8px;font-size:12.5px">수업 영상에서 자동으로 정리돼요. 눌러서 고칠 수 있어요.</p>
+    ${exs.length?exs.map(ex=>{ const L=G[ex], sk=skillOf(mid,ex); return `<div class="exblk"><div class="exhd"><b>${esc(ex)}</b>${sk?`<span class="muted" style="font-size:12px">${sk.label}</span>`:''}</div>
+      ${L.map(x=>`<button class="tline" data-act="focusEdit" data-m="${mid}" data-id="${x.id}"><span class="tn">${x.n}회차</span><span class="sp"><b>${esc(x.focus)}</b>${x.note?`<span class="muted"> · ${esc(x.note)}</span>`:''}</span>${dots(x.level)}</button>`).join('')}</div>`; }).join(''):'<p class="muted" style="margin:0 0 8px">아직 기록이 없어요. 수업을 촬영하면 운동별로 쌓여요.</p>'}
+    <button class="btn sm sec full" data-act="focusNew" data-m="${mid}" style="margin-top:8px">${I.plus} 직접 추가</button></div>`;
 }
 function focusSheet(mid,x){
-  const f=x||{n:(focusOf(mid).slice(-1)[0]||{n:0}).n+1,focus:'',level:2,note:''};
+  const f=x||{ex:'스쿼트',n:lessonNo(mid),focus:'',level:2,note:''};
   return `<div class="modal" id="focusModal"><div class="sheet" role="dialog" aria-label="수업 핵심 포인트">
     <h2>${x?'핵심 포인트 수정':'핵심 포인트 추가'}</h2><p class="muted" style="margin:0 0 12px">그 수업에서 가르친 핵심과 지금 단계를 남겨요.</p>
+    <label class="field"><span>운동</span><input type="text" id="ffEx" value="${esc(f.ex||'')}" list="exPresets" placeholder="예: 스쿼트"></label>
+    <datalist id="exPresets">${['스쿼트','루마니안 데드리프트','벤치프레스'].concat(window.EX_LIBRARY||[]).map(t=>`<option value="${t}">`).join('')}</datalist>
     <div class="grid2"><label class="field"><span>회차</span><input type="number" id="ffN" min="1" value="${f.n}"></label>
       <label class="field"><span>단계</span><select id="ffL">${[1,2,3,4,5].map(i=>`<option value="${i}" ${+f.level===i?'selected':''}>${i} · ${LEVELS[i]}</option>`).join('')}</select></label></div>
-    <label class="field"><span>핵심 포인트</span><input type="text" id="ffF" value="${esc(f.focus)}" placeholder="예: 무게중심 이동" list="focusPresets"></label>
+    <label class="field"><span>이 회차에 배운 핵심</span><input type="text" id="ffF" value="${esc(f.focus)}" placeholder="예: 무게중심 이동" list="focusPresets"></label>
     <datalist id="focusPresets">${['힙힌지','무게중심 이동','스쿼트 종류 다양화','흉추 가동성에 따른 스쿼트 변화','호흡·복압','무릎 정렬','발 너비·각도','템포 조절','한 발 동작'].map(t=>`<option value="${t}">`).join('')}</datalist>
     <label class="field"><span>코멘트 (선택)</span><input type="text" id="ffNote" value="${esc(f.note||'')}" placeholder="예: 뒤꿈치 들림 줄어듦"></label>
-    <div class="row"><button class="btn" data-act="focusSave" data-m="${mid}" data-old="${x?x.n:''}" style="flex:1">저장</button>${x?`<button class="btn sec" data-act="focusDel" data-m="${mid}" data-n="${x.n}" style="color:var(--red)">삭제</button>`:''}<button class="btn sec" data-act="focusClose">닫기</button></div></div></div>`;
+    <div class="row"><button class="btn" data-act="focusSave" data-m="${mid}" data-id="${x?x.id:''}" style="flex:1">저장</button>${x?`<button class="btn sec" data-act="focusDel" data-m="${mid}" data-id="${x.id}" style="color:var(--red)">삭제</button>`:''}<button class="btn sec" data-act="focusClose">닫기</button></div></div></div>`;
 }
 // 재등록 리포트: 자동으로 채우고, 트레이너가 고쳐서 저장·전송
 function reportDefault(mid){
@@ -2788,7 +2798,7 @@ function reportDefault(mid){
   return {title:`${m.name}님 ${m.total}회 성과 요약`, period:'10월 1일 – '+todayLabel(),
     rows:[['체지방률','31.8%',ib.pbf+'%'],['골격근량','21.6kg',ib.smm+'kg'],['스쿼트 가동범위',`${g.firstS}회차 기준`,`+${g.total}% (지난주보다 +${g.week}%)`],['스쿼트 중량','20kg','60kg'],['출석 · 숙제',`${m.done}/${m.done}회 출석`,'숙제 82%']],
     skill:sk?Math.round(sk.avg):3, skillNote:'힙힌지와 무게중심은 혼자서도 안정적이에요. 흉추를 펴는 연습을 더하면 무게를 올려도 자세가 유지될 단계예요.',
-    focus:focusOf(mid).map(x=>({n:x.n,focus:x.focus,level:x.level,note:x.note})),
+    focus:focusOf(mid).sort((a,b)=>a.ex.localeCompare(b.ex)||a.n-b.n).map(x=>({ex:x.ex,n:x.n,focus:x.focus,level:x.level,note:x.note})),
     comment:'처음보다 앉는 깊이가 확실히 늘었고, 동작 순서가 자리 잡았어요.',
     next:'체지방률 24%까지 지금 속도로 약 12주. 다음 단계는 템포 조절과 한 발 동작입니다.'};
 }
@@ -2803,8 +2813,8 @@ function reReportModal(){
     <div class="secttl" style="margin-top:14px">스쿼트 스킬 종합</div>
     <div class="row" style="align-items:center;gap:8px"><select id="rpSkill" style="flex:1;min-height:40px;border:1px solid var(--line);border-radius:10px;padding:0 10px">${[1,2,3,4,5].map(i=>`<option value="${i}" ${+r.skill===i?'selected':''}>${i}단계 · ${LEVELS[i]}</option>`).join('')}</select>${dots(+r.skill)}</div>
     <textarea class="rp-ta" id="rpSkillNote" rows="2">${esc(r.skillNote)}</textarea>
-    <div class="secttl">수업 핵심 포인트별 변화</div>
-    ${r.focus.length?r.focus.map((f,i)=>`<div class="rpf"><b>${f.n}회차 · <input class="rp-in" data-rf="${i}-focus" value="${esc(f.focus)}" style="width:70%"></b>
+    <div class="secttl">운동별 배운 내용 · 단계</div>
+    ${r.focus.length?r.focus.map((f,i)=>`<div class="rpf"><b>${f.ex?esc(f.ex)+' · ':''}${f.n}회차 · <input class="rp-in" data-rf="${i}-focus" value="${esc(f.focus)}" style="width:70%"></b>
       <div class="row" style="align-items:center;gap:8px;margin-top:4px"><select data-rf="${i}-level">${[1,2,3,4,5].map(k=>`<option value="${k}" ${+f.level===k?'selected':''}>${k} · ${LEVELS[k]}</option>`).join('')}</select></div>
       <input class="rp-in" data-rf="${i}-note" value="${esc(f.note||'')}" placeholder="코멘트"></div>`).join(''):'<p class="muted">회원 화면의 ‘수업 핵심 포인트’를 추가하면 여기에 들어가요.</p>'}
     <div class="secttl">트레이너 총평</div><textarea class="rp-ta" id="rpComment" rows="3">${esc(r.comment)}</textarea>
@@ -2822,18 +2832,18 @@ function readReport(){
 }
 function reportText(r){
   return `[${r.title}]\n${r.period}\n\n`+r.rows.map(x=>`· ${x[0]}: ${x[1]} → ${x[2]}`).join('\n')+
-    `\n\n스쿼트 스킬: ${r.skill}단계 (${LEVELS[r.skill]})\n${r.skillNote}\n\n수업 핵심 포인트\n`+r.focus.map(f=>`${f.n}회차 ${f.focus} — ${LEVELS[f.level]}${f.note?' · '+f.note:''}`).join('\n')+
+    `\n\n스쿼트 스킬: ${r.skill}단계 (${LEVELS[r.skill]})\n${r.skillNote}\n\n수업 핵심 포인트\n`+r.focus.map(f=>`${f.ex?f.ex+' ':''}${f.n}회차 ${f.focus} — ${LEVELS[f.level]}${f.note?' · '+f.note:''}`).join('\n')+
     `\n\n${r.comment}\n\n다음 목표: ${r.next}`;
 }
 function focusAct(act,a){
   switch(act){
     case 'focusNew': $('#modalRoot').innerHTML=focusSheet(a.dataset.m,null); return true;
-    case 'focusEdit': { const x=focusOf(a.dataset.m).find(f=>f.n===+a.dataset.n); $('#modalRoot').innerHTML=focusSheet(a.dataset.m,x); return true; }
+    case 'focusEdit': { const x=focusOf(a.dataset.m).find(f=>f.id===a.dataset.id); $('#modalRoot').innerHTML=focusSheet(a.dataset.m,x); return true; }
     case 'focusClose': $('#modalRoot').innerHTML=''; return true;
-    case 'focusSave': { const mid=a.dataset.m, n=Math.max(1,parseInt($('#ffN').value,10)||1), focus=($('#ffF').value||'').trim(); if(!focus){ toast('핵심 포인트를 넣어 주세요'); return true; }
-      let L=focusOf(mid).filter(f=>f.n!==+a.dataset.old&&f.n!==n); L.push({n,focus,level:+$('#ffL').value,note:($('#ffNote').value||'').trim()}); saveFocus(mid,L.sort((x,y)=>x.n-y.n));
-      $('#modalRoot').innerHTML=''; keepScroll(render); toast('핵심 포인트를 저장했어요 · 리포트에 반영돼요'); return true; }
-    case 'focusDel': { const mid=a.dataset.m; saveFocus(mid,focusOf(mid).filter(f=>f.n!==+a.dataset.n)); $('#modalRoot').innerHTML=''; keepScroll(render); return true; }
+    case 'focusSave': { const mid=a.dataset.m, n=Math.max(1,parseInt($('#ffN').value,10)||1), focus=($('#ffF').value||'').trim(), ex=($('#ffEx').value||'').trim()||'스쿼트'; if(!focus){ toast('배운 내용을 넣어 주세요'); return true; }
+      const L=focusOf(mid).filter(f=>f.id!==a.dataset.id); L.push({id:a.dataset.id||'m'+Date.now().toString(36),ex,n,focus,level:+$('#ffL').value,note:($('#ffNote').value||'').trim()}); saveFocus(mid,L);
+      $('#modalRoot').innerHTML=''; keepScroll(render); toast('저장했어요 · 리포트에 반영돼요'); return true; }
+    case 'focusDel': { const mid=a.dataset.m; saveFocus(mid,focusOf(mid).filter(f=>f.id!==a.dataset.id)); $('#modalRoot').innerHTML=''; keepScroll(render); return true; }
     case 'reReport': S.reportMid=a.dataset.m||(S.sub==='member'?S.subArg:'hw'); modal='re'; render(); return true;
     case 'rpSave': { const all=LS.get('aiwm_report',{})||{}; all[S.reportMid||'hw']=readReport(); LS.set('aiwm_report',all); toast('리포트를 저장했어요'); return true; }
     case 'rpShare': { const r=readReport(); const all=LS.get('aiwm_report',{})||{}; all[S.reportMid||'hw']=r; LS.set('aiwm_report',all); const t=reportText(r);
@@ -2842,7 +2852,7 @@ function focusAct(act,a){
   }
   return false;
 }
-function memberFocusView(mid){ const L=focusOf(mid); if(!L.length) return ''; return `<div class="muted" style="font-size:12px;margin:4px 0 6px">수업 핵심 포인트</div><div class="timeline">${L.map(x=>`<div class="it"><b>${x.n}회차 · ${esc(x.focus)}</b><span class="row" style="align-items:center;gap:8px">${dots(x.level)}<span class="muted" style="font-size:12px">${LEVELS[x.level]||''}</span></span></div>`).join('')}</div>`; }
+function memberFocusView(mid){ const G=focusByEx(mid), exs=Object.keys(G); if(!exs.length) return ''; return `<div class="muted" style="font-size:12px;margin:4px 0 6px">운동별 배운 내용</div>${exs.map(ex=>`<div class="exblk"><div class="exhd"><b>${esc(ex)}</b></div>${G[ex].map(x=>`<div class="tline"><span class="tn">${x.n}회차</span><span class="sp"><b>${esc(x.focus)}</b></span>${dots(x.level)}</div>`).join('')}</div>`).join('')}`; }
 // ---------- PAR-Q+ 건강 확인: 회원 작성 + 마지막 서명 → 트레이너가 작성 내용 확인 ----------
 const PARQ_TOPICS=['심장 질환 또는 고혈압 진단','안정 시·운동 중 가슴 통증','어지럼증으로 균형을 잃거나 의식 잃음','다른 만성 질환 진단','만성 질환 약 복용','운동으로 악화될 수 있는 뼈·관절·연부조직 문제','의사가 감독 하의 운동만 하라고 함'];
 function parqAll(){ return LS.get('aiwm_parq',{})||{}; }
@@ -3162,7 +3172,7 @@ function render(){
     else if(S.sub==='realReview') html=realReview();
     else if(S.sub==='review') html=tReview();
     else if(S.sub==='kakao') html=tKakao();
-    else if(S.sub==='member') html=tMemberDetail(S.subArg)+(S.subArg==='hw'?focusCard('hw')+signCard('hw')+signHistory('hw'):'');
+    else if(S.sub==='member') html=tMemberDetail(S.subArg)+(S.subArg==='hw'?signCard('hw')+signHistory('hw'):'');
     else html={home:tHome,schedule:tSchedule,members:tMembers,session:tSession,settle:tSettle}[S.tab]();
   } else {
     if(S.sub==='solo') html=(S.soloReal&&!S.ptEnded&&!needMedical())?(renderTop('혼자 연습 · '+S.subArg,true),soloRealView(S.subArg)):mSolo(S.subArg);

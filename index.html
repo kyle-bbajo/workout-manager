@@ -589,6 +589,8 @@ async function fetchModel(url, onStatus){
   let cache = null; try { cache = await caches.open('aiwm-models-v1'); const hit = await cache.match(url); if (hit) return await hit.arrayBuffer(); } catch (e) {}
   let r; try { r = await fetch(url, { mode: 'cors' }); } catch (e) { throw new Error('연결 안 됨'); }
   if (!r.ok) throw new Error('응답 ' + r.status);
+  // 저장소에 먼저 내려받고(진행률은 따로 못 봄) 한 번만 읽기 → 메모리 절약
+  if (cache && !(r.body && r.body.getReader)){ try { await cache.put(url, r.clone()); } catch (e) {} }
   const total = +r.headers.get('content-length') || 0, rd = r.body && r.body.getReader ? r.body.getReader() : null;
   let buf;
   if (rd){ const parts = []; let got = 0, last = 0;
@@ -596,7 +598,7 @@ async function fetchModel(url, onStatus){
       if (onStatus && Date.now() - last > 300){ last = Date.now(); onStatus(`정밀 골격 모델 받는 중… ${total ? Math.round(got / total * 100) + '%' : Math.round(got / 1048576) + 'MB'} (처음 한 번만)`); } }
     buf = new Uint8Array(got); let o = 0; for (const p of parts){ buf.set(p, o); o += p.length; } buf = buf.buffer;
   } else buf = await r.arrayBuffer();
-  try { if (cache) await cache.put(url, new Response(buf.slice(0), { headers: { 'content-type': 'application/octet-stream' } })); } catch (e) {}
+  try { if (cache) await cache.put(url, new Response(new Blob([buf]), { headers: { 'content-type': 'application/octet-stream' } })); } catch (e) {}
   return buf;
 }
 async function loadRTM(onStatus){
@@ -875,6 +877,7 @@ const LiveCam = {
     box.appendChild(canvas); S.video = video; S.canvas = canvas;
     const facing = o.facing || 'environment'; S.mirror = facing === 'user';
     o.onStatus && o.onStatus('카메라를 켜는 중…');
+    if (RTM.session && o.mode !== 'preview'){ try { RTM.session.release && RTM.session.release(); } catch (e) {} RTM.session = null; }   // 실시간 촬영 중엔 정밀 모델 내려서 메모리 확보
     S.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 960 }, height: { ideal: 720 } }, audio: false });
     if (!S.running){ S.stream.getTracks().forEach(t => t.stop()); return; }
     if (o.record){ await this._audio(); if (!S.running){ [S.stream, S.audio].forEach(st => st && st.getTracks().forEach(t => t.stop())); return; } }
@@ -1125,7 +1128,8 @@ window.LiveCam = LiveCam;
 window.LiveCamNames = CLASS_NAME;
 window.LiveCamCue = CUE;
 window.LiveCamDetectName = detectName;
-window.LiveCamPrecise = { status: () => ({ loaded: !!RTM.session, ep: RTM.ep, norm: RTM.norm, ms: Math.round(RTM.ms), frames: RTM.n, failed: RTM.failed, url: rtmModelURL(), on: preciseOn() }), load: (cb) => loadRTM(cb) };
+window.LiveCamPrecise = { release: () => { try { if (RTM.session && RTM.session.release) RTM.session.release(); } catch (e) {} RTM.session = null; RTM.norm = null; },
+  status: () => ({ loaded: !!RTM.session, ep: RTM.ep, norm: RTM.norm, ms: Math.round(RTM.ms), frames: RTM.n, failed: RTM.failed, url: rtmModelURL(), on: preciseOn() }), load: (cb) => loadRTM(cb) };
 window.LiveCamAngles = (lm, aspect) => jointAngles(lm, aspect || 4 / 3, 1);
 window.dispatchEvent(new Event('livecam-ready'));
 
@@ -1983,8 +1987,14 @@ function camFail(err){
   if(!window.isSecureContext) msg+='https 주소(깃허브 페이지)로 열어야 카메라가 켜져요.';
   else if(name==='NotAllowedError'||name==='SecurityError') msg+='이 화면에서는 카메라 권한이 막혀 있어요. 휴대폰 브라우저에서 웹앱 주소로 열고 권한을 허용해 주세요.';
   else if(name==='NotFoundError') msg+='이 기기에서 카메라를 찾지 못했어요.';
-  else msg+='골격 인식 모델을 불러오지 못했어요. 인터넷 연결을 확인해 주세요.';
-  return msg;
+  else if(name==='NotReadableError'||name==='AbortError') msg+='다른 앱이나 다른 탭이 카메라를 쓰고 있어요. 카메라 앱·영상통화를 닫고 다시 시도해 주세요.';
+  else if(name==='OverconstrainedError') msg+='이 카메라가 요청한 화질을 지원하지 않아요. 다시 시도해 주세요.';
+  else if(/fetch|import|network|load|Load/.test(String(err&&err.message||''))) msg+='골격 인식 모델을 받지 못했어요. 인터넷(와이파이) 연결을 확인하고 다시 시도해 주세요.';
+  else if(/memory|Memory|allocation|RangeError/.test(String(err&&err.message||'')+name)) msg+='휴대폰 메모리가 부족해요. 다른 앱·탭을 닫고 다시 시도해 주세요.';
+  else msg+='골격 인식을 시작하지 못했어요.';
+  const raw=`${name||'오류'}: ${String(err&&err.message||err||'').slice(0,140)}`;
+  try{ if(typeof DEVLOG!=='undefined'){ DEVLOG.unshift(new Date().toLocaleTimeString('ko-KR')+' 카메라 '+raw); } }catch(e){}
+  return msg+' ('+raw+')';
 }
 // landmarks → 정규화 (엉덩이 중심, 몸통 길이 1)
 function normLm(lm){
@@ -2069,7 +2079,7 @@ function startRealClass(){
       }
     }
   };
-  const fail=err=>{ stopReal(); set('camStatus',''); const fb=$('#fb'); if(fb){fb.className='feedback warn';fb.textContent=camFail(err);} set('repList','<button class="btn sec full" data-act="recStart" style="margin-top:4px">카메라 없이 시연 보기</button>'); };
+  const fail=err=>{ stopReal(); set('camStatus',''); const fb=$('#fb'); if(fb){fb.className='feedback warn';fb.textContent=camFail(err);} set('repList','<button class="btn full" data-act="realRetry" style="margin-top:8px">다시 시도</button><button class="btn sec full" data-act="recStart" style="margin-top:4px">카메라 없이 시연 보기</button>'); };
   // 미리보기로 켜 둔 카메라가 있으면 그대로 이어서 촬영 (다시 켜지 않음)
   if(window.LiveCam.isPreview&&window.LiveCam.isPreview()){ window.LiveCam.attach(box); set('camStatus',''); window.LiveCam.begin(opts).then(ok=>{ if(!ok) window.LiveCam.start(opts).catch(fail); }).catch(fail); }
   else window.LiveCam.start(opts).catch(fail);
@@ -2232,6 +2242,7 @@ function realAct(act,a){
     case 'preciseT': { try{ localStorage.setItem('aiwm_precise',preciseOnApp()?'0':'1'); }catch(e){} keepScroll(render); toast(preciseOnApp()?'정밀 분석 켬 · 영상 분석이 조금 오래 걸려요':'정밀 분석 끔'); return true; }
     case 'precisePre': { const P=window.LiveCamPrecise; if(!P) return true; toast('정밀 모델을 받는 중이에요'); P.load(t=>{ const e=document.getElementById('preStat'); if(e) e.textContent=t; }).then(()=>{ toast('정밀 모델 준비 완료'); keepScroll(render); }).catch(e=>{ toast('받지 못했어요 · '+(e&&e.message||'')); keepScroll(render); }); return true; }
     case 'poseKind': try{ localStorage.setItem('aiwm_pose',a.dataset.v); }catch(e){} if(window.LiveCam&&window.LiveCam.preload) window.LiveCam.preload(); keepScroll(render); return true;
+    case 'realRetry': { stopReal(); if(window.LiveCamPrecise&&window.LiveCamPrecise.release) window.LiveCamPrecise.release(); S.realOn=false; keepScroll(render); setTimeout(()=>{ const b=document.querySelector('[data-act="realStart"]'); if(b) b.click(); },300); return true; }
     case 'openSession': openSession(a.dataset.id); return true;
     case 'sessAll': S.sessAll=true; keepScroll(render); return true;
     case 'sessDel': if(confirm('이 수업의 영상과 기록을 지울까요? 되돌릴 수 없어요.')) deleteSession(a.dataset.id,false).then(()=>{ keepScroll(render); toast('수업 기록을 지웠어요'); }); return true;

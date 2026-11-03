@@ -3555,7 +3555,11 @@ const FIG_INK='#334155', FIG_FAR='#CBD5E1', FIG_HI='#F97316';
 // 운동 그림: ex/ 폴더에 '운동 이름.png' 를 넣으면 그 그림을 쓰고, 없으면 앱이 그린 막대 인형
 const EX_IMG_DIR=(window.APP_CONFIG&&window.APP_CONFIG.exImgDir)||'ex/';
 function exImgName(n){ return String(n||'').trim().replace(/[\\/:*?"<>|]/g,''); }
-function figHTML(name,lm){ const n=exImgName(name); return `<span class="figwrap">${figSVG(name,null)}${n?`<img class="eximg" src="${EX_IMG_DIR}${encodeURIComponent(n)}.png" alt="" loading="lazy" onerror="this.remove()">`:''}</span>`; }
+// 순서: ex/이름.mp4 (반복 영상) → ex/이름.png → 앱이 그린 막대 인형
+function figHTML(name,lm){ const n=exImgName(name); if(!n) return `<span class="figwrap">${figSVG(name,null)}</span>`; const b=EX_IMG_DIR+encodeURIComponent(n);
+  return `<span class="figwrap">${figSVG(name,null)}<video class="eximg" src="${b}.mp4" data-png="${b}.png" autoplay loop muted playsinline preload="metadata" aria-hidden="true" onerror="exFigFallback(this)"></video></span>`; }
+function exFigFallback(v){ const i=document.createElement('img'); i.className='eximg'; i.alt=''; i.onerror=()=>i.remove(); i.src=v.dataset.png; v.replaceWith(i); }
+window.exFigFallback=exFigFallback;
 function figSVG(name,lm,label){
   const kind=poseKind(name), hi=figHi(kind);
   const ln=(a,b,c,w)=>`<line x1="${a[0].toFixed(3)}" y1="${a[1].toFixed(3)}" x2="${b[0].toFixed(3)}" y2="${b[1].toFixed(3)}" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>`;

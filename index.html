@@ -439,6 +439,43 @@ input.nm{font:inherit;font-weight:800;font-size:16px;border:none;border-bottom:1
 .wl-bigfig .cap{font-size:11.5px;color:var(--muted,#6B7280);align-self:flex-start}
 .wl-bigfig.dark .cap{color:#94A3B8}
 .wl-bigrow .wl-bigfig{flex:1 1 0;min-width:0}
+/* 운동일지: 어두운 기록지 형식 */
+.sheet.wlog{background:#0B0B0D;color:#F8FAFC}
+.sheet.wlog .muted,.sheet.wlog .wl-meta{color:#9CA3AF}
+.sheet.wlog h2{color:#fff}
+.sheet.wlog .btn.sec{background:#1F2937;color:#F8FAFC;border-color:#374151}
+.sheet.wlog .btn.ghost{background:transparent}
+.wl-no{flex:none;width:46px;height:46px;border-radius:50%;background:#E5322D;color:#fff;font-weight:800;font-size:18px;display:flex;align-items:center;justify-content:center;margin-right:10px;letter-spacing:-.02em}
+.sheet.wlog .wl-ex{border-top:1px solid #1F2937}
+.sheet.wlog .wl-name{color:#fff}
+.wl-set{width:auto;height:auto;background:none;border:0;padding:0;display:flex;flex-direction:column;align-items:center;gap:3px;color:inherit}
+.wl-set i{font-style:normal;width:44px;height:44px;border-radius:50%;background:#E5322D;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;letter-spacing:-.02em}
+.wl-set span{font-size:10.5px;color:#9CA3AF;margin:0}
+.wl-set.on i{outline:3px solid #FCA5A5;outline-offset:2px}
+.wl-set.add i{background:transparent;border:2px dashed #7F1D1D;color:#F87171;font-size:20px}
+.wl-sets{gap:8px}
+.sheet.wlog .wl-fig{background:#16161A}
+.sheet.wlog .wl-memo{color:#E5E7EB;border-bottom-color:#374151}
+.sheet.wlog .wl-memo::placeholder{color:#6B7280}
+.sheet.wlog .wl-edit{background:#1F2937}
+.sheet.wlog .wl-edit input{background:#111827;color:#fff;border-color:#374151}
+.sheet.wlog .wl-ana.o{background:#2A1A0F}
+.sheet.wlog .wl-ana.g{background:#0F2A1E}
+.sheet.wlog .wl-addex{border-top-color:#1F2937}
+.sheet.wlog .wl-addex input{background:#111827;color:#fff;border-color:#374151}
+.sheet.wlog .t th,.sheet.wlog .t td{border-color:#1F2937;color:inherit}
+.sheet.wlog .wl-play{color:#60A5FA}
+.sheet.wlog .figsvg line[stroke="#334155"]{stroke:#E5E7EB}
+.sheet.wlog .figsvg circle[fill="#fff"]{fill:#0B0B0D;stroke:#E5E7EB}
+.sheet.wlog .figsvg line[stroke="#CBD5E1"]{stroke:#4B5563}
+.wl-strip{display:flex;gap:8px;overflow-x:auto;margin-top:12px;padding-bottom:4px}
+.wl-sth{flex:none;width:76px;border:0;background:none;padding:0;color:#9CA3AF;font:inherit;font-size:11px;cursor:pointer;text-align:center}
+.wl-sth img{width:76px;height:76px;object-fit:cover;border-radius:10px;border:2px solid #E5322D;display:block;margin-bottom:3px}
+.wl-sth img[hidden]{display:block;background:#1F2937}
+.wl-sth span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wl-set.add{background:none;border:0;width:auto;height:auto}
+.wl-set i{width:40px;height:40px;font-size:14px}
+.wl-sets{gap:6px}
 
 .realbtn{display:flex;align-items:center;justify-content:center;gap:8px}
 </style>
@@ -3614,22 +3651,24 @@ function wlogListCard(mid,title,solo){ const L=wlogAll(mid); if(!L.length&&!solo
     return `<button class="list-item" data-act="wlogOpen" data-id="${r.id}"><div class="wl-mini">${figHTML(wlogSegs(r)[0]?wlogSegs(r)[0].name:'')}</div><div class="sp"><b style="font-size:14px">${mdLabel(r.date)}${r.n?` · ${r.n}회차`:''}${r.demo?' <span class="pill p-gray" style="font-size:10.5px">예시</span>':''}${r.solo?' <span class="pill p-blue" style="font-size:10.5px">혼자 운동</span>':''}</b><div class="muted">${wlogSegs(r).map(x=>esc(x.name)).join(' · ')}</div><div class="muted" style="font-size:12px">${st.sets}세트${st.vol?` · 총 ${fmtKg(st.vol)}kg`:''}${r.solo?(r.segs.some(g=>g.vid)?' · 내 영상 있음':''):r.noVideo||r.demo?'':' · 영상 있음'}</div></div><span class="muted">›</span></button>`; }).join('')}
     ${L.length>4&&!S.wlAll?`<button class="btn sm sec full" data-act="wlAll" style="margin-top:8px">전체 ${L.length}개 보기</button>`:''}</div>`; }
 const WL={url:null,id:null,thumbs:{}};
+function wlSetThumb(i,u){ document.querySelectorAll(`.wl-thumb[data-th="${i}"]`).forEach(img=>{ img.src=u; img.hidden=false; if(img.parentElement.classList.contains('wl-fig')) img.parentElement.classList.add('hasimg'); }); }
 function wlogSheet(id){ const rec=wlogGet(id); if(!rec) return '';
   const st=wlogStats(rec), ed=S.wlEdit&&S.wlEdit.id===id?S.wlEdit:null, hasVid0=!rec.demo&&!rec.noVideo&&!rec.solo;
   return `<div class="modal"><div class="sheet wlog" role="dialog" aria-label="운동일지">
-    <div class="row" style="align-items:flex-start"><div class="sp"><h2 style="margin:0">${mdLabel(rec.date)}${rec.n?` · ${rec.n}회차`:''}</h2><p class="muted" style="margin:2px 0 0">운동 ${st.n}가지 · ${st.sets}세트${st.vol?` · 총 볼륨 ${fmtKg(st.vol)}kg`:''}</p></div><button class="btn sm sec" data-act="wlShare" data-id="${id}">보내기</button>${rec.solo?`<button class="btn sm ghost" data-act="soloDel" data-id="${id}" style="color:var(--red);margin-left:4px">삭제</button>`:''}</div>
+    <div class="row" style="align-items:flex-start"><div class="wl-no">${rec.n?rec.n:rec.solo?'혼자':'·'}</div><div class="sp"><h2 style="margin:0">${mdLabel(rec.date)}${rec.n?` · ${rec.n}회차`:''}</h2><p class="muted" style="margin:2px 0 0">운동 ${st.n}가지 · ${st.sets}세트${st.vol?` · 총 볼륨 ${fmtKg(st.vol)}kg`:''}</p></div><button class="btn sm sec" data-act="wlShare" data-id="${id}">보내기</button>${rec.solo?`<button class="btn sm ghost" data-act="soloDel" data-id="${id}" style="color:var(--red);margin-left:4px">삭제</button>`:''}</div>
     ${rec.solo?'<p class="muted" style="font-size:12px;margin:6px 0 0">혼자 운동 기록 · 운동마다 내 영상을 올리면 자세를 평가해요</p>':''}
     ${rec.demo?'<p class="muted" style="font-size:12px;margin:6px 0 0">예시 기록이에요 · 수업을 촬영하면 실제 기록과 내 영상이 여기에 쌓여요</p>':''}
     <div class="wl-list">${wlogSegs(rec).map(({g,i,name})=>{ const L=segSets(g), mx=L.reduce((a,x)=>Math.max(a,+x.w||0),0), rm=est1RM(L), hasVid=hasVid0||rec.solo&&g.vid;
       return `<div class="wl-ex"><div class="wl-main"><b class="wl-name">${esc(name)}</b>
-        <div class="wl-meta">${mx?`최고 ${fmtKg(mx)}kg`:''}${rm?` · 추정 1RM ${fmtKg(rm)}kg`:''}${g.setup&&g.setup.seat?` · ${esc(g.setup.seat)}`:''}${g.setup&&g.setup.pin?` · ${esc(g.setup.pin)}`:''}</div>
-        <div class="wl-sets">${L.map((x,k)=>`<button class="wl-set ${ed&&ed.i===i&&ed.k===k?'on':''}" data-act="wlSet" data-id="${id}" data-i="${i}" data-k="${k}" aria-label="${k+1}세트 ${x.w!=null?x.w+'kg':''} ${x.r||''}회 고치기"><b>${x.w==null?'–':+x.w===0?'맨몸':fmtKg(x.w)}</b><span>${x.r?x.r+'회':'–'}</span></button>`).join('')}<button class="wl-set add" data-act="wlAdd" data-id="${id}" data-i="${i}" aria-label="세트 추가">+</button></div>
+        <div class="wl-meta">${mx?`최고 무게 ${fmtKg(mx)}kg`:''}${rm?` | 1RM ${fmtKg(rm)}kg`:''}${g.setup&&g.setup.seat?` · ${esc(g.setup.seat)}`:''}${g.setup&&g.setup.pin?` · ${esc(g.setup.pin)}`:''}</div>
+        <div class="wl-sets">${L.map((x,k)=>`<button class="wl-set ${ed&&ed.i===i&&ed.k===k?'on':''}" data-act="wlSet" data-id="${id}" data-i="${i}" data-k="${k}" aria-label="${k+1}세트 ${x.w!=null?x.w+'kg':''} ${x.r||''}회 고치기"><i>${x.w==null?'–':+x.w===0?'맨몸':fmtKg(x.w)}</i><span>${x.r?x.r+'회':'–'}</span></button>`).join('')}<button class="wl-set add" data-act="wlAdd" data-id="${id}" data-i="${i}" aria-label="세트 추가"><i>+</i><span>세트</span></button></div>
         ${ed&&ed.i===i?`<div class="wl-edit"><label><span>무게 kg</span><input type="number" inputmode="decimal" id="wlW" value="${L[ed.k]&&L[ed.k].w!=null?L[ed.k].w:''}" placeholder="맨몸 0"></label><label><span>횟수</span><input type="number" inputmode="numeric" id="wlR" value="${L[ed.k]&&L[ed.k].r!=null?L[ed.k].r:''}"></label><button class="btn sm" data-act="wlSetSave" data-id="${id}">저장</button><button class="btn sm ghost" data-act="wlSetDel" data-id="${id}" style="color:var(--red)">삭제</button></div>`:''}
         ${rec.solo?soloSegHTML(rec,g,i):''}
         <input class="wl-memo" data-wlmemo="${i}" data-id="${id}" value="${esc(g.memo!=null?g.memo:(g.point||''))}" placeholder="메모 (예: 외전할 때 엉덩이 자극 좋음)">
       </div>
       <button class="wl-fig" data-act="wlClip" data-id="${id}" data-i="${i}" aria-label="${esc(name)} ${hasVid?'내 영상 보기':'동작 그림 크게 보기'}">${hasVid?`<img class="wl-thumb" data-th="${i}" alt="" hidden>`:''}${figHTML(name)}${hasVid?'<span class="wl-play">▶ 내 영상</span>':''}</button></div>`; }).join('')||`<p class="muted">${rec.solo?'아래에서 오늘 한 운동을 추가하세요.':'이 수업에서 정리된 운동이 없어요.'}</p>`}</div>
     ${rec.solo?`<div class="wl-addex"><input id="soloEx" list="soloExList" placeholder="운동 이름 (예: 스쿼트, 힙 어브덕션)" autocomplete="off"><datalist id="soloExList">${(window.EX_LIBRARY||[]).map(n=>`<option value="${esc(n)}">`).join('')}</datalist><button class="btn sm" data-act="soloAddEx" data-id="${id}">${I.plus} 운동 추가</button></div>`:''}
+    ${(()=>{ const V=wlogSegs(rec).filter(({g})=>rec.solo?g.vid:!rec.demo&&!rec.noVideo); return V.length?`<div class="wl-strip">${V.map(({i,name})=>`<button class="wl-sth" data-act="wlClip" data-id="${id}" data-i="${i}" aria-label="${esc(name)} 영상"><img class="wl-thumb" data-th="${i}" alt="" hidden><span>${esc(name)}</span></button>`).join('')}</div>`:''; })()}
     <p class="muted" style="font-size:12px;margin:10px 0 0">동그라미를 누르면 무게·횟수를 고칠 수 있어요 · 추정 1RM은 무게 × (1 + 횟수 ÷ 30)</p>
     <button class="btn sec full" data-act="wlClose" style="margin-top:10px">닫기</button></div></div>`; }
 async function wlVideoURL(id){ if(String(id).includes(':')){ try{ const b=await IDB.get(id); return b?URL.createObjectURL(b):null; }catch(e){ return null; } } if(WL.id===id&&WL.url) return WL.url; try{ const b=await IDB.get(id); if(!b) return null; if(WL.url) URL.revokeObjectURL(WL.url); WL.url=URL.createObjectURL(b); WL.id=id; return WL.url; }catch(e){ return null; } }
@@ -3638,11 +3677,11 @@ function wlRange(rec,i){ try{ if(typeof segRange==='function') return segRange(r
 async function wlThumbs(id){ const rec=wlogGet(id); if(!rec||rec.demo||rec.noVideo) return; if(rec.solo){ for(const {g,i} of wlogSegs(rec)) if(g.vid) await wlThumbOne(id,i,id+':'+i); return; } const url=await wlVideoURL(id); if(!url) return;
   const v=document.createElement('video'); v.muted=true; v.playsInline=true; v.preload='auto'; v.src=url;
   await new Promise(r=>{ v.onloadeddata=r; v.onerror=r; setTimeout(r,4000); });
-  for(const {i} of wlogSegs(rec)){ const img=document.querySelector(`.wl-thumb[data-th="${i}"]`); if(!img) continue;
-    if(WL.thumbs[id+':'+i]){ img.src=WL.thumbs[id+':'+i]; img.hidden=false; img.parentElement.classList.add('hasimg'); continue; }
+  for(const {i} of wlogSegs(rec)){ if(!document.querySelector(`.wl-thumb[data-th="${i}"]`)) continue;
+    if(WL.thumbs[id+':'+i]){ wlSetThumb(i,WL.thumbs[id+':'+i]); continue; }
     const [t0,t1]=wlRange(rec,i); try{ await new Promise((r,j)=>{ v.onseeked=r; v.onerror=j; v.currentTime=Math.max(0,(t0+t1)/2); setTimeout(r,2500); });
       const c=document.createElement('canvas'), W=240, H=Math.round(W*(v.videoHeight||3)/(v.videoWidth||4)); c.width=W; c.height=H; c.getContext('2d').drawImage(v,0,0,W,H);
-      const u=c.toDataURL('image/jpeg',.7); WL.thumbs[id+':'+i]=u; img.src=u; img.hidden=false; img.parentElement.classList.add('hasimg'); }catch(e){} } }
+      const u=c.toDataURL('image/jpeg',.7); WL.thumbs[id+':'+i]=u; wlSetThumb(i,u); }catch(e){} } }
 async function wlClip(id,i){ const rec=wlogGet(id); if(!rec) return; const g=rec.segs[i], name=segTitle(g)||'운동', L=segSets(g);
   const url=rec.solo?(g.vid?await wlVideoURL(id+':'+i):null):rec.demo||rec.noVideo?null:await wlVideoURL(id), [t0,t1]=rec.solo?[0,9999]:wlRange(rec,i);
   $('#modalRoot').innerHTML=`<div class="modal"><div class="sheet" role="dialog" aria-label="${esc(name)} 영상"><h2>${esc(name)}</h2><p class="muted" style="margin:0 0 10px">${mdLabel(rec.date)} · ${L.map(x=>`${x.w==null?'':+x.w===0?'맨몸 ':fmtKg(x.w)+'kg '}${x.r?x.r+'회':''}`).join(' / ')}</p>
@@ -3692,12 +3731,12 @@ async function soloAnalyze(id,i,file){ const rec=wlogGet(id); if(!rec) return; c
       if(!segSets(g).length||segSets(g).every(x=>x.r==null)) g.log=[{w:(segSets(g)[0]||{}).w??null,r:reps.length}]; }
   }catch(e){ const m=String(e&&e.message||''); g.ana={err:/fetch|import|network|load/i.test(m)?'골격 모델을 불러오지 못했어요 · 인터넷 연결을 확인하고 다시 올려 주세요':(m||'분석하지 못했어요')}; }
   S.wlUp=null; wlogSave(rec); if(document.querySelector('.wlog')) wlOpen(id); toast(g.ana&&!g.ana.err?'자세 평가를 마쳤어요':'영상을 저장했어요'); }
-async function wlThumbOne(id,i,key){ const img=document.querySelector(`.wl-thumb[data-th="${i}"]`); if(!img) return;
-  if(WL.thumbs[key]){ img.src=WL.thumbs[key]; img.hidden=false; img.parentElement.classList.add('hasimg'); return; }
+async function wlThumbOne(id,i,key){ if(!document.querySelector(`.wl-thumb[data-th="${i}"]`)) return;
+  if(WL.thumbs[key]){ wlSetThumb(i,WL.thumbs[key]); return; }
   const url=await wlVideoURL(key); if(!url) return; const v=document.createElement('video'); v.muted=true; v.playsInline=true; v.preload='auto'; v.src=url;
   await new Promise(r=>{ v.onloadeddata=r; v.onerror=r; setTimeout(r,4000); });
   try{ await new Promise(r=>{ v.onseeked=r; v.currentTime=Math.min(1,(v.duration||2)/2); setTimeout(r,2500); }); const c=document.createElement('canvas'), W=240, H=Math.round(W*(v.videoHeight||3)/(v.videoWidth||4)); c.width=W; c.height=H; c.getContext('2d').drawImage(v,0,0,W,H);
-    const u=c.toDataURL('image/jpeg',.7); WL.thumbs[key]=u; img.src=u; img.hidden=false; img.parentElement.classList.add('hasimg'); }catch(e){}
+    const u=c.toDataURL('image/jpeg',.7); WL.thumbs[key]=u; wlSetThumb(i,u); }catch(e){}
   URL.revokeObjectURL(url); }
 function soloAct(act,a){
   switch(act){

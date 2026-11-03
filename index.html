@@ -13,6 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="AI 운동 매니저">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" href="icons/icon-192.png">
+<script src="config.js"></script>
 <script>window.APP_BUILD=true;if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));</script>
 <style>
 :root{
@@ -1736,8 +1737,10 @@ function poseSettingHTML(){ let k='full'; try{ k=localStorage.getItem('aiwm_pose
 // ---------- AI 인식 (음식 사진 · 인바디 결과지) ----------
 // 사용자가 넣은 API 키로 브라우저에서 바로 호출 (키는 이 기기 브라우저에만 저장)
 const AI_MODELS=[['gemini-flash-latest','Gemini Flash · 무료 사용량 있음'],['claude-sonnet-5-5','Claude Sonnet 5.5 · 정확'],['claude-haiku-5-5','Claude Haiku 5.5 · 빠름']];
-function aiCfg(){ return Object.assign({model:'gemini-flash-latest',key:''}, LS.get('aiwm_ai',{})); }
-function aiReady(){ return !!aiCfg().key; }
+// 시험판 공용 AI: config.js의 aiProxy(키를 숨긴 중계 서버)를 쓰고, 내 키를 넣으면 내 키가 우선
+function sharedAI(){ const C=window.APP_CONFIG||{}; return C.aiProxy?{proxy:String(C.aiProxy).replace(/\/$/,''),model:C.aiModel||'gemini-flash-latest'}:null; }
+function aiCfg(){ const c=Object.assign({model:'gemini-flash-latest',key:''}, LS.get('aiwm_ai',{})); if(!c.key){ const sh=sharedAI(); if(sh){ c.proxy=sh.proxy; c.model=sh.model; c.shared=true; } } return c; }
+function aiReady(){ const c=aiCfg(); return !!(c.key||c.proxy); }
 function todayKey(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function todayLabel(){ const d=new Date(); return (d.getMonth()+1)+'월 '+d.getDate()+'일'; }
 function slotNow(){ const h=new Date().getHours()+new Date().getMinutes()/60; return h<10.5?'아침':h<15?'점심':h<21?'저녁':'간식'; }
@@ -1755,12 +1758,12 @@ function thumbOf(dataURL){ return new Promise(res=>{ const im=new Image(); im.on
 function parseJSON(t){ t=String(t||'').replace(/```json|```/g,''); const a=t.indexOf('{'), b=t.lastIndexOf('}'); if(a<0||b<a) throw new Error('AI 답을 읽지 못했어요'); return JSON.parse(t.slice(a,b+1)); }
 async function aiCall(prompt,b64,mime){
   mime=mime||'image/jpeg';
-  const c=aiCfg(); if(!c.key) throw new Error('NOKEY');
+  const c=aiCfg(); if(!c.key&&!c.proxy) throw new Error('NOKEY');
   let r, j;
   try{
-    if(c.model.startsWith('gemini')){
+    if(c.proxy||c.model.startsWith('gemini')){
       const parts=[]; if(b64) parts.push({inline_data:{mime_type:mime,data:b64}}); parts.push({text:prompt});
-      r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(c.model)}:generateContent`,{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':c.key},
+      r=await fetch(c.proxy?`${c.proxy}/?model=${encodeURIComponent(c.model)}`:`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(c.model)}:generateContent`,{method:'POST',headers:c.proxy?{'content-type':'application/json'}:{'content-type':'application/json','x-goog-api-key':c.key},
         body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{temperature:0.2,responseMimeType:'application/json'}})});
       j=await r.json().catch(()=>({}));
       if(!r.ok) throw new Error(aiErr(r.status,(j.error&&j.error.message)||''));
@@ -1794,7 +1797,9 @@ const INBODY_PROMPT=`인바디(InBody) 결과지 사진이나 인바디 앱 화�
 {"model":"기종(예: InBody 570) 또는 빈 문자열","date":"YYYY-MM-DD 또는 빈 문자열","time":"HH:MM 또는 빈 문자열","weight_kg":숫자|null,"smm_kg":숫자|null,"fat_mass_kg":숫자|null,"pbf_pct":숫자|null,"bmr_kcal":숫자|null}`;
 function aiSettingsCard(compact){
   const c=aiCfg();
-  return `<div class="card" id="aiCard"><h3>AI 연결 <span class="r">${c.key?'<span class="pill p-green">연결됨</span>':'<span class="pill p-orange">필요</span>'}</span></h3>
+  if(c.shared&&compact) return '';
+  return `<div class="card" id="aiCard"><h3>AI 연결 <span class="r">${c.key?'<span class="pill p-green">내 키 연결됨</span>':c.shared?'<span class="pill p-green">시험판 AI 연결됨</span>':'<span class="pill p-orange">필요</span>'}</span></h3>
+    ${c.shared&&!c.key?'<p class="muted" style="margin:-4px 0 10px">시험판에서는 따로 키를 넣지 않아도 음식·인바디·자막 인식이 됩니다. 내 키를 넣으면 내 키로 바뀝니다.</p>':''}
     ${compact?'<p class="muted" style="margin:-4px 0 10px">음식 사진 인식에 AI가 필요해요. API 키를 한 번만 넣어 주세요.</p>':''}
     <label class="field"><span>AI 모델</span><select id="aiModel">${AI_MODELS.map(([v,t])=>`<option value="${v}" ${c.model===v?'selected':''}>${t}</option>`).join('')}</select></label>
     <label class="field"><span>API 키</span><input type="password" id="aiKey" autocomplete="off" placeholder="${c.key?'저장됨 · 바꾸려면 새로 입력':'여기에 붙여 넣기'}"></label>
@@ -1877,13 +1882,13 @@ function mDiet(){
 }
 function aiAct(act,a){
   switch(act){
-    case 'aiSave': { const m=$('#aiModel').value, k=($('#aiKey').value||'').trim(); const c=aiCfg(); c.model=m; if(k) c.key=k; LS.set('aiwm_ai',c);
-      const msg=$('#aiMsg'); if(!c.key){ if(msg) msg.textContent='API 키를 넣어 주세요.'; return true; }
+    case 'aiSave': { const m=$('#aiModel').value, k=($('#aiKey').value||'').trim(); const c=Object.assign({model:'gemini-flash-latest',key:''},LS.get('aiwm_ai',{})); c.model=m; if(k) c.key=k; LS.set('aiwm_ai',{model:c.model,key:c.key});
+      const msg=$('#aiMsg'); if(!c.key&&!sharedAI()){ if(msg) msg.textContent='API 키를 넣어 주세요.'; return true; }
       if(msg) msg.textContent='확인 중…';
       aiCall('연결 확인입니다. {"ok":true} 만 답하세요.').then(()=>{ toast('AI 연결 완료'); if(S.dietRec&&S.dietRec.status==='nokey'){ S.dietRec.status='error'; S.dietRec.err='‘다시 분석’을 눌러 주세요'; } keepScroll(render); })
         .catch(e=>{ const mm=$('#aiMsg'); if(mm) mm.textContent=e.message; else toast(e.message); });
       return true; }
-    case 'aiClear': { const c=aiCfg(); c.key=''; LS.set('aiwm_ai',c); keepScroll(render); toast('키를 지웠어요'); return true; }
+    case 'aiClear': { const c=Object.assign({model:'gemini-flash-latest'},LS.get('aiwm_ai',{})); LS.set('aiwm_ai',{model:c.model,key:''}); keepScroll(render); toast('키를 지웠어요'); return true; }
     case 'dietSlot': if(S.dietRec){ S.dietRec.slot=a.dataset.v; keepScroll(render); } return true;
     case 'dietRetry': { const r=S.dietRec; if(!r) return true; if(!aiReady()){ toast('먼저 AI를 연결해 주세요'); return true; }
       r.status='loading'; keepScroll(render);
@@ -1945,7 +1950,8 @@ async function processSession(R){
   if(R.busy) return; R.busy=true;
   const c=aiCfg(); let caps=null, warn='';
   R.ai={state:'run',msg:'자막 추출 준비 중…'}; rerenderReview();
-  if(c.key && c.model.startsWith('gemini') && R.audioBlob){
+  const gem=c.proxy||c.model.startsWith('gemini');
+  if((c.key||c.proxy) && gem && R.audioBlob){
     try{
       let chunks;
       try{ chunks=await audioToWavChunks(R.audioBlob,240); }
@@ -1961,8 +1967,8 @@ async function processSession(R){
         (j.captions||[]).forEach(x=>{ if(x&&x.text&&isFinite(+x.start)) caps.push({start:+x.start+chunks[k].offset,end:(isFinite(+x.end)?+x.end:+x.start+2)+chunks[k].offset,text:String(x.text).trim()}); });
       }
     }catch(e){ caps=null; warn='소리에서 자막을 뽑지 못해 촬영 중 받아쓴 말로 대신했어요 ('+e.message+')'; }
-  } else if(c.key && !c.model.startsWith('gemini')) warn='Claude는 소리를 받지 못해 촬영 중 받아쓴 말로 자막을 만들었어요. 영상에서 바로 자막을 뽑으려면 Gemini를 고르세요.';
-  else if(c.key && !R.audioBlob) warn='녹음된 소리가 없어 촬영 중 받아쓴 말로 자막을 만들었어요.';
+  } else if(c.key && !gem) warn='Claude는 소리를 받지 못해 촬영 중 받아쓴 말로 자막을 만들었어요. 영상에서 바로 자막을 뽑으려면 Gemini를 고르세요.';
+  else if((c.key||c.proxy) && !R.audioBlob) warn='녹음된 소리가 없어 촬영 중 받아쓴 말로 자막을 만들었어요.';
   if(!caps) caps=(R.transcript||[]).map(x=>({start:Math.max(0,x.t-2),end:x.t+1,text:x.txt}));
   R.captions=caps.sort((a,b)=>a.start-b.start); buildVTT(R);
   // 동작으로 나눈 구간이 없으면(반복을 못 잡았을 때) 말한 운동 이름으로 구간을 나눔
@@ -1976,7 +1982,7 @@ async function processSession(R){
   }
   // 자막에서 운동 이름이 나오면 그 구간 이름으로
   R.segs.forEach((g,i)=>{ if(!g.label){ const nm=capsOf(R,i).map(x=>x.text).join(' '); const hit=(window.LiveCamDetectName||(()=>null))(nm); if(hit) g.label=hit; } });
-  if(!c.key){ localSummary(R); R.ai={state:'nokey'}; R.busy=false; saveSession(R); rerenderReview(); return; }
+  if(!c.key&&!c.proxy){ localSummary(R); R.ai={state:'nokey'}; R.busy=false; saveSession(R); rerenderReview(); return; }
   R.ai.msg='운동별 키워드로 정리 중…'; rerenderReview();
   try{
     const j=parseJSON(await aiCall(summaryPrompt(R)));

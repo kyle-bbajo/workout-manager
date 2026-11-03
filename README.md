@@ -34,6 +34,15 @@
 - 혼자 연습의 트레이너 목소리는 합성음으로 대신합니다. 실제 앱에서는 수업 녹음 클립을 재생합니다.
 - 카카오톡은 요약 텍스트를 공유하거나 복사하는 방식입니다.
 
+## 시험판 공용 AI (키 입력 없이 쓰기)
+
+`config.js`의 `aiProxy`에 중계 서버 주소가 들어가 있으면, 앱을 연 누구나 키 없이 음식·인바디·자막 인식을 쓸 수 있습니다. Gemini 키는 중계 서버(Cloudflare Worker)의 비밀 변수에만 두고 저장소에는 넣지 않습니다.
+
+1. aistudio.google.com → Get API key로 Gemini 키를 만듭니다 (결제 연결 안 한 프로젝트 권장).
+2. dash.cloudflare.com → Workers & Pages → Create → Worker를 만들고, `proxy/worker.js` 내용을 붙여 넣어 Deploy합니다.
+3. Worker → Settings → Variables and Secrets → `GEMINI_API_KEY`를 **Secret**으로 추가합니다. (선택: `DAILY_LIMIT` 하루 요청 수, 기본 300)
+4. 배포된 주소(`https://○○.workers.dev`)를 `config.js`의 `aiProxy`에 넣습니다.
+
 ## AI 연결 (음식·인바디 인식)
 
 내 정보 → AI 연결에서 모델을 고르고 API 키를 한 번 넣습니다.
@@ -53,6 +62,8 @@
 
 ```
 index.html        앱 전체 (화면 + 카메라 모듈)
+config.js         시험판 설정 (공용 AI 중계 주소)
+proxy/worker.js   Gemini 키를 숨기는 중계 서버 (Cloudflare Worker)
 manifest.json     홈 화면 설치 정보
 sw.js             오프라인 캐시 (네트워크 우선)
 icons/            앱 아이콘

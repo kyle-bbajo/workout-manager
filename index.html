@@ -275,23 +275,56 @@ input.nm{font:inherit;font-weight:800;font-size:16px;border:none;border-bottom:1
 // - 음성 인식으로 코칭 키워드·중량을 뽑고, 트레이너 판단을 기준으로 반영
 const MP_VER = '1.2.0';
 const MP_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VER}`;
-const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
-
-let landmarker = null, loading = null;
+// 정확(full): 덜 흔들림 · 빠름(lite): 오래된 폰용
+const MODELS = {
+  full: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task',
+  lite: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
+};
+function modelPref(){ try { return localStorage.getItem('aiwm_pose') === 'lite' ? 'lite' : 'full'; } catch (e) { return 'full'; } }
+let landmarker = null, loading = null, loadedKind = null;
 async function loadModel(onStatus){
-  if (landmarker) return landmarker;
+  const kind = modelPref();
+  if (landmarker && loadedKind === kind) return landmarker;
   if (loading) return loading;
+  if (landmarker){ try { landmarker.close(); } catch (e) {} landmarker = null; }
+  const MODEL_URL = MODELS[kind];
   loading = (async () => {
-    onStatus && onStatus('골격 인식 모델을 불러오는 중…');
+    onStatus && onStatus('골격 인식 모델을 불러오는 중… (처음 한 번만 오래 걸려요)');
     const { PoseLandmarker, FilesetResolver } = await import(`${MP_URL}/vision_bundle.mjs`);
     const fileset = await FilesetResolver.forVisionTasks(`${MP_URL}/wasm`);
-    const opts = (delegate) => ({ baseOptions: { modelAssetPath: MODEL_URL, delegate }, runningMode: 'VIDEO', numPoses: 3,
+    const opts = (delegate) => ({ baseOptions: { modelAssetPath: MODEL_URL, delegate }, runningMode: 'VIDEO', numPoses: 2,
       minPoseDetectionConfidence: 0.5, minPosePresenceConfidence: 0.5, minTrackingConfidence: 0.5 });
     try { landmarker = await PoseLandmarker.createFromOptions(fileset, opts('GPU')); }
     catch (e) { landmarker = await PoseLandmarker.createFromOptions(fileset, opts('CPU')); }
+    loadedKind = kind;
+    window.dispatchEvent(new Event('livecam-model'));
     return landmarker;
   })();
   try { return await loading; } finally { loading = null; }
+}
+
+// ---------- 흔들림 줄이기 (One Euro 필터) ----------
+// 가만히 있을 때는 강하게, 빠르게 움직일 때는 약하게 걸러서 떨림만 줄이고 동작은 따라감
+function lowpass(a, prev, x){ return prev == null ? x : prev + a * (x - prev); }
+function alpha(cutoff, dt){ const tau = 1 / (2 * Math.PI * cutoff); return 1 / (1 + tau / dt); }
+function OneEuro(minCutoff, beta, dCutoff){ this.mc = minCutoff; this.b = beta; this.dc = dCutoff; this.x = null; this.dx = 0; }
+OneEuro.prototype.f = function (v, dt){
+  if (this.x == null){ this.x = v; return v; }
+  const d = (v - this.x) / dt; this.dx = lowpass(alpha(this.dc, dt), this.dx, d);
+  const cutoff = this.mc + this.b * Math.abs(this.dx);
+  this.x = lowpass(alpha(cutoff, dt), this.x, v); return this.x;
+};
+function makeSmoother(){
+  const fs = Array.from({ length: 33 }, () => ({ x: new OneEuro(1.0, 60, 1.0), y: new OneEuro(1.0, 60, 1.0), last: null }));
+  let tPrev = null;
+  return function (lm, t){
+    const dt = tPrev == null ? 1 / 30 : Math.min(0.2, Math.max(1 / 120, (t - tPrev) / 1000)); tPrev = t;
+    return lm.map((p, i) => {
+      const f = fs[i], vis = p.visibility ?? 1;
+      if (vis < 0.35 && f.last) return Object.assign({}, f.last, { visibility: vis }); // 잘 안 보이는 관절은 직전 위치 유지
+      const q = { x: f.x.f(p.x, dt), y: f.y.f(p.y, dt), z: p.z, visibility: vis }; f.last = q; return q;
+    });
+  };
 }
 
 // ---------- geometry ----------
@@ -413,6 +446,8 @@ const ALL = Array.from({ length: 33 }, (_, i) => i);
 // ---------- session ----------
 const LiveCam = {
   supported(){ return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia); },
+  ready(){ return !!landmarker && loadedKind === modelPref(); },
+  preload(onStatus){ return loadModel(onStatus).catch(() => null); },
   async start(o){
     const S = this.s = { o, reps: [], segs: [], buf: [], kws: [], weight: null, transcript: [], lastRepT: 0, running: true, crit: Object.assign({ depth: 5 }, o.criteria || {}) };
     const box = o.box; box.innerHTML = '';
@@ -452,7 +487,11 @@ const LiveCam = {
     ctx.drawImage(v, 0, 0, W, H); ctx.restore();
     const poses = (res && res.landmarks) || [];
     const mx = p => S.mirror ? { ...p, x: 1 - p.x } : p;
-    const ps = poses.map(lm => lm.map(mx));
+    let ps = poses.map(lm => lm.map(mx));
+    // 화면에서 가장 크게 보이는 사람을 주인공으로 (순서가 바뀌어 골격이 튀는 것 방지)
+    const size = lm => Math.hypot((lm[11].x + lm[12].x - lm[23].x - lm[24].x) / 2, (lm[11].y + lm[12].y - lm[23].y - lm[24].y) / 2);
+    if (ps.length > 1){ const k = ps.reduce((bi, lm, i) => size(lm) > size(ps[bi]) ? i : bi, 0); if (k) ps = [ps[k], ...ps.filter((_, i) => i !== k)]; }
+    if (ps.length){ if (!S.smooth || now - (S.seenT || 0) > 1000) S.smooth = makeSmoother(); S.seenT = now; ps[0] = S.smooth(ps[0], now); }
     // privacy: main person's face, other people's whole body
     ps.forEach((lm, k) => {
       if (k === 0) { const [x, y, w, h] = bbox(lm, [0,1,2,3,4,5,6,7,8,9,10], W, H, 1.9); pixelate(ctx, v, x, y, w, h, S.mirror, W); }
@@ -1164,7 +1203,7 @@ function tLive(){
     <div class="segs" id="segStrip"><span class="segc">운동을 바꾸면 자동으로 나눠 기록해요</span></div>
     <div class="cam"><div id="simFig">${drawFig(pose(0),{})}</div>
       <div class="hud"><span class="chip ok">전신 인식 OK</span><span class="chip">측면 각도 OK</span></div></div>
-    ${window.APP_BUILD?`<button class="recbtn" data-act="realStart" aria-label="카메라로 측정 촬영 시작"><i></i><span>촬영 시작</span></button><button class="btn ghost full" data-act="recStart" style="margin-top:6px">카메라 없이 시연 보기</button>`:`<button class="recbtn" data-act="recStart" aria-label="측정 촬영 시작"><i></i><span>촬영 시작</span></button><button class="btn sec full realbtn" data-act="realStart" style="margin-top:6px">${I.cam||''}실제 카메라로 촬영 (휴대폰 웹앱)</button>`}
+    ${window.APP_BUILD?`<button class="recbtn" data-act="realStart" aria-label="카메라로 측정 촬영 시작"><i></i><span>촬영 시작</span></button><button class="btn ghost full" data-act="recStart" style="margin-top:6px">카메라 없이 시연 보기</button>${poseSettingHTML()}`:`<button class="recbtn" data-act="recStart" aria-label="측정 촬영 시작"><i></i><span>촬영 시작</span></button><button class="btn sec full realbtn" data-act="realStart" style="margin-top:6px">${I.cam||''}실제 카메라로 촬영 (휴대폰 웹앱)</button>`}
     <p class="muted" style="text-align:center;margin:6px 0 0;line-height:1.6">누르면 측정 영상 촬영이 시작됩니다.<br>운동 종류·관절 각도·코칭 멘트가 운동별로 자동 정리됩니다.</p>
     <div class="cue" style="margin-top:14px"><b>지난 코칭 · 이 회원</b><span class="kw">#깊이 수평까지</span><span class="kw">#상체 45°</span><span class="kw">#엉덩이 뒤로</span></div>
     <div class="card" style="margin-top:12px"><h3>분석하는 운동</h3><div class="muted" style="font-size:12.5px;line-height:1.7"><b style="color:var(--ink)">하체</b> 스쿼트 · 런지 · 스플릿 스쿼트 · 레그프레스<br><b style="color:var(--ink)">힙힌지</b> 데드리프트 · 루마니안 데드리프트 · 힙 쓰러스트<br><b style="color:var(--ink)">당기기</b> 덤벨·바벨 로우 · 랫풀다운 · 풀업<br><b style="color:var(--ink)">밀기</b> 오버헤드 프레스 · 푸시업 · 벤치프레스(측면 거치)<br><b style="color:var(--ink)">트레이너 동작</b> 시연 3회로 등록한 커스텀 동작</div></div>`;
@@ -1545,7 +1584,7 @@ function startRealClass(){
   }).catch(err=>{ stopReal(); set('camStatus',''); const fb=$('#fb'); if(fb){fb.className='feedback warn';fb.textContent=camFail(err);} set('repList','<button class="btn sec full" data-act="recStart" style="margin-top:4px">카메라 없이 시연 보기</button>'); });
 }
 function segTitle(g){ return g.title||g.label||g.name; }
-function segRange(R,i){ const g=R.segs[i]; const from=i===0?0:R.segs[i-1].end; const to=i===R.segs.length-1?Math.max(g.end,R.duration||0):g.end; return [Math.max(0,from),to]; }
+function segRange(R,i){ const g=R.segs[i]; const from=i===0?0:R.segs[i-1].end; const to=i===R.segs.length-1?Math.max(g.end,R.duration||0):g.end; return [Math.max(0,from),Math.max(to,from+1)]; }
 function capsOf(R,i){ const [a,b]=segRange(R,i); return (R.captions||[]).filter(c=>c.start>=a-0.5&&c.start<b); }
 function fmtT(s){ s=Math.max(0,Math.round(s)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
 function bestRep(g){ const ok=g.reps.filter(r=>r.ok); return (ok.length?ok:g.reps).slice().sort((a,b)=>(b.hipPk||0)-(a.hipPk||0))[0]; }
@@ -1559,7 +1598,7 @@ function realReview(){
   const status = ai.state==='run' ? `<div class="alert b"><div><b>${esc(ai.msg)}</b><br>영상 속 말소리를 자막으로 옮기고, 운동마다 이름·중량·특징을 키워드로 정리하고 있어요.</div></div>`
     : ai.state==='nokey' ? `<div class="alert o"><div><b>AI를 연결하면 자막과 키워드가 자동으로 정리돼요</b><br>지금은 촬영 중 받아쓴 말로만 정리했어요. 내 정보 → AI 연결(Gemini 권장) 후 ‘다시 정리’를 눌러 주세요.</div><button class="btn sm sec" data-act="realAI" style="align-self:center">다시 정리</button></div>`
     : ai.state==='error' ? `<div class="alert o"><div><b>자동 정리를 끝내지 못했어요</b><br>${esc(ai.msg)}</div><button class="btn sm sec" data-act="realAI" style="align-self:center">다시 정리</button></div>`
-    : ai.state==='done' ? `<div class="alert g"><div><b>정리 완료</b><br>운동 ${R.segs.length}개 · 반복 ${total}회 · 자막 ${(R.captions||[]).length}줄${ai.warn?`<br><span style="font-size:12px">${esc(ai.warn)}</span>`:''}</div></div>` : '';
+    : ai.state==='done' ? `<div class="alert ${(R.captions||[]).length?'g':'o'}"><div><b>정리 완료</b><br>운동 ${R.segs.length}개 · 반복 ${total}회 · 자막 ${(R.captions||[]).length}줄${(R.captions||[]).length?'':'<br>들린 말이 없었어요. 마이크 권한과 휴대폰과의 거리를 확인해 주세요.'}${ai.warn?`<br><span style="font-size:12px">${esc(ai.warn)}</span>`:''}${R.speechOnly?'<br><span style="font-size:12px">동작 반복을 잡지 못해 말한 운동 이름으로 구간을 나눴어요.</span>':''}</div>${(R.captions||[]).length?'':'<button class="btn sm sec" data-act="realAI" style="align-self:center">다시 정리</button>'}</div>` : '';
   const dl = R.videoURL?`<a class="btn sec full" style="margin-top:8px;text-align:center;text-decoration:none" href="${R.videoURL}" download="수업영상_${(R.date||'').replace(/[^0-9]/g,'')}.${(R.mime||'').includes('mp4')?'mp4':'webm'}">전체 영상 저장</a>`:'';
   if(!R.segs.length) return status+`<div class="card"><h3>인식된 반복이 없어요</h3><div class="muted" style="line-height:1.7">· 기기를 옆쪽 2~3m에 세워 전신(머리~발)이 나오게 해 주세요.<br>· 밝은 곳에서, 한 명만 화면 중앙에 서면 더 잘 잡혀요.<br>· 반복은 천천히 끝까지 움직여야 1회로 셉니다.</div>${dl}</div><button class="btn full" data-act="realAgain">다시 촬영</button>`;
   return status+R.segs.map((g,i)=>{
@@ -1568,16 +1607,16 @@ function realReview(){
     const okN=g.reps.filter(r=>r.ok).length;
     return `<div class="card">
       <h3 style="gap:8px">${i+1}. ${esc(segTitle(g))}${g.w?`<span class="kw w" style="margin-left:auto">${esc(g.w)}</span>`:''}</h3>
-      <div class="muted" style="margin:-4px 0 10px">${g.sets}세트 · ${g.reps.length}회 · ${fmtT(t0)}–${fmtT(t1)}${g.label?'':' · 이름은 동작으로 추정'}</div>
+      <div class="muted" style="margin:-4px 0 10px">${g.reps.length?`${g.sets}세트 · ${g.reps.length}회`:'반복 인식 안 됨 · 말로 나눈 구간'} · ${fmtT(t0)}–${fmtT(t1)}</div>
       ${R.videoURL?`<video src="${R.videoURL}#t=${t0.toFixed(1)},${t1.toFixed(1)}" controls playsinline preload="metadata" style="width:100%;border-radius:12px;background:#000;display:block">${R.vttURL?`<track kind="captions" srclang="ko" label="자막" src="${R.vttURL}" default>`:''}</video>`:'<div class="muted" style="font-size:12px">영상 없음 (이 기기에 저장된 영상이 없어요)</div>'}
       <div class="muted" style="font-size:12px;margin:10px 0 6px">키워드 요약 · 자막에서 추출</div>
       <div>${kws.length?kws.map(k=>`<button class="kw" data-act="segKw" data-seg="${i}" data-k="${esc(k)}" aria-label="${esc(k)} 키워드 빼기">#${esc(k)} <span aria-hidden="true">×</span></button>`).join(''):'<span class="muted">아직 키워드가 없어요</span>'}</div>
       <details style="margin-top:10px"><summary class="muted" style="font-size:13px;cursor:pointer">자막 ${caps.length}줄</summary>
         <div style="font-size:13px;line-height:1.7;margin-top:6px">${caps.length?caps.map(c=>`<div><span class="muted" style="font-variant-numeric:tabular-nums">${fmtT(c.start)}</span> ${esc(c.text)}</div>`).join(''):'<span class="muted">이 구간에 들린 말이 없어요</span>'}</div></details>
-      <details style="margin-top:6px"><summary class="muted" style="font-size:13px;cursor:pointer">동작 분석 · 좋은 반복 ${okN}/${g.reps.length}</summary>
+      ${g.reps.length?`<details style="margin-top:6px"><summary class="muted" style="font-size:13px;cursor:pointer">동작 분석 · 좋은 반복 ${okN}/${g.reps.length}</summary>
         <div class="anal" style="margin-top:8px"><div class="clip" style="aspect-ratio:auto">${lmSVG(lm, saved&&saved.lm)}<span>${saved?'점선: 저장된 기준 동작':'대표 반복'}</span></div>
         <div>${g.reps.slice(0,6).map((r,j)=>`<div class="fd"><span>${r.set}세트 ${j+1}회</span><b class="${r.ok?'ok':'warn'}">${esc(r.txt)}</b></div>`).join('')}${g.reps.length>6?`<div class="muted" style="font-size:12px">외 ${g.reps.length-6}회</div>`:''}</div></div>
-        <div class="muted" style="font-size:12px;margin-top:6px">분석 패턴: ${g.name}</div></details>
+        <div class="muted" style="font-size:12px;margin-top:6px">분석 패턴: ${g.name}</div></details>`:''}
       ${lm?`<button class="btn ${saved?'sec':''} full" data-act="saveRef" data-seg="${i}" style="margin-top:10px">${saved?'기준 동작 다시 저장':'좋은 반복을 회원 기준 동작으로 저장'}</button>`:''}
     </div>`;}).join('')+
   `<div class="card"><h3>전체 영상 <span class="r muted">얼굴 모자이크</span></h3>${R.videoURL?`<video src="${R.videoURL}" controls playsinline preload="metadata" style="width:100%;border-radius:12px;background:#000">${R.vttURL?`<track kind="captions" srclang="ko" label="자막" src="${R.vttURL}" default>`:''}</video>`:''}${dl}</div>
@@ -1659,7 +1698,8 @@ function realAct(act,a){
     case 'camFlip': { REAL.facing=REAL.facing==='environment'?'user':'environment'; stopReal(); render(); return true; }
     case 'realEnd': { const L=window.LiveCam; const p=L&&L.s?L.stop():Promise.resolve(null);
       p.then(res=>{ S.realOn=false; if(res){ res.ts=Date.now(); res.date=new Date().toLocaleDateString('ko-KR'); REAL.result=res; saveSession(res); } go('realReview'); if(res) processSession(res); }); return true; }
-    case 'realAI': if(REAL.result) processSession(REAL.result); return true;
+    case 'realAI': if(REAL.result){ REAL.result.busy=false; processSession(REAL.result); } return true;
+    case 'poseKind': try{ localStorage.setItem('aiwm_pose',a.dataset.v); }catch(e){} if(window.LiveCam&&window.LiveCam.preload) window.LiveCam.preload(); keepScroll(render); return true;
     case 'openSession': openSession(a.dataset.id); return true;
     case 'segKw': { const R=REAL.result, g=R&&R.segs[+a.dataset.seg]; if(!g) return true; const k=a.dataset.k; if(g.aiKws) g.aiKws=g.aiKws.filter(x=>x!==k); g.kws=(g.kws||[]).filter(x=>x!==k); saveSession(R); keepScroll(render); return true; }
     case 'realAgain': S.realOn=true; go('live'); return true;
@@ -1680,6 +1720,18 @@ function realAct(act,a){
   }
   return false;
 }
+
+// 앱을 열면 골격 모델을 미리 받아 둠 (처음 한 번만 오래 걸리고, 이후에는 기기에 저장된 것을 씀)
+if(window.APP_BUILD){
+  const pre=()=>{ if(window.LiveCam&&window.LiveCam.preload) window.LiveCam.preload(); };
+  window.addEventListener('livecam-ready',()=>setTimeout(pre,800));
+  window.addEventListener('livecam-model',()=>{ const e=document.getElementById('poseState'); if(e) e.innerHTML=poseStateHTML(); });
+}
+function poseStateHTML(){ const ok=window.LiveCam&&window.LiveCam.ready&&window.LiveCam.ready(); return ok?'<span class="pill p-green">골격 모델 준비됨</span>':'<span class="pill p-orange">골격 모델 받는 중…</span>'; }
+function poseSettingHTML(){ let k='full'; try{ k=localStorage.getItem('aiwm_pose')==='lite'?'lite':'full'; }catch(e){}
+  return `<div class="card" style="margin-top:12px"><h3>골격 인식 <span class="r" id="poseState">${poseStateHTML()}</span></h3>
+    <div class="seg" role="group" aria-label="골격 모델"><button class="${k==='full'?'on':''}" data-act="poseKind" data-v="full">정확 · 덜 흔들림</button><button class="${k==='lite'?'on':''}" data-act="poseKind" data-v="lite">빠름 · 오래된 폰</button></div>
+    <p class="muted" style="margin:8px 0 0;font-size:12.5px;line-height:1.6">휴대폰을 거치대에 고정하고, 옆에서 2~3m, 골반 높이로 세우면 골격이 가장 덜 흔들려요. 밝은 곳, 몸에 붙는 옷이 좋아요.</p></div>`; }
 
 // ---------- AI 인식 (음식 사진 · 인바디 결과지) ----------
 // 사용자가 넣은 API 키로 브라우저에서 바로 호출 (키는 이 기기 브라우저에만 저장)
@@ -1857,7 +1909,7 @@ const CAPTION_PROMPT=`PT 수업을 녹음한 소리입니다(트레이너와 회
 function summaryPrompt(R){
   const segs=R.segs.map((g,i)=>{ const [a,b]=segRange(R,i); const ok=g.reps.filter(r=>r.ok).length;
     return {i, 시간:`${fmtT(a)}-${fmtT(b)}`, 말한_운동이름:g.label||'', 동작_분석_패턴:g.name, 세트:g.sets, 반복:g.reps.length, 좋은_반복:ok,
-      판정:[...new Set(g.reps.filter(r=>!r.ok).map(r=>r.txt))].slice(0,3), 자막:capsOf(R,i).map(c=>c.text).slice(0,60)}; });
+      동작_인식:g.reps.length?'됨':'안 됨(말로만 나눈 구간)', 판정:[...new Set(g.reps.filter(r=>!r.ok).map(r=>r.txt))].slice(0,3), 자막:capsOf(R,i).map(c=>c.text).slice(0,60)}; });
   return `PT 수업 촬영 기록입니다. 카메라가 동작으로 나눈 운동 구간과, 그 시간에 들린 말(자막)이 있습니다.
 구간마다 정리하세요.
 - name: 운동 이름. 말에서 나온 이름을 우선, 없으면 동작 분석 패턴과 자막으로 가장 그럴듯한 한국어 운동 이름.
@@ -1895,10 +1947,17 @@ async function processSession(R){
   R.ai={state:'run',msg:'자막 추출 준비 중…'}; rerenderReview();
   if(c.key && c.model.startsWith('gemini') && R.audioBlob){
     try{
-      const chunks=await audioToWavChunks(R.audioBlob,240); caps=[];
+      let chunks;
+      try{ chunks=await audioToWavChunks(R.audioBlob,240); }
+      catch(e){ // 소리 변환이 안 되는 브라우저면 녹음 파일을 그대로 보냄
+        if(R.audioBlob.size>14*1024*1024) throw new Error('녹음이 너무 길어 이 기기에서 자막을 뽑지 못했어요');
+        const b=new Uint8Array(await R.audioBlob.arrayBuffer());
+        chunks=[{offset:0,b64:b64OfBytes(b),mime:(R.audioBlob.type||'audio/mp4').split(';')[0]}];
+      }
+      caps=[];
       for(let k=0;k<chunks.length;k++){
         R.ai.msg=`영상에서 자막 추출 중… (${k+1}/${chunks.length})`; rerenderReview();
-        const j=parseJSON(await aiCall(CAPTION_PROMPT,chunks[k].b64,'audio/wav'));
+        const j=parseJSON(await aiCall(CAPTION_PROMPT,chunks[k].b64,chunks[k].mime||'audio/wav'));
         (j.captions||[]).forEach(x=>{ if(x&&x.text&&isFinite(+x.start)) caps.push({start:+x.start+chunks[k].offset,end:(isFinite(+x.end)?+x.end:+x.start+2)+chunks[k].offset,text:String(x.text).trim()}); });
       }
     }catch(e){ caps=null; warn='소리에서 자막을 뽑지 못해 촬영 중 받아쓴 말로 대신했어요 ('+e.message+')'; }
@@ -1906,6 +1965,15 @@ async function processSession(R){
   else if(c.key && !R.audioBlob) warn='녹음된 소리가 없어 촬영 중 받아쓴 말로 자막을 만들었어요.';
   if(!caps) caps=(R.transcript||[]).map(x=>({start:Math.max(0,x.t-2),end:x.t+1,text:x.txt}));
   R.captions=caps.sort((a,b)=>a.start-b.start); buildVTT(R);
+  // 동작으로 나눈 구간이 없으면(반복을 못 잡았을 때) 말한 운동 이름으로 구간을 나눔
+  if(!R.segs.length && R.captions.length){
+    const dn=window.LiveCamDetectName||(()=>null), segs=[];
+    R.captions.forEach(c=>{ const nm=dn(c.text); const last=segs[segs.length-1];
+      if(nm && (!last || last.label!==nm)){ if(last) last.end=c.start; segs.push({cls:'other',name:'동작 인식 안 됨',label:nm,reps:[],sets:0,kws:[],w:null,lines:[],judged:0,start:c.start,end:R.duration||c.end}); } });
+    if(!segs.length) segs.push({cls:'other',name:'동작 인식 안 됨',label:null,reps:[],sets:0,kws:[],w:null,lines:[],judged:0,start:0,end:R.duration||R.captions[R.captions.length-1].end});
+    else segs[0].start=0;
+    R.segs=segs; R.speechOnly=true;
+  }
   // 자막에서 운동 이름이 나오면 그 구간 이름으로
   R.segs.forEach((g,i)=>{ if(!g.label){ const nm=capsOf(R,i).map(x=>x.text).join(' '); const hit=(window.LiveCamDetectName||(()=>null))(nm); if(hit) g.label=hit; } });
   if(!c.key){ localSummary(R); R.ai={state:'nokey'}; R.busy=false; saveSession(R); rerenderReview(); return; }

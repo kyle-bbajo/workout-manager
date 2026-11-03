@@ -326,6 +326,18 @@ input.nm{font:inherit;font-weight:800;font-size:16px;border:none;border-bottom:1
 .tline:first-of-type{border-top:none}
 .tline .tn{width:44px;flex:none;font-size:12px;color:var(--blue);font-weight:800}
 .pill.p-violet{background:#EDE9FE;color:#6D28D9}
+.sumgrid{display:grid;gap:10px}
+.sumbox{border:1px solid var(--line,#E5E7EB);border-radius:14px;padding:12px 14px;background:var(--bg2,#F9FAFB)}
+.sumbox.pay{background:#EFF6FF;border-color:#BFDBFE}
+.sumv{font-size:24px;font-weight:800;letter-spacing:-.02em;margin:2px 0 8px}
+.sumbox.pay .sumv{color:var(--blue)}
+.sumv small{font-size:13px;font-weight:600;margin-left:2px;color:var(--muted,#6B7280)}
+.sumrow{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13.5px;padding:3px 0}
+.sumrow i{font-style:normal;color:var(--muted,#6B7280);font-size:12px;margin-left:4px}
+.sum2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:2px}
+.sum2 .sumv{font-size:20px;margin:0 0 2px}
+.sumcap{font-size:12px;line-height:1.45;color:var(--muted,#6B7280)}
+.sumcap i{font-style:normal;font-size:11px;opacity:.8}
 
 .realbtn{display:flex;align-items:center;justify-content:center;gap:8px}
 </style>
@@ -2923,7 +2935,7 @@ function policy(){ return Object.assign({nsDeduct:true,nsPay:true},LS.get('aiwm_
 function noshows(){ return LS.get('aiwm_noshow',[]); }
 function unitPrice(mid){ const m=members.find(x=>x.id===mid); const c=m&&m.contracts&&m.contracts.slice().reverse().find(c=>+c.amount>0); return c?Math.round(c.amount/c.count):S.settle.price; }
 // 정산 방식: fixed 회당 고정 수당(원) · rate 매출 비율(%) · tier 이번 달 수업 수 구간별 비율
-function settleCfg(){ return Object.assign({mode:'rate',fixed:30000,price:S.settle.price,rate:S.settle.rate,bonusPay:'none',tierMode:'all',tiers:[{upto:40,pct:40},{upto:80,pct:50},{upto:null,pct:60}]},LS.get('aiwm_settle',{})); }
+function settleCfg(){ return Object.assign({mode:'rate',fixed:30000,price:S.settle.price,rate:S.settle.rate,bonusPay:'none',base:0,salesPct:0,tax:false,tierMode:'all',tiers:[{upto:40,pct:40},{upto:80,pct:50},{upto:null,pct:60}]},LS.get('aiwm_settle',{})); }
 function saveSettle(c){ LS.set('aiwm_settle',c); S.settle.price=c.price; S.settle.rate=c.rate; }
 function tierPct(c,n){ const t=c.tiers.find(t=>t.upto==null||n<=t.upto)||c.tiers[c.tiers.length-1]; return t?+t.pct:0; }
 function unitPriceC(mid,c){ const m=members.find(x=>x.id===mid); const k=m&&m.contracts&&m.contracts.slice().reverse().find(k=>+k.amount>0); return k?cUnit(k):c.price; }
@@ -2950,18 +2962,31 @@ function monthKey(d){ return (d||ymd(new Date())).slice(0,7); }
       out.push({id:'seed'+j+i,mid,name,n:Math.max(1,m.done-i),d:ymd(d),lt:time,t:min2hm(hm2min(time)+58+(i%3)*6),sig:wave(j+i),via:(j+i)%2?'member':'trainer',ts:d.getTime()}); }); });
   LS.set('aiwm_signs',out); })();
 function lessonTimeFor(mid,ds){ const x=sched().find(l=>l.mid===mid&&l.date===ds&&!isReq(l)); return x?x.time:''; }
-function monthDone(){ const mk=monthKey(), P=policy();
+function monthDone(mk){ mk=mk||monthKey(); const P=policy();
   const sg=signs().filter(s=>s.d.startsWith(mk)).map(s=>({kind:'sign',mid:s.mid,name:s.name,n:s.n,d:s.d,lt:s.lt||lessonTimeFor(s.mid,s.d),at:s.t,via:s.via,sig:s.sig,id:s.id}));
   const ns=noshows().filter(x=>x.d.startsWith(mk)&&P.nsPay).map(x=>({kind:'noshow',mid:x.mid,name:x.name,n:x.n,d:x.d,lt:x.lt,at:x.at,id:x.id}));
   return sg.concat(ns).sort((a,b)=>(b.d+b.lt).localeCompare(a.d+a.lt)); }
+// 정산 화면에서 보는 달 (기본: 이번 달)
+function stMonth(){ return S.stMonth||monthKey(); }
+function monthLabel(mk){ const [y,m]=mk.split('-'); return (y==String(new Date().getFullYear())?'':y+'년 ')+(+m)+'월'; }
+function shiftMonth(mk,k){ const [y,m]=mk.split('-').map(Number); const d=new Date(y,m-1+k,1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+// 그 달 등록 매출: 회원 계약 중 계약일이 그 달인 것 (첫 계약 = 신규, 이후 = 재등록)
+function monthSales(mk){ const out=[]; members.forEach(m=>(m.contracts||[]).forEach((c,i)=>{ if(+c.amount>0&&String(c.date||'').startsWith(mk)) out.push({mid:m.id,name:m.name,date:c.date,count:+c.count||0,bonus:+c.bonus||0,amount:+c.amount,pay:c.pay||'',kind:i===0?'신규':'재등록'}); }));
+  return out.sort((a,b)=>b.date.localeCompare(a.date)); }
+// 한 달 정산 요약: 등록 매출 + 수업 매출 / 수업 수당 + 매출 인센티브 + 기본급 (선택: 3.3% 공제)
+function settleSummary(mk){ mk=mk||stMonth(); const md=monthDone(mk), PR=payroll(md), c=PR.cfg, sales=monthSales(mk);
+  const salesAmt=sales.reduce((a,x)=>a+x.amount,0), incentive=Math.round(salesAmt*(+c.salesPct||0)/100), base=+c.base||0;
+  const gross=PR.total+incentive+base, tax=c.tax?Math.floor(gross*0.033/10)*10:0;
+  return {mk,md,PR,c,sales,salesAmt,lessonRev:PR.rev,lessonPay:PR.total,incentive,base,gross,tax,net:gross-tax,
+    nNew:sales.filter(x=>x.kind==='신규').length,nRe:sales.filter(x=>x.kind==='재등록').length}; }
 function todayLessons(){ const t=ymd(new Date()); return sched().filter(l=>l.date===t&&!isReq(l)).sort((a,b)=>a.time.localeCompare(b.time)).map(l=>{
   const sg=signs().find(s=>s.mid===l.mid&&s.d===t), ns=noshows().find(x=>x.lessonId===l.id);
   return Object.assign({},l,{state:ns?'noshow':sg?'done':'todo',sg,ns}); }); }
 function homeTiles(){
   const tl=todayLessons(), done=tl.filter(x=>x.state==='done').length, ns=tl.filter(x=>x.state==='noshow').length, md=monthDone();
-  const pay=payroll(md).total;
+  const pay=settleSummary(monthKey()).gross;
   const tile2=(act,label,val,status,cls)=>`<button class="tile tilebtn" data-act="${act}"><div class="tl">${label}</div><div class="tv">${numBig(String(val))}</div><span class="st ${cls}">${status}</span></button>`;
-  return `<div class="tiles">${tile2('tileToday','오늘 수업 (건)',tl.length,`완료 ${done}${ns?' · 노쇼 '+ns:''} · 남음 ${tl.length-done-ns}`,'gray')}${tile2('tileDone','수업 완료 (회)',md.length,'이번 달 · 서명 '+md.filter(x=>x.kind==='sign').length,'green')}${tile2('tilePay','정산 대기',Math.round(pay/10000)+'만','이번 달 예정','orange')}</div>`;
+  return `<div class="tiles">${tile2('tileToday','오늘 수업 (건)',tl.length,`완료 ${done}${ns?' · 노쇼 '+ns:''} · 남음 ${tl.length-done-ns}`,'gray')}${tile2('tileDone','수업 완료 (회)',md.length,'이번 달 · 서명 '+md.filter(x=>x.kind==='sign').length,'green')}${tile2('tilePay','이번 달 정산',Math.round(pay/10000)+'만','이번 달 예정','orange')}</div>`;
 }
 function rowLesson(x){ // 한 줄: 언제 · 누구 · 몇 회차 · 서명 몇 시
   const _m=members.find(y=>y.id===x.mid), _si=_m&&x.n?sessionInfo(_m,x.n):null; x=Object.assign({},x,{_bonus:_si&&_si.bonus});
@@ -2974,18 +2999,33 @@ function tileSheet(kind){
   if(kind==='today'){ const tl=todayLessons();
     return `<div class="modal"><div class="sheet" role="dialog" aria-label="오늘 수업"><h2>오늘 수업</h2><p class="muted" style="margin:0 0 10px">${mdLabel(ymd(new Date()))} · ${tl.length}건</p>
       ${tl.length?tl.map(x=>`${rowLesson(x)}${x.state==='todo'?`<div class="row" style="margin:-2px 0 10px 64px;gap:6px"><button class="btn sm" data-act="signHere" data-m="${x.mid}">서명받기</button><button class="btn sm sec" data-act="nsMark" data-id="${x.id}" style="color:var(--red)">노쇼 처리</button></div>`:x.state==='noshow'?`<div class="row" style="margin:-2px 0 10px 64px"><button class="btn sm sec" data-act="nsUndo" data-id="${x.ns.id}">노쇼 취소</button></div>`:x.sg?`<div style="margin:-2px 0 10px 64px;max-width:180px">${sigSVG(x.sg.sig,38)}</div>`:''}`).join(''):'<p class="muted">오늘 잡힌 수업이 없어요.</p>'}${close}</div></div>`; }
-  const md=monthDone(), PR=payroll(md), byM={}; md.forEach(x=>{ (byM[x.mid]=byM[x.mid]||{name:x.name,c:0,ns:0,bo:0,pay:0}); byM[x.mid].c++; if(x.kind==='noshow') byM[x.mid].ns++; if(PR.bonusIds[x.id]) byM[x.mid].bo++; byM[x.mid].pay+=PR.pay[x.id]||0; });
+  const _mk=kind==='pay'?stMonth():monthKey(), md=monthDone(_mk), PR=payroll(md), byM={}; md.forEach(x=>{ (byM[x.mid]=byM[x.mid]||{name:x.name,c:0,ns:0,bo:0,pay:0}); byM[x.mid].c++; if(x.kind==='noshow') byM[x.mid].ns++; if(PR.bonusIds[x.id]) byM[x.mid].bo++; byM[x.mid].pay+=PR.pay[x.id]||0; });
   if(kind==='done') return `<div class="modal"><div class="sheet" role="dialog" aria-label="수업 완료"><h2>이번 달 수업 완료</h2><p class="muted" style="margin:0 0 10px">${md.length}회 · 서명 ${md.filter(x=>x.kind==='sign').length} · 노쇼 ${md.filter(x=>x.kind==='noshow').length}</p>
       ${md.map(x=>`${rowLesson(x)}${x.sig?`<div style="margin:-2px 0 10px 64px;max-width:180px">${sigSVG(x.sig,38)}</div>`:''}`).join('')||'<p class="muted">이번 달 완료한 수업이 없어요.</p>'}${close}</div></div>`;
-  const total=PR.total;
-  return `<div class="modal"><div class="sheet" role="dialog" aria-label="정산 대기"><h2>정산 대기 · 이번 달</h2><p class="muted" style="margin:0 0 10px">서명 완료${policy().nsPay?' + 노쇼':''} 수업 기준 · ${PR.label}</p>
-    <div class="big" style="color:var(--blue);margin-bottom:8px">${fmt(total)}원</div>
+  const SS=settleSummary(_mk);
+  return `<div class="modal"><div class="sheet" role="dialog" aria-label="정산 내역"><h2>${monthLabel(_mk)} 정산 내역</h2><p class="muted" style="margin:0 0 10px">서명 완료${policy().nsPay?' + 노쇼':''} 수업 기준 · ${PR.label}</p>
+    ${summaryBlock(SS)}
+    <div class="secttl" style="margin-top:12px">회원별 수업 수당</div>
     <table class="t"><tr><th>회원</th><th>완료</th><th>회당 단가</th><th>수당</th></tr>${Object.entries(byM).map(([mid,v])=>`<tr><td>${esc(v.name)}</td><td>${v.c}회${v.ns?` <span class="muted">(노쇼 ${v.ns})</span>`:''}${v.bo?` <span class="muted">(보너스 ${v.bo})</span>`:''}</td><td>${fmt(unitPriceC(mid,PR.cfg))}</td><td><b>${fmt(v.pay)}</b></td></tr>`).join('')}</table>
     <div class="secttl" style="margin-top:12px">수업별 내역</div>${md.map(rowLesson).join('')}
+    ${SS.sales.length?`<div class="secttl" style="margin-top:12px">등록 내역</div>${salesRows(SS.sales)}`:''}
     <button class="btn full" data-act="copySettle2" style="margin-top:10px">센터 제출용 내역 복사</button>${close}</div></div>`;
 }
-function settleText(){ const md=monthDone(), PR=payroll(md);
-  return `${new Date().getMonth()+1}월 수업 정산 내역\n완료 ${md.length}회 · 매출 ${fmt(PR.rev)}원 · 정산 방식 ${PR.label} · 예상 수당 ${fmt(PR.total)}원\n\n`+md.slice().reverse().map(x=>`${x.d} ${x.lt||''} ${x.name} ${x.n?x.n+'회차':''} · ${x.kind==='noshow'?'노쇼':'서명 '+x.at+(x.via==='member'?'(회원폰)':'(트레이너폰)')} · ${fmt(PR.pay[x.id]||0)}원`).join('\n'); }
+function salesRows(L){ return `<table class="t"><tr><th>날짜</th><th>회원</th><th>횟수</th><th>금액</th></tr>${L.map(x=>`<tr><td>${x.date.slice(5).replace('-','/')}</td><td>${esc(x.name)} <span class="pill ${x.kind==='신규'?'p-blue':'p-green'}" style="font-size:10.5px">${x.kind}</span></td><td>${x.count}회${x.bonus?`<span class="muted">+${x.bonus}</span>`:''}</td><td>${fmt(x.amount)}</td></tr>`).join('')}</table>`; }
+// 매출 2줄 + 정산 금액 계산식
+function summaryBlock(S2){ const c=S2.c;
+  return `<div class="sumgrid"><div class="sumbox"><div class="muted">내 매출</div><div class="sum2">
+      <div><div class="sumv">${fmt(S2.salesAmt)}<small>원</small></div><div class="sumcap">등록 매출 · 신규 ${S2.nNew} · 재등록 ${S2.nRe}<br><i>이 달 받은 계약 금액</i></div></div>
+      <div><div class="sumv">${fmt(S2.lessonRev)}<small>원</small></div><div class="sumcap">수업 매출 · 완료 ${S2.md.length}회<br><i>진행한 수업 × 회당 단가</i></div></div></div></div>
+    <div class="sumbox pay"><div class="muted">나의 정산 금액</div><div class="sumv">${fmt(c.tax?S2.net:S2.gross)}<small>원${c.tax?' 실수령':''}</small></div>
+      <div class="sumrow"><span>수업 수당 <i>${S2.PR.label}</i></span><b>${fmt(S2.lessonPay)}</b></div>
+      ${+c.salesPct?`<div class="sumrow"><span>매출 인센티브 <i>등록 매출의 ${c.salesPct}%</i></span><b>${fmt(S2.incentive)}</b></div>`:''}
+      ${+c.base?`<div class="sumrow"><span>기본급</span><b>${fmt(S2.base)}</b></div>`:''}
+      ${c.tax?`<div class="sumrow"><span>합계 (세전)</span><b>${fmt(S2.gross)}</b></div><div class="sumrow"><span>3.3% 원천징수</span><b style="color:var(--red)">−${fmt(S2.tax)}</b></div>`:''}</div></div>`; }
+function settleText(){ const S2=settleSummary(), md=S2.md, PR=S2.PR, c=S2.c;
+  const head=`${monthLabel(S2.mk)} 정산 내역\n\n[매출]\n- 등록 매출 ${fmt(S2.salesAmt)}원 (신규 ${S2.nNew}건 · 재등록 ${S2.nRe}건)\n- 수업 매출 ${fmt(S2.lessonRev)}원 (완료 ${md.length}회)\n\n[정산] ${fmt(S2.gross)}원${c.tax?` · 3.3% 공제 후 ${fmt(S2.net)}원`:''}\n- 수업 수당 ${fmt(S2.lessonPay)}원 (${PR.label})`+(+c.salesPct?`\n- 매출 인센티브 ${fmt(S2.incentive)}원 (등록 매출의 ${c.salesPct}%)`:'')+(+c.base?`\n- 기본급 ${fmt(S2.base)}원`:'')
+    +(S2.sales.length?`\n\n[등록 내역]\n`+S2.sales.slice().reverse().map(x=>`${x.date} ${x.name} ${x.kind} ${x.count}회${x.bonus?'+보너스 '+x.bonus:''} · ${fmt(x.amount)}원${x.pay?' ('+x.pay+')':''}`).join('\n'):'');
+  return head+`\n\n[수업 내역]\n`+md.slice().reverse().map(x=>`${x.d} ${x.lt||''} ${x.name} ${x.n?x.n+'회차':''} · ${x.kind==='noshow'?'노쇼':'서명 '+x.at+(x.via==='member'?'(회원폰)':'(트레이너폰)')} · ${fmt(PR.pay[x.id]||0)}원`).join('\n'); }
 function noShow(lessonId){
   const l=sched().find(x=>x.id===lessonId); if(!l) return;
   const now=new Date(), m=members.find(x=>x.id===l.mid), P=policy();
@@ -3002,7 +3042,7 @@ function tileAct(act,a){
   switch(act){
     case 'tileToday': $('#modalRoot').innerHTML=tileSheet('today'); return true;
     case 'tileDone': $('#modalRoot').innerHTML=tileSheet('done'); return true;
-    case 'tilePay': $('#modalRoot').innerHTML=tileSheet('pay'); return true;
+    case 'tilePay': if(a.closest('.tiles')) S.stMonth=null; $('#modalRoot').innerHTML=tileSheet('pay'); return true;
     case 'tileClose': $('#modalRoot').innerHTML=''; keepScroll(render); return true;
     case 'nsMark': { const l=sched().find(x=>x.id===a.dataset.id); if(!l) return true;
       if(!confirm(`${l.name} ${mdLabel(l.date)} ${l.time} 수업을 노쇼로 처리할까요?${policy().nsDeduct?' 수강권이 1회 차감돼요.':''}`)) return true;
@@ -3016,12 +3056,17 @@ function tileAct(act,a){
 }
 // 정산 탭: 실제 서명·노쇼 기록으로 계산
 function tSettle(){
-  renderTop(`정산 · ${new Date().getMonth()+1}월`,false);
-  const md=monthDone(), PR=payroll(md), c=PR.cfg, P=policy(), n=md.length;
+  const mk=stMonth(), SS=settleSummary(mk);
+  renderTop(`정산 · ${monthLabel(mk)}`,false);
+  const md=SS.md, PR=SS.PR, c=PR.cfg, P=policy(), n=md.length;
   const byM={}; md.forEach(x=>{ (byM[x.mid]=byM[x.mid]||{name:x.name,c:0,s:0,ns:0,pay:0}); byM[x.mid].c++; x.kind==='sign'?byM[x.mid].s++:byM[x.mid].ns++; byM[x.mid].pay+=PR.pay[x.id]||0; });
   const help={fixed:'수업 1회를 하면 정해진 금액을 받아요. 회원이 낸 금액과 상관없어요. (예: 회당 3만 원)',rate:'회원이 낸 회당 금액(계약 금액 ÷ 횟수)의 몇 %를 받아요. (예: 7만 원 수업의 50% = 3.5만 원)',tier:'이번 달 수업 수가 많을수록 비율이 올라가요. (예: 40회까지 40%, 80회까지 50%, 그 이상 60%)'};
   const cur=c.tiers.findIndex(t=>t.upto==null||n<=t.upto), nextT=c.tiers[cur];
-  return `<div class="card"><h3>정산 방식</h3>
+  return `<div class="card"><div class="row" style="align-items:center;margin-bottom:10px"><button class="btn sm sec" data-act="stMonth" data-k="-1" aria-label="이전 달">‹</button><h3 class="sp" style="margin:0;text-align:center">${monthLabel(mk)} 정산 요약</h3><button class="btn sm sec" data-act="stMonth" data-k="1" aria-label="다음 달" ${mk>=monthKey()?'disabled':''}>›</button></div>
+    ${summaryBlock(SS)}
+    <button class="btn sec full" data-act="tilePay" style="margin-top:10px">수업별·등록별 내역 보기 ›</button></div>
+  <div class="card"><h3>${monthLabel(mk)} 등록 내역 <span class="muted" style="font-size:13px;font-weight:600">${fmt(SS.salesAmt)}원</span></h3>${SS.sales.length?salesRows(SS.sales):'<p class="muted" style="margin:0;font-size:13px">이 달 계약일로 등록된 계약이 없어요. 회원 → 계약 추가(재등록)에서 받은 금액을 넣으면 여기에 잡혀요.</p>'}</div>
+  <div class="card"><h3>정산 방식</h3>
     <div class="seg" role="group"><button class="${c.mode==='fixed'?'on':''}" data-act="stMode" data-v="fixed">회당 고정</button><button class="${c.mode==='rate'?'on':''}" data-act="stMode" data-v="rate">매출 비율</button><button class="${c.mode==='tier'?'on':''}" data-act="stMode" data-v="tier">구간별 비율</button></div>
     <p class="muted" style="margin:8px 0 10px;font-size:12.5px;line-height:1.55">${help[c.mode]}</p>
     ${c.mode==='fixed'?`<label class="field"><span>회당 수당 (원)</span><input type="number" inputmode="numeric" id="stFixed" value="${c.fixed}"></label>`:''}
@@ -3036,10 +3081,12 @@ function tSettle(){
     <div class="secttl" style="margin-top:12px">보너스(서비스) 수업 수당</div>
     <div class="seg" role="group"><button class="${c.bonusPay==='none'?'on':''}" data-act="bonusPay" data-v="none">지급 안 함</button><button class="${c.bonusPay==='unit'?'on':''}" data-act="bonusPay" data-v="unit">회당 단가로 지급</button></div>
     <p class="muted" style="margin:6px 0 0;font-size:12px">회원마다 회당 단가는 ‘받은 금액 ÷ 유료 횟수’예요. 보너스 회차는 매출에 넣지 않아요.</p>
+    <div class="secttl" style="margin-top:14px">그 밖의 급여 항목</div>
+    <label class="field"><span>등록 매출 인센티브 (%) · 신규·재등록 받은 금액 기준, 없으면 0</span><input type="number" inputmode="decimal" id="stSalesPct" value="${c.salesPct||0}"></label>
+    <label class="field"><span>기본급 (원) · 없으면 0</span><input type="number" inputmode="numeric" id="stBase" value="${c.base||0}"></label>
+    <div class="row" style="align-items:center;margin-top:4px"><span class="sp" style="font-size:14px">3.3% 원천징수 빼고 실수령 보기</span><button class="toggle ${c.tax?'on':''}" data-act="stTax" aria-pressed="${!!c.tax}" aria-label="3.3% 공제"></button></div>
     <button class="btn sm full" data-act="stSave" style="margin-top:10px">정산 방식 저장</button></div>
-  <button class="card tilebtn" data-act="tilePay" style="width:100%;text-align:left"><div class="muted">완료 수업 (서명${P.nsPay?' + 노쇼':''}) · ${PR.label}</div><div class="big">${n}회 <span class="muted" style="font-size:13px;font-weight:600">매출 ${fmt(PR.rev)}원</span></div>
-    <div class="muted" style="margin-top:8px">예상 정산금</div><div class="big" style="color:var(--blue)">${fmt(PR.total)}원</div><div class="muted" style="font-size:12px;margin-top:4px">눌러서 수업별 내역 보기 ›</div></button>
-  <div class="card"><h3>회원별 완료 수업</h3><table class="t"><tr><th>회원</th><th>완료</th><th>서명</th><th>수당</th></tr>${Object.values(byM).map(v=>`<tr><td>${esc(v.name)}</td><td>${v.c}회</td><td><span class="pill p-green">${v.s}/${v.c}</span>${v.ns?` <span class="pill p-red">노쇼 ${v.ns}</span>`:''}</td><td>${fmt(v.pay)}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">이번 달 기록이 없어요</td></tr>'}</table></div>
+  <div class="card"><h3>회원별 완료 수업 <span class="muted" style="font-size:13px;font-weight:600">${n}회</span></h3><table class="t"><tr><th>회원</th><th>완료</th><th>서명</th><th>수당</th></tr>${Object.values(byM).map(v=>`<tr><td>${esc(v.name)}</td><td>${v.c}회</td><td><span class="pill p-green">${v.s}/${v.c}</span>${v.ns?` <span class="pill p-red">노쇼 ${v.ns}</span>`:''}</td><td>${fmt(v.pay)}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">이번 달 기록이 없어요</td></tr>'}</table></div>
   <div class="card"><h3>노쇼 처리 규칙</h3>
     <div class="row" style="align-items:center"><span class="sp" style="font-size:14px">노쇼하면 수강권 1회 차감</span><button class="toggle ${P.nsDeduct?'on':''}" data-act="nsPolicy" data-k="nsDeduct" aria-pressed="${P.nsDeduct}" aria-label="노쇼 수강권 차감"></button></div>
     <div class="row" style="align-items:center;margin-top:8px"><span class="sp" style="font-size:14px">노쇼도 정산(수당)에 포함</span><button class="toggle ${P.nsPay?'on':''}" data-act="nsPolicy" data-k="nsPay" aria-pressed="${P.nsPay}" aria-label="노쇼 정산 포함"></button></div>
@@ -3050,13 +3097,15 @@ function tSettle(){
 }
 
 function readSettleForm(){ const c=settleCfg(), v=id=>{ const e=$('#'+id); return e?parseFloat(e.value):NaN; };
-  if(isFinite(v('stFixed'))) c.fixed=Math.max(0,v('stFixed')); if(isFinite(v('stPrice2'))) c.price=Math.max(0,v('stPrice2')); if(isFinite(v('stRate2'))) c.rate=Math.min(100,Math.max(0,v('stRate2')));
+  if(isFinite(v('stFixed'))) c.fixed=Math.max(0,v('stFixed')); if(isFinite(v('stPrice2'))) c.price=Math.max(0,v('stPrice2')); if(isFinite(v('stSalesPct'))) c.salesPct=Math.min(100,Math.max(0,v('stSalesPct'))); if(isFinite(v('stBase'))) c.base=Math.max(0,Math.round(v('stBase'))); if(isFinite(v('stRate2'))) c.rate=Math.min(100,Math.max(0,v('stRate2')));
   document.querySelectorAll('[data-tier]').forEach(e=>{ const t=c.tiers[+e.dataset.tier]; if(!t) return; const x=parseFloat(e.value); if(isFinite(x)) t[e.dataset.k]=e.dataset.k==='pct'?Math.min(100,Math.max(0,x)):Math.max(1,Math.round(x)); });
   return c; }
 function settleAct(act,a){
   switch(act){
     case 'stMode': { const c=readSettleForm(); c.mode=a.dataset.v; saveSettle(c); keepScroll(render); return true; }
     case 'tierMode': { const c=readSettleForm(); c.tierMode=a.dataset.v; saveSettle(c); keepScroll(render); return true; }
+    case 'stMonth': { const k=+a.dataset.k, nx=shiftMonth(stMonth(),k); S.stMonth=nx>=monthKey()?null:nx; keepScroll(render); return true; }
+    case 'stTax': { const c=readSettleForm(); c.tax=!c.tax; saveSettle(c); keepScroll(render); return true; }
     case 'bonusPay': { const c=readSettleForm(); c.bonusPay=a.dataset.v; saveSettle(c); keepScroll(render); return true; }
     case 'tierAdd': { const c=readSettleForm(), last=c.tiers[c.tiers.length-1], prev=c.tiers[c.tiers.length-2]; const start=prev?+prev.upto:0; c.tiers.splice(c.tiers.length-1,0,{upto:start+20,pct:Math.min(100,(+(prev||{pct:last.pct-10}).pct)+5)}); saveSettle(c); keepScroll(render); return true; }
     case 'tierDel': { const c=readSettleForm(); c.tiers.splice(+a.dataset.i,1); saveSettle(c); keepScroll(render); return true; }

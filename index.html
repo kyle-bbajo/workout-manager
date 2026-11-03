@@ -372,6 +372,16 @@ input.nm{font:inherit;font-weight:800;font-size:16px;border:none;border-bottom:1
 .rpx select{min-height:34px;border:1px solid var(--line);border-radius:8px;padding:0 8px;font:inherit;font-size:13px}
 .rpx-tg{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 2px}
 .rpx-tg span{font-size:11.5px;background:var(--bg2,#F3F4F6);border-radius:999px;padding:2px 8px;color:var(--ink2,#374151)}
+.phonebar{display:flex;align-items:center;gap:6px;padding:10px 12px;border-radius:12px;background:var(--bg2,#F9FAFB);border:1px solid var(--line,#E5E7EB)}
+.phonebar a.btn{text-decoration:none}
+.noteit{display:flex;align-items:flex-start;gap:8px;padding:9px 0;border-bottom:1px solid var(--line,#E5E7EB)}
+.noteit .pill{flex:none;margin-top:2px;font-size:11px}
+.noteit.pin{background:#FFFBEB;margin:0 -10px;padding:9px 10px;border-radius:10px;border-bottom:0}
+.notenew{margin-top:10px}
+.notenew .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.notenew .chip{border:1px solid var(--line,#E5E7EB);background:#fff;border-radius:999px;padding:5px 10px;font:inherit;font-size:12.5px;color:var(--ink2,#374151);cursor:pointer}
+.notenew .chip.on{background:var(--blue,#2563EB);border-color:var(--blue,#2563EB);color:#fff}
+.notenew textarea{width:100%;font:inherit;font-size:14px;border:1px solid var(--line,#E5E7EB);border-radius:10px;padding:8px 10px;margin-bottom:6px;resize:vertical}
 
 .realbtn{display:flex;align-items:center;justify-content:center;gap:8px}
 </style>
@@ -1426,6 +1436,7 @@ function tMemberDetail(id){
   return `
   <div class="card"><div class="row"><div class="av">혜</div><div class="sp"><b>혜원</b><div class="muted">수강권 17/20회 · 다음 수업 오늘 10:00</div></div><span class="pill p-orange">남은 3회</span></div>
     <div class="row" style="margin-top:12px"><button class="btn sm" data-act="reReport">재등록 리포트</button><button class="btn sm sec" data-act="startClass" data-id="hw">수업 시작</button></div></div>
+  ${memberInfoCard(members.find(x=>x.id==='hw'))}${noteCard('hw')}
   ${parqTrainerCard('hw')}
   <div class="card" style="display:none"><h3>PAR-Q+ · 건강 확인</h3>${needMedical()?'<span class="pill p-red">의료 확인 필요</span><p class="muted" style="margin:8px 0 0">추가 문항 ‘예’. 혼자 연습·루틴 추천 잠김. 의사 소견서를 올리면 풀립니다.</p>':parqYes()&&!S.parqFollow?'<span class="pill p-orange">추가 문항 확인 중</span>':'<span class="pill p-green">통과 · 10월 1일 작성</span>'}</div>
   ${focusCard('hw')}
@@ -2334,6 +2345,11 @@ function setupNotesCard(){ const all=LS.get('aiwm_setups',{}), L=Object.entries(
   return `<div class="card"><h3>내 기구 · 운동 세팅<span class="r">수업에서 정리</span></h3><p class="muted" style="margin:-4px 0 8px;font-size:12.5px">수업 때 트레이너가 말한 세팅이에요. 혼자 할 때 그대로 맞추세요.</p>${L.map(([nm,v])=>`<details class="setupitem"><summary><b>${esc(nm)}</b><span class="muted" style="font-size:12px">${new Date(v.date).getMonth()+1}/${new Date(v.date).getDate()} 수업</span></summary>${SETUP_KEYS.filter(([k])=>v.setup[k]).map(([k,l])=>`<div class="fd"><span>${l}</span><b>${esc(v.setup[k])}</b></div>`).join('')}</details>`).join('')}</div>`; }
 
 if(window.APP_BUILD){ S.meals=loadMeals(); const _ib=LS.get('aiwm_inbody',null); if(_ib) S.inbody=_ib; const _g=LS.get('aiwm_goal',null); if(_g) Object.assign(S.goal,_g); }
+// 시연 회원 기본 정보 (수정하면 저장된 값이 우선)
+const DEMO_INFO={hw:{phone:'010-2345-6789',gender:'여',birth:'1992-05-14',height:'163',goal:'체지방 줄이기 · 바른 자세',start:'2026-10-01'},
+  mj:{phone:'010-3456-7890',gender:'남',birth:'1988-11-02',height:'177',goal:'허리 통증 없이 데드리프트',start:'2026-09-15'},
+  sy:{phone:'010-4567-8901',gender:'여',birth:'1999-03-21',height:'160',goal:'체력 · 근력 기초',start:'2026-10-25'}};
+members.forEach(m=>{ const d=DEMO_INFO[m.id]; if(d) Object.keys(d).forEach(k=>{ if(m[k]==null||m[k]==='') m[k]=d[k]; }); });
 // ---------- 회원 추가 · 수정 (이 기기에 저장) ----------
 (function(){ const L=LS.get('aiwm_members',[]); L.forEach(m=>{ const ex=members.find(x=>x.id===m.id); if(ex) Object.assign(ex,m); else members.push(Object.assign({left:0,flag:null,last:'기록 없음',custom:true},m)); }); })();
 const PAYS=['카드','계좌이체','현금','기타'];
@@ -2345,7 +2361,7 @@ function cDisc(c){ return +c.list>0&&+c.amount>0&&+c.amount<+c.list?Math.round((
 function sessionInfo(m,n){ const L=(m&&m.contracts)||[]; let acc=0; for(const c of L){ const paid=+c.count||0, bonus=+c.bonus||0; if(n<=acc+paid) return {c,bonus:false,unit:cUnit(c)}; if(n<=acc+paid+bonus) return {c,bonus:true,unit:cUnit(c)}; acc+=paid+bonus; } return {c:null,bonus:false,unit:0}; }
 function syncTotal(m){ if(m.contracts&&m.contracts.length) m.total=contractTotal(m); }
 function won(n){ return (Math.round(+n||0)).toLocaleString('ko-KR')+'원'; }
-function ageOf(y){ y=+y; return y>1900?(new Date().getFullYear()-y)+'세':''; }
+function ageOf(b){ const s=String(b||''), y=+s.slice(0,4); if(!(y>1900)) return ''; const t=new Date(); let a=t.getFullYear()-y; if(s.length>=10&&s.slice(5,10)>String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0')) a--; return '만 '+a+'세'; }
 function saveMembers(){ LS.set('aiwm_members',members.filter(m=>m.custom).map(m=>({id:m.id,name:m.name,phone:m.phone||'',gender:m.gender||'',birth:m.birth||'',height:m.height||'',total:m.total,done:m.done,note:m.note||'',goal:m.goal||'',start:m.start||'',contracts:m.contracts||[],custom:true}))); }
 function ensureNext(m){ try{ if(typeof nextOf==='function') Object.defineProperty(m,'next',{get(){ return nextOf(m.id); },configurable:true}); }catch(e){} }
 function memberSheet(m){
@@ -2356,7 +2372,7 @@ function memberSheet(m){
     <div class="secttl">신상 정보</div>
     <label class="field"><span>이름</span><input type="text" id="mfName" value="${esc(f.name)}" placeholder="예: 김지훈" autocomplete="off"></label>
     <div class="grid2"><label class="field"><span>성별</span><select id="mfGender">${['','여','남'].map(g=>`<option value="${g}" ${f.gender===g?'selected':''}>${g||'선택 안 함'}</option>`).join('')}</select></label>
-      <label class="field"><span>출생 연도</span><input type="number" id="mfBirth" inputmode="numeric" value="${esc(f.birth||'')}" placeholder="예: 1992"></label></div>
+      <label class="field"><span>생년월일</span><input type="date" id="mfBirth" value="${/^\d{4}-\d{2}-\d{2}$/.test(f.birth||'')?esc(f.birth):''}"></label></div>
     <div class="grid2"><label class="field"><span>연락처</span><input type="tel" id="mfPhone" value="${esc(f.phone||'')}" placeholder="010-0000-0000"></label>
       <label class="field"><span>키 (cm)</span><input type="number" id="mfHeight" inputmode="decimal" value="${esc(f.height||'')}" placeholder="선택"></label></div>
     ${m?'':`<div class="secttl">계약</div>
@@ -2396,8 +2412,8 @@ function readContract(){ const v=id=>{ const e=$('#'+id); return e?Math.max(0,pa
 function memberCard(m){
   const today=ymd(new Date()), up=sched().filter(x=>x.mid===m.id&&x.date>=today).slice(0,5), left=Math.max(0,m.total-m.done);
   return `<div class="card"><div class="row"><div class="av">${esc(m.name[0]||'?')}</div><div class="sp"><b>${esc(m.name)}</b><div class="muted">수강권 ${m.done}/${m.total}회 · 다음 수업 ${m.next}</div></div><span class="pill ${left<=3?'p-orange':'p-green'}">남은 ${left}회</span></div>
-    ${m.custom?`<div class="kv" style="margin-top:10px"><span class="k">성별 · 나이</span><span class="v">${[m.gender,m.birth?ageOf(m.birth)+' ('+m.birth+')':''].filter(Boolean).join(' · ')||'-'}</span><span class="k">연락처</span><span class="v">${m.phone?`<a href="tel:${esc(m.phone)}">${esc(m.phone)}</a>`:'-'}</span>${m.height?`<span class="k">키</span><span class="v">${esc(m.height)}cm</span>`:''}${m.goal?`<span class="k">목표</span><span class="v">${esc(m.goal)}</span>`:''}${m.note?`<span class="k">메모</span><span class="v">${esc(m.note)}</span>`:''}</div>`:''}
-    <div class="row" style="margin-top:12px"><button class="btn sm" data-act="schedNew" data-m="${m.id}">수업 잡기</button><button class="btn sm sec" data-act="startClass" data-id="${m.id}">수업 시작</button>${m.custom?`<button class="btn sm sec" data-act="memEdit" data-id="${m.id}">정보 수정</button>`:''}</div></div>
+    <div class="row" style="margin-top:12px"><button class="btn sm" data-act="schedNew" data-m="${m.id}">수업 잡기</button><button class="btn sm sec" data-act="startClass" data-id="${m.id}">수업 시작</button></div></div>
+  ${memberInfoCard(m)}${noteCard(m.id)}
   <div class="card"><h3>수강권 · 계약</h3><div class="row" style="align-items:center"><span class="sp">한 수업 <b>${m.done}</b> / 계약 ${m.total}회</span><button class="btn sm sec" data-act="memDone" data-id="${m.id}" data-v="-1" aria-label="한 수업 1회 빼기">−1</button><button class="btn sm" data-act="memDone" data-id="${m.id}" data-v="1" aria-label="한 수업 1회 더하기">+1</button></div>
     ${(m.contracts||[]).length?`<table class="t" style="margin-top:10px"><tr><th>계약일</th><th>횟수</th><th>받은 금액</th><th>회당</th><th></th></tr>${m.contracts.map(c=>`<tr><td>${c.date.slice(2).replace(/-/g,'.')}</td><td>${c.count}회${+c.bonus?`<br><span class="muted" style="font-size:11px">+보너스 ${c.bonus}</span>`:''}</td><td>${c.amount?won(c.amount):'-'}${cDisc(c)?`<br><span class="muted" style="font-size:11px">할인 ${cDisc(c)}%</span>`:''}</td><td>${cUnit(c)?won(cUnit(c)):'-'}</td><td><button class="btn sm sec" data-act="cfDel" data-id="${m.id}" data-c="${c.id}" aria-label="이 계약 삭제" style="padding:2px 8px">×</button></td></tr>`).join('')}</table>
     <div class="kv" style="margin-top:8px"><span class="k">총 계약</span><span class="v">${contractTotal(m)}회 (보너스 ${m.contracts.reduce((x,c)=>x+(+c.bonus||0),0)}회) · ${won(m.contracts.reduce((x,c)=>x+(+c.amount||0),0))}</span><span class="k">지금 회차</span><span class="v">${(()=>{ const si=sessionInfo(m,m.done+1); return `${m.done+1}회차 · ${si.c?(si.bonus?'보너스 수업':'유료 · 회당 '+won(si.unit)):'계약 범위 밖'}`; })()}</span><span class="k">결제</span><span class="v">${[...new Set(m.contracts.map(c=>c.pay))].join(', ')}</span></div>`:'<p class="muted" style="margin:8px 0 0">계약 기록이 없어요.</p>'}
@@ -2414,7 +2430,7 @@ function tMembers(){
   const list=members.filter(m=>!q||m.name.includes(q));
   return `<button class="btn full" data-act="memNew" style="margin-bottom:12px">${I.plus} 회원 추가</button>
   ${members.length>5?`<label class="field"><input type="search" id="memQ" value="${esc(q)}" placeholder="회원 이름 검색"></label>`:''}
-  <div class="card">${list.map(m=>{ const left=Math.max(0,m.total-m.done); return `<button class="list-item" data-act="memberDetail" data-id="${m.id}"><div class="av">${esc(m.name[0]||'?')}</div><div class="sp"><b>${esc(m.name)}</b><div class="muted">수강권 ${m.done}/${m.total}회 · 다음 ${m.next}</div></div>${m.custom?(left<=3?'<span class="pill p-orange">재등록 시기</span>':'<span class="pill p-green">남은 '+left+'회</span>'):m.flag==='re'?'<span class="pill p-orange">재등록 시기</span>':m.flag==='idle'?'<span class="pill p-red">기록 없음 7일</span>':'<span class="pill p-green">정상</span>'}${m.id==='hw'&&needMedical()?'<span class="pill p-red">의료 확인</span>':''}</button>`; }).join('')||'<p class="muted" style="margin:0">찾는 회원이 없어요.</p>'}</div>
+  <div class="card">${list.map(m=>{ const left=Math.max(0,m.total-m.done); return `<button class="list-item" data-act="memberDetail" data-id="${m.id}"><div class="av">${esc(m.name[0]||'?')}</div><div class="sp"><b>${esc(m.name)}</b>${hasCaution(m.id)?' <span class="pill p-red" style="font-size:10.5px;padding:1px 6px">특이사항</span>':''}<div class="muted">수강권 ${m.done}/${m.total}회 · 다음 ${m.next}</div></div>${m.custom?(left<=3?'<span class="pill p-orange">재등록 시기</span>':'<span class="pill p-green">남은 '+left+'회</span>'):m.flag==='re'?'<span class="pill p-orange">재등록 시기</span>':m.flag==='idle'?'<span class="pill p-red">기록 없음 7일</span>':'<span class="pill p-green">정상</span>'}${m.id==='hw'&&needMedical()?'<span class="pill p-red">의료 확인</span>':''}</button>`; }).join('')||'<p class="muted" style="margin:0">찾는 회원이 없어요.</p>'}</div>
   <p class="foot">회원 정보는 이 휴대폰에 저장됩니다 · 회원 앱 초대는 서버를 붙인 뒤 제공</p>`;
 }
 function memAct(act,a){
@@ -2428,9 +2444,9 @@ function memAct(act,a){
     case 'memClose': $('#modalRoot').innerHTML=''; return true;
     case 'memSave': { const name=($('#mfName').value||'').trim(); if(!name){ toast('이름을 넣어 주세요'); return true; }
       const val=id=>{ const e=$('#'+id); return e?(e.value||'').trim():''; };
-      const v={name,phone:val('mfPhone'),gender:val('mfGender'),birth:val('mfBirth'),height:val('mfHeight'),goal:val('mfGoal'),note:val('mfNote')};
+      const v={name,phone:val('mfPhone'),gender:val('mfGender'),birth:val('mfBirth')||(a.dataset.id&&(find(a.dataset.id)||{}).birth)||'',height:val('mfHeight'),goal:val('mfGoal'),note:val('mfNote')};
       let m=a.dataset.id&&find(a.dataset.id);
-      if(m){ Object.assign(m,v); sched().forEach(x=>{ if(x.mid===m.id) x.name=m.name; }); saveSched(); }
+      if(m){ Object.assign(m,v); m.custom=true; if(!m.contracts) m.contracts=[{id:'c0',date:m.start||ymd(new Date()),count:m.total,amount:0,pay:'기타'}]; sched().forEach(x=>{ if(x.mid===m.id) x.name=m.name; }); saveSched(); }
       else { const c=readContract(); m=Object.assign({id:'u'+Date.now().toString(36),left:0,flag:null,last:'기록 없음',custom:true,start:c.date,contracts:[c],total:c.count+(+c.bonus||0),done:Math.min(c.count,Math.max(0,parseInt(val('mfDone'),10)||0))},v); members.push(m); ensureNext(m); }
       saveMembers(); $('#modalRoot').innerHTML='';
       if(a.dataset.id){ keepScroll(render); toast('회원 정보를 저장했어요'); } else { S.tab='members'; go('member',m.id); toast(`${m.name} 회원을 추가했어요 · 첫 수업을 잡아 보세요`); }
@@ -2445,6 +2461,41 @@ function memAct(act,a){
   return false;
 }
 function bindMemberSearch(){ const q=$('#memQ'); if(q) q.addEventListener('input',()=>{ S.memQ=q.value; const pos=q.selectionStart; keepScroll(render); const n=$('#memQ'); if(n){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} } }); }
+
+// ---------- 회원 정보 카드 · 특이사항 ----------
+function telHref(p){ return String(p||'').replace(/[^0-9+]/g,''); }
+function memberInfoCard(m){ if(!m) return '';
+  const age=m.birth&&typeof ageOf==='function'?ageOf(m.birth):'', left=Math.max(0,(+m.total||0)-(+m.done||0));
+  const kv=(k,v)=>v?`<span class="k">${k}</span><span class="v">${v}</span>`:'';
+  return `<div class="card"><h3>회원 정보<button class="btn sm sec" data-act="memEdit" data-id="${m.id}" style="margin-left:auto">정보 수정</button></h3>
+    ${m.phone?`<div class="phonebar"><div class="sp"><div class="muted" style="font-size:12px">휴대폰</div><b style="font-size:17px;letter-spacing:.01em">${esc(m.phone)}</b></div>
+      <a class="btn sm" href="tel:${telHref(m.phone)}">전화</a><a class="btn sm sec" href="sms:${telHref(m.phone)}">문자</a><button class="btn sm sec" data-act="copyPhone" data-v="${esc(m.phone)}">복사</button></div>`:`<p class="muted" style="margin:0 0 8px;font-size:13px">휴대폰 번호가 없어요 · 정보 수정에서 넣어 주세요</p>`}
+    <div class="kv" style="margin-top:8px">${kv('성별 · 나이',[m.gender,age].filter(Boolean).map(esc).join(' · '))}${kv('생년월일',m.birth?esc(m.birth):'')}${kv('키',m.height?esc(m.height)+'cm':'')}${kv('목표',m.goal?esc(m.goal):'')}${kv('등록일',m.start?esc(m.start):'')}${kv('수강권',`${m.done}/${m.total}회 · 남은 ${left}회`)}</div></div>`; }
+const NOTE_TAGS=[['injury','부상 · 통증','p-red'],['health','건강 · 약','p-orange'],['pref','성향 · 선호','p-blue'],['sched','일정 · 연락','p-gray'],['etc','기타','p-gray']];
+function memNotes(mid){ const all=LS.get('aiwm_memnotes',{}); let L=all[mid];
+  if(!L){ const m=members.find(x=>x.id===mid); L=[]; if(m&&m.note) L.push({id:'n0',tag:'etc',t:m.note,d:m.start||ymd(new Date())});
+    if(mid==='hw'&&!all.hw) L.push({id:'d1',tag:'injury',t:'왼쪽 무릎 안쪽 가끔 시큰함 · 깊은 런지 주의',d:'2026-10-01',pin:true},{id:'d2',tag:'pref',t:'숫자로 설명하는 것 선호 · 칭찬에 동기부여 큼',d:'2026-10-08'},{id:'d3',tag:'sched',t:'수요일은 야근 많음 · 오전 수업 선호',d:'2026-10-15'});
+    if(mid==='mj'&&!all.mj) L.push({id:'d1',tag:'injury',t:'허리 디스크 이력(L4-5) · 굴곡 동작 무게 천천히',d:'2026-09-15',pin:true}); }
+  return L.slice().sort((a,b)=>(b.pin?1:0)-(a.pin?1:0)||String(b.d).localeCompare(String(a.d))); }
+function saveNotes(mid,L){ const all=LS.get('aiwm_memnotes',{}); all[mid]=L; LS.set('aiwm_memnotes',all); }
+function hasCaution(mid){ return memNotes(mid).some(x=>x.tag==='injury'||x.tag==='health'); }
+function noteCard(mid){ const L=memNotes(mid), sel=S.noteTag||'injury';
+  return `<div class="card"><h3>특이사항<span class="r">${L.length}개</span></h3>
+    ${L.map(x=>{ const tg=NOTE_TAGS.find(t=>t[0]===x.tag)||NOTE_TAGS[4]; return `<div class="noteit ${x.pin?'pin':''}"><span class="pill ${tg[2]}">${tg[1]}</span><div class="sp"><div style="font-size:14px;line-height:1.5">${esc(x.t)}</div><div class="muted" style="font-size:11.5px">${esc(String(x.d||'').slice(2).replace(/-/g,'.'))}${x.pin?' · 맨 위 고정':''}</div></div>
+      <button class="btn sm ghost" data-act="notePin" data-m="${mid}" data-id="${x.id}" aria-label="${x.pin?'고정 풀기':'맨 위 고정'}" style="padding:2px 6px">${x.pin?'고정됨':'고정'}</button><button class="btn sm ghost" data-act="noteDel" data-m="${mid}" data-id="${x.id}" aria-label="특이사항 지우기" style="padding:2px 8px">×</button></div>`; }).join('')||'<p class="muted" style="margin:0 0 8px;font-size:13px">부상, 통증, 복용 약, 성향, 일정처럼 수업 때 알아야 할 것을 적어 두세요.</p>'}
+    <div class="notenew"><div class="chips">${NOTE_TAGS.map(t=>`<button class="chip ${sel===t[0]?'on':''}" data-act="noteTag" data-v="${t[0]}">${t[1]}</button>`).join('')}</div>
+      <textarea id="noteText" rows="2" placeholder="예: 오른쪽 어깨 수술 이력 · 머리 위로 드는 동작 주의"></textarea>
+      <button class="btn sm full" data-act="noteAdd" data-m="${mid}">${I.plus} 특이사항 추가</button></div></div>`; }
+function noteAct(act,a){
+  switch(act){
+    case 'noteTag': { const t=$('#noteText'), keep=t?t.value:''; S.noteTag=a.dataset.v; keepScroll(render); const t2=$('#noteText'); if(t2){ t2.value=keep; } return true; }
+    case 'noteAdd': { const mid=a.dataset.m, t=(($('#noteText')||{}).value||'').trim(); if(!t){ toast('내용을 적어 주세요'); return true; }
+      const L=memNotes(mid); L.push({id:'n'+Date.now().toString(36),tag:S.noteTag||'injury',t,d:ymd(new Date())}); saveNotes(mid,L); keepScroll(render); toast('특이사항을 추가했어요'); return true; }
+    case 'noteDel': { const mid=a.dataset.m; if(!confirm('이 특이사항을 지울까요?')) return true; saveNotes(mid,memNotes(mid).filter(x=>x.id!==a.dataset.id)); keepScroll(render); return true; }
+    case 'notePin': { const mid=a.dataset.m, L=memNotes(mid), x=L.find(x=>x.id===a.dataset.id); if(x) x.pin=!x.pin; saveNotes(mid,L); keepScroll(render); return true; }
+    case 'copyPhone': { try{ navigator.clipboard.writeText(a.dataset.v).then(()=>toast('번호를 복사했어요'),()=>toast(a.dataset.v)); }catch(e){ toast(a.dataset.v); } return true; }
+  }
+  return false; }
 
 // ---------- 트레이너 스케줄 (주간 · 월간 드롭다운 · 수업 중 예약) ----------
 const DOW='일월화수목금토';
@@ -3437,6 +3488,7 @@ document.addEventListener('click',e=>{
   if(tileAct(act,a)) return;
   if(uploadAct(act,a)) return;
   if(settleAct(act,a)) return;
+  if(noteAct(act,a)) return;
   switch(act){
     case 'back':
       if(S.role==='trainer'){ if(S.sub==='kakao') go('review'); else if(S.sub==='review') go(null); else go(null);} else go(null); break;

@@ -652,11 +652,8 @@ async function rtmRefine(src, lm, W, H){
   if (!(bw > 4 && bh > 4)) return lm;
   const ar = RTM_IN_W / RTM_IN_H; if (bw > bh * ar) bh = bw / ar; else bw = bh * ar; bw *= 1.25; bh *= 1.25;
   const box = { x: cx - bw / 2, y: cy - bh / 2, w: bw, h: bh }, t0 = performance.now();
-  // 처음 한 번: 입력 정규화 방식을 점수로 자동 선택 (모델마다 내보낸 방식이 달라서)
-  if (!RTM.norm){ let best = null;
-    for (const nm of ['rgb', 'bgr', 'raw']){ try { const o = await RTM.session.run({ [RTM.inName]: rtmTensor(src, W, H, box, nm) }); const kp = rtmDecode(o, box, W, H);
-      const sc = kp.slice(0, 17).reduce((a, k) => a + k.s, 0) / 17; if (!best || sc > best.sc) best = { nm, sc }; } catch (e) {} }
-    RTM.norm = best ? best.nm : 'rgb'; }
+  // 학습 설정(MMPose: RGB, mean 123.675/116.28/103.53, std 58.395/57.12/57.375)과 같게
+  if (!RTM.norm) RTM.norm = (window.APP_CONFIG && window.APP_CONFIG.rtmNorm) || 'rgb';
   const out = await RTM.session.run({ [RTM.inName]: rtmTensor(src, W, H, box, RTM.norm) });
   const kp = rtmDecode(out, box, W, H); RTM.ms = RTM.ms * 0.9 + (performance.now() - t0) * 0.1; RTM.n++;
   const res = lm.map(p => ({ x: p.x, y: p.y, z: p.z, visibility: p.visibility }));

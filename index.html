@@ -298,6 +298,11 @@ input.nm{font:inherit;font-weight:800;font-size:16px;border:none;border-bottom:1
 .rp-ta{font:inherit;font-size:13.5px;width:100%;border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0 4px;resize:vertical;line-height:1.5}
 .rpf{border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin-bottom:8px}
 .rpf select{min-height:34px;border:1px solid var(--line);border-radius:8px;padding:0 8px;font:inherit;font-size:13px}
+.tilebtn{cursor:pointer;font:inherit;color:inherit}
+.tilebtn:active{transform:scale(.98)}
+.lrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.lrow .lt{width:54px;display:flex;flex-direction:column;font-size:12px;color:var(--ink3);line-height:1.3}.lrow .lt b{color:var(--ink);font-size:12.5px}
+.wkb.ns{background:#FEE2E2!important;border-color:#DC2626!important;color:#991B1B!important;text-decoration:line-through}
 
 .realbtn{display:flex;align-items:center;justify-content:center;gap:8px}
 </style>
@@ -1174,14 +1179,14 @@ function gridItem(act,label,icon,tone,tag,arg){
 function tHome(){
   renderTop('',false,true);
   return `
-  <div class="hello"><b class="hl">코치님</b>, 오늘 수업 3건이에요</div>
+  <div class="hello"><b class="hl">코치님</b>, 오늘 수업 ${todayLessons().length}건이에요</div>
   <div class="hs">
     <div class="hcard"><span class="tag o">이번 주</span><div><b>재등록 상담 시기</b><div class="muted">혜원 · 남은 수업 3회 · 성과 요약 준비됨</div></div><button class="btn sm sec" data-act="reReport">보기</button></div>
     <div class="hcard"><span class="tag r">확인 필요</span><div><b>이탈 신호</b><div class="muted">민준 · 7일째 혼자 운동·식단 기록 없음</div></div><button class="btn sm sec" data-act="memberDetail" data-id="mj">보기</button></div>
     ${needMedical()?'<div class="hcard"><span class="tag r">건강</span><div><b>의료 확인 필요</b><div class="muted">혜원 · PAR-Q+ 추가 문항 예</div></div><button class="btn sm sec" data-act="memberDetail" data-id="hw">보기</button></div>':''}
   </div>
   <button class="banner" data-act="startClass" data-id="hw"><span><small>10:00 · 혜원 17회차</small><b>수업 촬영 시작</b></span><span class="arr">›</span></button>
-  <div class="tiles">${tile('오늘 수업 (건)','3','진행 전','gray',true)}${tile('확인 대기 (건)','2','식단 1 · 연습 1','orange')}${tile('이번 달 (회)','46','정산 '+fmt(46*S.settle.price*S.settle.rate/100/10000)+'만','green')}</div>
+  ${homeTiles()}
   <div class="card grid5">
     ${gridItem('startClass','수업 촬영',I.cam,'t-red','',`hw`)}${gridItem('goTab','회원',I.users,'t-blue','')}${gridItem('goTab2','스케줄',I.cal,'t-green','요청 1')}${gridItem('goTab3','정산',I.won,'t-amber','')}${gridItem('reReport','재등록 리포트',I.note,'t-violet','1명')}
   </div>
@@ -1401,7 +1406,7 @@ function tKakao(){
   <button class="btn full" data-act="send">보내기</button>
   <p class="foot">시연용: 실제 앱에서는 카카오톡 공유 창이 열립니다</p>`;
 }
-function tSettle(){
+function tSettleDemo(){
   renderTop('정산 · 10월',false);
   const st=S.settle, n=46;
   const pay = st.mode==='fixed'? n*st.price*st.rate/100 : n*st.price*st.rate/100;
@@ -2338,7 +2343,7 @@ function tSchedule(){
       ${(()=>{ const A=avail(); return days.map((d,i)=>{ const a=A[parseYmd(d).getDay()], L=`left:calc(30px + ${i} * (100% - 30px) / 7)`; const blk=(m0,m1)=>{ m0=Math.max(m0,H0*60); m1=Math.min(m1,H1*60); return m1>m0?`<div class="wkoff" style="${L};top:${(m0-H0*60)/60*ROW}px;height:${(m1-m0)/60*ROW}px"></div>`:''; };
         if(!a.on) return blk(H0*60,H1*60);
         return blk(H0*60,hm2min(a.s))+blk(hm2min(a.e),H1*60)+(A.brk.on?blk(hm2min(A.brk.s),hm2min(A.brk.e)):''); }).join(''); })()}
-      ${days.map((d,i)=>lessonsOn(d).map(x=>{ const top=(hm2min(x.time)-H0*60)/60*ROW, h=Math.max(18,x.dur/60*ROW-2); return `<button class="wkb${x.mid==='hw'?' c1':x.mid==='mj'?' c2':x.mid==='sy'?' c3':''}${isReq(x)?' req':''}" data-act="${isReq(x)?'reqView':'schedEdit'}" data-id="${x.id}" style="left:calc(30px + ${i} * (100% - 30px) / 7 + 1px);top:${top}px;height:${h}px" aria-label="${mdLabel(d)} ${x.time} ${x.name}"><b>${isReq(x)?'요청 · ':''}${x.name}</b><span>${x.time}</span></button>`; }).join('')).join('')}
+      ${days.map((d,i)=>lessonsOn(d).map(x=>{ const top=(hm2min(x.time)-H0*60)/60*ROW, h=Math.max(18,x.dur/60*ROW-2); return `<button class="wkb${x.mid==='hw'?' c1':x.mid==='mj'?' c2':x.mid==='sy'?' c3':''}${isReq(x)?' req':''}${x.st==='noshow'?' ns':''}" data-act="${isReq(x)?'reqView':'schedEdit'}" data-id="${x.id}" style="left:calc(30px + ${i} * (100% - 30px) / 7 + 1px);top:${top}px;height:${h}px" aria-label="${mdLabel(d)} ${x.time} ${x.name}"><b>${isReq(x)?'요청 · ':x.st==='noshow'?'노쇼 · ':''}${x.name}</b><span>${x.time}</span></button>`; }).join('')).join('')}
       ${days.includes(today)?(()=>{ const nm=new Date().getHours()*60+new Date().getMinutes(); const i=days.indexOf(today); return nm>=H0*60&&nm<=H1*60?`<div class="wknow" style="left:calc(30px + ${i} * (100% - 30px) / 7);top:${(nm-H0*60)/60*ROW}px"></div>`:''; })():''}
     </div>
     <p class="muted" style="margin:8px 2px 0;font-size:12px">빈 칸을 누르면 그 시간에 수업을 잡고, 수업을 누르면 바꾸거나 취소할 수 있어요.</p>
@@ -2373,6 +2378,7 @@ function schedSheet(f){
     <label class="field"><span>메모 (선택)</span><input type="text" id="sfNote" value="${f.note||''}" placeholder="예: 하체 · 스쿼트 무게 올리기"></label>
     <div id="sfWarn">${warnHTML(f)}</div>
     ${mem?`<p class="muted" style="margin:0 0 10px;font-size:12.5px">${mem.name} 다음 수업: ${nextOf(mem.id)}${left!=null?` · 남은 수강권 ${left}회 (예약 제외)`:''}</p>`:''}
+    ${f.id&&f.st!=='noshow'&&f.date<=ymd(new Date())?`<button class="btn sec full" data-act="nsMark" data-id="${f.id}" style="color:var(--red);margin-bottom:8px">노쇼 처리${policy().nsDeduct?' (수강권 차감)':''}</button>`:''}${f.st==='noshow'?'<div class="alert o" style="margin:0 0 10px"><div><b>노쇼로 처리된 수업</b></div></div>':''}
     <div class="row"><button class="btn" data-act="schedSave" style="flex:1">${f.id?'저장':'잡기'}</button>${f.id?'<button class="btn sec" data-act="schedDel" style="background:var(--red-soft);color:var(--red)">취소하기</button>':''}<button class="btn sec" data-act="schedClose">닫기</button></div>
   </div></div>`;
 }
@@ -2489,6 +2495,7 @@ function signScreen(){
 function linkBase(){ return location.origin+location.pathname; }
 function shareOrCopy(text,url,okMsg){ if(navigator.share){ navigator.share({text,url}).catch(()=>{}); } else { try{ navigator.clipboard.writeText(text+'\n'+url).then(()=>toast(okMsg||'링크를 복사했어요'),()=>toast('복사가 막혀 있어요')); }catch(e){ toast('복사가 막혀 있어요'); } } }
 function recordSign(r){
+  if(!r.lt){ const l=sched().find(x=>x.mid===r.mid&&x.date===r.d&&x.st!=='req'); if(l) r.lt=l.time; } // 그 날 잡힌 수업 시각
   addSign(r);
   const m=members.find(x=>x.id===r.mid);
   if(m){ m.done=Math.min(m.total,Math.max(m.done,r.n)); if(m.custom) saveMembers(); else { m.custom=true; m.contracts=m.contracts||[{id:'c0',date:m.start||ymd(new Date()),count:m.total,amount:0,pay:'기타'}]; saveMembers(); } }
@@ -2766,6 +2773,105 @@ function handleParqHash(){
 }
 handleParqHash(); window.addEventListener('hashchange',()=>{ if(handleParqHash()) render(); });
 
+// ---------- 오늘 수업 · 수업 완료 · 정산 대기 (눌러서 상세) + 노쇼 처리 ----------
+function policy(){ return Object.assign({nsDeduct:true,nsPay:true},LS.get('aiwm_policy',{})); }
+function noshows(){ return LS.get('aiwm_noshow',[]); }
+function unitPrice(mid){ const m=members.find(x=>x.id===mid); const c=m&&m.contracts&&m.contracts.slice().reverse().find(c=>+c.amount>0); return c?Math.round(c.amount/c.count):S.settle.price; }
+function payOf(mid){ return Math.round(unitPrice(mid)*S.settle.rate/100); }
+function monthKey(d){ return (d||ymd(new Date())).slice(0,7); }
+// 처음 열 때 이번 달 예시 서명 기록을 몇 건 넣어 둠 (시연용)
+(function(){ if(LS.get('aiwm_signs',null)) return; const t=new Date(), out=[]; const wave=k=>encSig([[...Array(14)].map((_,i)=>[0.1+i*0.06,0.5+Math.sin(i/2+k)*0.25]),[[0.2,0.75],[0.5,0.78],[0.8,0.72]]]);
+  const plan=[['hw','혜원','10:00',[2,5,7,9]],['mj','민준','14:00',[1,6,8]],['sy','서연','19:30',[1,4]]];
+  plan.forEach(([mid,name,time,backs],j)=>{ const m=members.find(x=>x.id===mid)||{done:1};
+    backs.forEach((k,i)=>{ const d=new Date(t.getFullYear(),t.getMonth(),t.getDate()-k);
+      out.push({id:'seed'+j+i,mid,name,n:Math.max(1,m.done-i),d:ymd(d),lt:time,t:min2hm(hm2min(time)+58+(i%3)*6),sig:wave(j+i),via:(j+i)%2?'member':'trainer',ts:d.getTime()}); }); });
+  LS.set('aiwm_signs',out); })();
+function lessonTimeFor(mid,ds){ const x=sched().find(l=>l.mid===mid&&l.date===ds&&!isReq(l)); return x?x.time:''; }
+function monthDone(){ const mk=monthKey(), P=policy();
+  const sg=signs().filter(s=>s.d.startsWith(mk)).map(s=>({kind:'sign',mid:s.mid,name:s.name,n:s.n,d:s.d,lt:s.lt||lessonTimeFor(s.mid,s.d),at:s.t,via:s.via,sig:s.sig,id:s.id}));
+  const ns=noshows().filter(x=>x.d.startsWith(mk)&&P.nsPay).map(x=>({kind:'noshow',mid:x.mid,name:x.name,n:x.n,d:x.d,lt:x.lt,at:x.at,id:x.id}));
+  return sg.concat(ns).sort((a,b)=>(b.d+b.lt).localeCompare(a.d+a.lt)); }
+function todayLessons(){ const t=ymd(new Date()); return sched().filter(l=>l.date===t&&!isReq(l)).sort((a,b)=>a.time.localeCompare(b.time)).map(l=>{
+  const sg=signs().find(s=>s.mid===l.mid&&s.d===t), ns=noshows().find(x=>x.lessonId===l.id);
+  return Object.assign({},l,{state:ns?'noshow':sg?'done':'todo',sg,ns}); }); }
+function homeTiles(){
+  const tl=todayLessons(), done=tl.filter(x=>x.state==='done').length, ns=tl.filter(x=>x.state==='noshow').length, md=monthDone();
+  const pay=md.reduce((a,x)=>a+payOf(x.mid),0);
+  const tile2=(act,label,val,status,cls)=>`<button class="tile tilebtn" data-act="${act}"><div class="tl">${label}</div><div class="tv">${numBig(String(val))}</div><span class="st ${cls}">${status}</span></button>`;
+  return `<div class="tiles">${tile2('tileToday','오늘 수업 (건)',tl.length,`완료 ${done}${ns?' · 노쇼 '+ns:''} · 남음 ${tl.length-done-ns}`,'gray')}${tile2('tileDone','수업 완료 (회)',md.length,'이번 달 · 서명 '+md.filter(x=>x.kind==='sign').length,'green')}${tile2('tilePay','정산 대기',Math.round(pay/10000)+'만','이번 달 예정','orange')}</div>`;
+}
+function rowLesson(x){ // 한 줄: 언제 · 누구 · 몇 회차 · 서명 몇 시
+  const tag=x.kind==='noshow'||x.state==='noshow'?'<span class="pill p-red">노쇼</span>':x.state==='todo'?'<span class="pill p-gray">진행 전</span>':'<span class="pill p-green">서명</span>';
+  const sub=x.kind==='noshow'||x.state==='noshow'?`노쇼 처리 ${x.at||(x.ns&&x.ns.at)||''}${policy().nsDeduct?' · 수강권 차감':''}`:x.state==='todo'?'서명 전':`서명 ${x.at||(x.sg&&x.sg.t)} · ${(x.via||(x.sg&&x.sg.via))==='member'?'회원 휴대폰':'트레이너 휴대폰'}`;
+  return `<div class="lrow"><div class="lt"><b>${mdLabel(x.d||x.date)}</b><span>${x.lt||x.time||''}</span></div><div class="sp"><b style="font-size:14px">${esc(x.name)}${x.n?` · ${x.n}회차`:''}</b><div class="muted" style="font-size:12.5px">${sub}</div></div>${tag}</div>`;
+}
+function tileSheet(kind){
+  const close='<button class="btn sec full" data-act="tileClose" style="margin-top:12px">닫기</button>';
+  if(kind==='today'){ const tl=todayLessons();
+    return `<div class="modal"><div class="sheet" role="dialog" aria-label="오늘 수업"><h2>오늘 수업</h2><p class="muted" style="margin:0 0 10px">${mdLabel(ymd(new Date()))} · ${tl.length}건</p>
+      ${tl.length?tl.map(x=>`${rowLesson(x)}${x.state==='todo'?`<div class="row" style="margin:-2px 0 10px 64px;gap:6px"><button class="btn sm" data-act="signHere" data-m="${x.mid}">서명받기</button><button class="btn sm sec" data-act="nsMark" data-id="${x.id}" style="color:var(--red)">노쇼 처리</button></div>`:x.state==='noshow'?`<div class="row" style="margin:-2px 0 10px 64px"><button class="btn sm sec" data-act="nsUndo" data-id="${x.ns.id}">노쇼 취소</button></div>`:x.sg?`<div style="margin:-2px 0 10px 64px;max-width:180px">${sigSVG(x.sg.sig,38)}</div>`:''}`).join(''):'<p class="muted">오늘 잡힌 수업이 없어요.</p>'}${close}</div></div>`; }
+  const md=monthDone(), byM={}; md.forEach(x=>{ (byM[x.mid]=byM[x.mid]||{name:x.name,c:0,ns:0,pay:0}); byM[x.mid].c++; if(x.kind==='noshow') byM[x.mid].ns++; byM[x.mid].pay+=payOf(x.mid); });
+  if(kind==='done') return `<div class="modal"><div class="sheet" role="dialog" aria-label="수업 완료"><h2>이번 달 수업 완료</h2><p class="muted" style="margin:0 0 10px">${md.length}회 · 서명 ${md.filter(x=>x.kind==='sign').length} · 노쇼 ${md.filter(x=>x.kind==='noshow').length}</p>
+      ${md.map(x=>`${rowLesson(x)}${x.sig?`<div style="margin:-2px 0 10px 64px;max-width:180px">${sigSVG(x.sig,38)}</div>`:''}`).join('')||'<p class="muted">이번 달 완료한 수업이 없어요.</p>'}${close}</div></div>`;
+  const total=md.reduce((a,x)=>a+payOf(x.mid),0);
+  return `<div class="modal"><div class="sheet" role="dialog" aria-label="정산 대기"><h2>정산 대기 · 이번 달</h2><p class="muted" style="margin:0 0 10px">서명 완료${policy().nsPay?' + 노쇼':''} 수업 기준 · 수당 ${S.settle.rate}%</p>
+    <div class="big" style="color:var(--blue);margin-bottom:8px">${fmt(total)}원</div>
+    <table class="t"><tr><th>회원</th><th>완료</th><th>회당 단가</th><th>수당</th></tr>${Object.entries(byM).map(([mid,v])=>`<tr><td>${esc(v.name)}</td><td>${v.c}회${v.ns?` <span class="muted">(노쇼 ${v.ns})</span>`:''}</td><td>${fmt(unitPrice(mid))}</td><td><b>${fmt(v.pay)}</b></td></tr>`).join('')}</table>
+    <div class="secttl" style="margin-top:12px">수업별 내역</div>${md.map(rowLesson).join('')}
+    <button class="btn full" data-act="copySettle2" style="margin-top:10px">센터 제출용 내역 복사</button>${close}</div></div>`;
+}
+function settleText(){ const md=monthDone(); const total=md.reduce((a,x)=>a+payOf(x.mid),0);
+  return `${new Date().getMonth()+1}월 수업 정산 내역\n완료 ${md.length}회 · 예상 수당 ${fmt(total)}원\n\n`+md.slice().reverse().map(x=>`${x.d} ${x.lt||''} ${x.name} ${x.n?x.n+'회차':''} · ${x.kind==='noshow'?'노쇼':'서명 '+x.at+(x.via==='member'?'(회원폰)':'(트레이너폰)')} · ${fmt(payOf(x.mid))}원`).join('\n'); }
+function noShow(lessonId){
+  const l=sched().find(x=>x.id===lessonId); if(!l) return;
+  const now=new Date(), m=members.find(x=>x.id===l.mid), P=policy();
+  const rec={id:'ns'+Date.now().toString(36),lessonId,mid:l.mid,name:l.name,n:m?m.done+1:null,d:l.date,lt:l.time,at:min2hm(now.getHours()*60+now.getMinutes()),deduct:P.nsDeduct};
+  const L=noshows(); L.unshift(rec); LS.set('aiwm_noshow',L.slice(0,500)); l.st='noshow'; saveSched();
+  if(m&&P.nsDeduct){ m.done=Math.min(m.total,m.done+1); if(!m.custom){ m.custom=true; m.contracts=m.contracts||[{id:'c0',date:ymd(new Date()),count:m.total,amount:0,pay:'기타'}]; } saveMembers(); }
+}
+function undoNoShow(id){
+  const L=noshows(), r=L.find(x=>x.id===id); if(!r) return; LS.set('aiwm_noshow',L.filter(x=>x.id!==id));
+  const l=sched().find(x=>x.id===r.lessonId); if(l){ delete l.st; saveSched(); }
+  const m=members.find(x=>x.id===r.mid); if(m&&r.deduct){ m.done=Math.max(0,m.done-1); saveMembers(); }
+}
+function tileAct(act,a){
+  switch(act){
+    case 'tileToday': $('#modalRoot').innerHTML=tileSheet('today'); return true;
+    case 'tileDone': $('#modalRoot').innerHTML=tileSheet('done'); return true;
+    case 'tilePay': $('#modalRoot').innerHTML=tileSheet('pay'); return true;
+    case 'tileClose': $('#modalRoot').innerHTML=''; keepScroll(render); return true;
+    case 'nsMark': { const l=sched().find(x=>x.id===a.dataset.id); if(!l) return true;
+      if(!confirm(`${l.name} ${mdLabel(l.date)} ${l.time} 수업을 노쇼로 처리할까요?${policy().nsDeduct?' 수강권이 1회 차감돼요.':''}`)) return true;
+      noShow(l.id); toast('노쇼로 처리했어요'+(policy().nsDeduct?' · 수강권 차감':''));
+      if($('#modalRoot').innerHTML.includes('오늘 수업')) $('#modalRoot').innerHTML=tileSheet('today'); else { $('#modalRoot').innerHTML=''; keepScroll(render); } return true; }
+    case 'nsUndo': undoNoShow(a.dataset.id); toast('노쇼를 취소했어요'); $('#modalRoot').innerHTML=tileSheet('today'); return true;
+    case 'nsPolicy': { const P=policy(); P[a.dataset.k]=!P[a.dataset.k]; LS.set('aiwm_policy',P); keepScroll(render); return true; }
+    case 'copySettle2': { const t=settleText(); try{ navigator.clipboard.writeText(t).then(()=>toast('정산 내역을 복사했어요'),()=>toast('복사가 막혀 있어요')); }catch(e){ toast('복사가 막혀 있어요'); } return true; }
+  }
+  return false;
+}
+// 정산 탭: 실제 서명·노쇼 기록으로 계산
+function tSettle(){
+  renderTop(`정산 · ${new Date().getMonth()+1}월`,false);
+  const st=S.settle, md=monthDone(), total=md.reduce((a,x)=>a+payOf(x.mid),0), P=policy();
+  const byM={}; md.forEach(x=>{ (byM[x.mid]=byM[x.mid]||{name:x.name,c:0,s:0,ns:0,pay:0}); byM[x.mid].c++; x.kind==='sign'?byM[x.mid].s++:byM[x.mid].ns++; byM[x.mid].pay+=payOf(x.mid); });
+  return `<div class="card"><h3>정산 방식</h3>
+    <div class="seg" role="group"><button class="${st.mode==='fixed'?'on':''}" data-act="settleMode" data-v="fixed">회당 수당</button><button class="${st.mode==='rate'?'on':''}" data-act="settleMode" data-v="rate">매출 비율</button></div>
+    <div class="grid2" style="margin-top:10px">
+      <label class="field"><span>기본 회당 단가 (원)</span><input type="number" id="stPrice" value="${st.price}"></label>
+      <label class="field"><span>${st.mode==='fixed'?'수당 비율 (%)':'배분 비율 (%)'}</span><input type="number" id="stRate" value="${st.rate}"></label></div>
+    <p class="muted" style="margin:0;font-size:12px">계약 금액을 넣은 회원은 그 회원의 회당 단가로 계산해요.</p></div>
+  <button class="card tilebtn" data-act="tilePay" style="width:100%;text-align:left"><div class="muted">완료 수업 (서명${P.nsPay?' + 노쇼':''})</div><div class="big">${md.length}회</div>
+    <div class="muted" style="margin-top:8px">예상 정산금</div><div class="big" style="color:var(--blue)">${fmt(total)}원</div><div class="muted" style="font-size:12px;margin-top:4px">눌러서 수업별 내역 보기 ›</div></button>
+  <div class="card"><h3>회원별 완료 수업</h3><table class="t"><tr><th>회원</th><th>완료</th><th>서명</th><th>수당</th></tr>${Object.values(byM).map(v=>`<tr><td>${esc(v.name)}</td><td>${v.c}회</td><td><span class="pill p-green">${v.s}/${v.c}</span>${v.ns?` <span class="pill p-red">노쇼 ${v.ns}</span>`:''}</td><td>${fmt(v.pay)}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">이번 달 기록이 없어요</td></tr>'}</table></div>
+  <div class="card"><h3>노쇼 처리 규칙</h3>
+    <div class="row" style="align-items:center"><span class="sp" style="font-size:14px">노쇼하면 수강권 1회 차감</span><button class="toggle ${P.nsDeduct?'on':''}" data-act="nsPolicy" data-k="nsDeduct" aria-pressed="${P.nsDeduct}" aria-label="노쇼 수강권 차감"></button></div>
+    <div class="row" style="align-items:center;margin-top:8px"><span class="sp" style="font-size:14px">노쇼도 정산(수당)에 포함</span><button class="toggle ${P.nsPay?'on':''}" data-act="nsPolicy" data-k="nsPay" aria-pressed="${P.nsPay}" aria-label="노쇼 정산 포함"></button></div>
+    <p class="muted" style="margin:8px 0 0;font-size:12px">센터 규정에 맞춰 정하세요. 노쇼는 스케줄의 수업이나 ‘오늘 수업’에서 처리해요.</p></div>
+  <button class="btn sec full" data-act="copySettle2">센터 제출용 내역 복사</button>
+  <p class="foot">계산과 내역 관리만 합니다 · 실제 지급은 센터에서</p>`;
+}
+
 // ---------- render ----------
 let modal=null;
 function render(){
@@ -2836,6 +2942,7 @@ document.addEventListener('click',e=>{
   if(reqAct(act,a)) return;
   if(focusAct(act,a)) return;
   if(parqAct(act,a)) return;
+  if(tileAct(act,a)) return;
   switch(act){
     case 'back':
       if(S.role==='trainer'){ if(S.sub==='kakao') go('review'); else if(S.sub==='review') go(null); else go(null);} else go(null); break;

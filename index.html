@@ -348,6 +348,21 @@ input.nm{font:inherit;font-weight:800;font-size:16px;border:none;border-bottom:1
 .mtbl .mr i{font-style:normal;color:var(--muted,#6B7280);font-size:11px;margin-left:3px}
 .mtbl em{font-style:normal;font-size:11.5px;font-weight:700}
 .mtbl em.ok{color:var(--green,#16A34A)} .mtbl em.op{color:var(--blue,#2563EB)} .mtbl em.no{color:#C2410C}
+.mtbl .myr{padding:7px 10px;font-size:12px;font-weight:800;color:var(--ink2,#374151);background:#F3F4F6;border-top:1px solid var(--line,#E5E7EB)}
+.mtbl .mr.ysum{background:#FAFAFA;cursor:default;font-size:12.5px}
+.mtbl em.na{color:var(--muted,#9CA3AF);font-weight:500} .mtbl .mr:has(em.na) span{color:#9CA3AF}
+.radlist{display:grid;gap:8px}
+.radopt{display:flex;align-items:flex-start;gap:10px;width:100%;text-align:left;padding:12px;border:1.5px solid var(--line,#E5E7EB);border-radius:14px;background:#fff;font:inherit;color:inherit;cursor:pointer}
+.radopt b{display:block;font-size:14.5px}
+.radopt small{display:block;color:var(--muted,#6B7280);font-size:12px;line-height:1.5;margin-top:2px}
+.radopt .rad{flex:none;width:20px;height:20px;border-radius:50%;border:2px solid #CBD5E1;margin-top:1px;position:relative}
+.radopt.on{border-color:var(--blue,#2563EB);background:#F5F9FF}
+.radopt.on .rad{border-color:var(--blue,#2563EB)}
+.radopt.on .rad::after{content:'';position:absolute;inset:3px;border-radius:50%;background:var(--blue,#2563EB)}
+.radopt .pill{flex:none;font-size:11px}
+.radbody{margin:-10px 0 0;padding:12px 12px 4px;border:1.5px solid var(--blue,#2563EB);border-top:0;border-radius:0 0 14px 14px;background:#F5F9FF}
+.radbody:empty{display:none}
+.radlist .radopt.on{border-radius:14px 14px 0 0;border-bottom-color:transparent}
 
 .realbtn{display:flex;align-items:center;justify-content:center;gap:8px}
 </style>
@@ -2990,14 +3005,20 @@ function settleSummary(mk){ mk=mk||stMonth(); const md=monthDone(mk), PR=payroll
   return {mk,md,PR,c,sales,salesAmt,lessonRev:PR.rev,lessonPay:PR.total,incentive,base,gross,tax,net:gross-tax,
     nNew:sales.filter(x=>x.kind==='신규').length,nRe:sales.filter(x=>x.kind==='재등록').length}; }
 // ---------- 월별 정산 현황 · 지급 완료 처리 · 남은 수업 ----------
+useSince && setTimeout(()=>{ try{ useSince(); }catch(e){} },0);
 function paidMonths(){ return LS.get('aiwm_paidmon',{}); }
 function man(x){ x=+x||0; if(Math.abs(x)<10000) return fmt(x); const v=x/10000; return (Math.abs(v)>=100?Math.round(v):Math.round(v*10)/10).toLocaleString('ko-KR')+'만'; }
 function monthsWithData(){ const cur=monthKey(), set=new Set([cur]);
   signs().forEach(x=>x.d&&set.add(x.d.slice(0,7))); noshows().forEach(x=>x.d&&set.add(x.d.slice(0,7)));
   members.forEach(m=>(m.contracts||[]).forEach(c=>+c.amount>0&&c.date&&set.add(String(c.date).slice(0,7)))); Object.keys(paidMonths()).forEach(k=>set.add(k));
-  return [...set].filter(k=>k<=cur).sort().reverse().slice(0,12); }
+  const start=[...set].concat(useSince()).filter(k=>k<=cur).sort()[0]||cur, out=[];
+  for(let k=start;k<=cur;k=shiftMonth(k,1)) out.push(k);   // 사용 시작한 달부터 이번 달까지 빠짐없이
+  return out.reverse(); }
+// 이 앱을 처음 쓴 달 (처음 열 때 한 번 기록)
+function useSince(){ let v=LS.get('aiwm_since',null); if(!v){ v=monthKey(); LS.set('aiwm_since',v); } return v; }
+function firstMonth(){ const L=monthsWithData(); return L[L.length-1]; }
 function monthStatus(mk){ const P=paidMonths()[mk]; return P?'paid':mk===monthKey()?'open':'unpaid'; }
-function monthTable(){ const L=monthsWithData().map(mk=>Object.assign(settleSummary(mk),{st:monthStatus(mk),paid:paidMonths()[mk]}));
+function monthTable(){ const L=monthsWithData().map(mk=>{ const x=settleSummary(mk); let st=monthStatus(mk); if(st==='unpaid'&&!x.gross) st='none'; return Object.assign(x,{st,paid:paidMonths()[mk]}); });
   const un=L.filter(x=>x.st!=='paid'&&x.md.length), unPast=un.filter(x=>x.st==='unpaid');
   return {L,un,unAmt:un.reduce((a,x)=>a+x.gross,0),unN:un.reduce((a,x)=>a+x.md.length,0),unPastAmt:unPast.reduce((a,x)=>a+x.gross,0),unPastN:unPast.reduce((a,x)=>a+x.md.length,0),unPastM:unPast.length,
     paidAmt:L.filter(x=>x.st==='paid').reduce((a,x)=>a+(x.paid.amount!=null?x.paid.amount:x.gross),0)}; }
@@ -3012,13 +3033,12 @@ function remainingInfo(){ const c=settleCfg(), rows=[];
   const est=c.mode==='fixed'?(paid+(c.bonusPay==='unit'?bonus:0))*(+c.fixed):Math.round(val*pct/100+(c.bonusPay==='unit'?rows.reduce((a,x)=>a+x.bonus*(x.paid?x.val/x.paid:0),0)*pct/100:0));
   return {rows,paid,bonus,val,est}; }
 function statusCards(){ const T=monthTable(), RI=remainingInfo(), mk=stMonth();
-  return `<div class="card"><h3>월별 매출 · 정산</h3>
+  return `<div class="card"><h3>월별 매출 · 정산 <span class="muted" style="font-size:13px;font-weight:600">${T.L[T.L.length-1].mk.replace('-','년 ').replace(/ 0?/,' ')}월부터</span></h3>
     <div class="sumgrid" style="grid-template-columns:1fr 1fr;margin-bottom:10px">
       <div class="sumbox" style="background:#FFF7ED;border-color:#FED7AA"><div class="muted">아직 안 받은 정산</div><div class="sumv" style="font-size:20px;color:#C2410C;margin:2px 0">${fmt(T.unAmt)}<small>원</small></div><div class="sumcap">수업 ${T.unN}회${T.unPastM?` · 지난 달 ${T.unPastM}개월 ${man(T.unPastAmt)}`:''}${T.L.some(x=>x.st==='open')?' · 이번 달 진행 중 포함':''}</div></div>
-      <div class="sumbox"><div class="muted">받은 정산 (표시한 달)</div><div class="sumv" style="font-size:20px;margin:2px 0">${fmt(T.paidAmt)}<small>원</small></div><div class="sumcap">지급 완료 ${T.L.filter(x=>x.st==='paid').length}개월</div></div></div>
+      <div class="sumbox"><div class="muted">받은 정산 (전체)</div><div class="sumv" style="font-size:20px;margin:2px 0">${fmt(T.paidAmt)}<small>원</small></div><div class="sumcap">지급 완료 ${T.L.filter(x=>x.st==='paid').length}개월</div></div></div>
     <div class="mtbl"><div class="mh"><span>월</span><span>수업</span><span>등록 매출</span><span>수업 매출</span><span>정산액</span><span>상태</span></div>
-    ${T.L.map(x=>`<button class="mr ${x.mk===mk?'on':''}" data-act="stGoMonth" data-mk="${x.mk}"><span><b>${+x.mk.slice(5)}월</b>${x.mk.slice(0,4)!=String(new Date().getFullYear())?`<i>${x.mk.slice(2,4)}년</i>`:''}</span><span>${x.md.length}회</span><span>${man(x.salesAmt)}</span><span>${man(x.lessonRev)}</span><span><b>${man(x.paid&&x.paid.amount!=null?x.paid.amount:x.gross)}</b></span><span>${x.st==='paid'?'<em class="ok">완료</em>':x.st==='open'?'<em class="op">진행</em>':'<em class="no">미정산</em>'}</span></button>`).join('')}
-    <div class="mr sum"><span><b>합계</b></span><span>${T.L.reduce((a,x)=>a+x.md.length,0)}회</span><span>${man(T.L.reduce((a,x)=>a+x.salesAmt,0))}</span><span>${man(T.L.reduce((a,x)=>a+x.lessonRev,0))}</span><span><b>${man(T.L.reduce((a,x)=>a+(x.paid&&x.paid.amount!=null?x.paid.amount:x.gross),0))}</b></span><span></span></div></div>
+    ${mtBody(T.L,mk)}</div>
     <p class="muted" style="margin:8px 0 0;font-size:12px">달을 누르면 위 요약이 그 달로 바뀌어요. 정산액은 세전, 지급 완료한 달은 그때 금액으로 고정돼요.</p></div>
   <div class="card"><h3>남은 수업 <span class="muted" style="font-size:13px;font-weight:600">회원들이 결제하고 아직 안 한 수업</span></h3>
     <div class="sumgrid" style="grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
@@ -3026,6 +3046,14 @@ function statusCards(){ const T=monthTable(), RI=remainingInfo(), mk=stMonth();
       <div class="sumbox"><div class="muted" style="font-size:12px">남은 금액</div><div class="sumv" style="font-size:19px;margin:2px 0">${man(RI.val)}<small>원</small></div><div class="sumcap">받아 둔 수업료</div></div>
       <div class="sumbox pay"><div class="muted" style="font-size:12px">예상 수당</div><div class="sumv" style="font-size:19px;margin:2px 0">${man(RI.est)}<small>원</small></div><div class="sumcap">남은 수업 다 하면</div></div></div>
     <table class="t"><tr><th>회원</th><th>남은 회차</th><th>남은 금액</th></tr>${RI.rows.map(x=>`<tr><td>${esc(x.name)}</td><td>${x.paid}회${x.bonus?` <span class="muted">+보너스 ${x.bonus}</span>`:''}</td><td>${fmt(x.val)}</td></tr>`).join('')||'<tr><td colspan="3" class="muted">남은 수업이 없어요</td></tr>'}</table></div>`; }
+function mtVal(x){ return x.paid&&x.paid.amount!=null?x.paid.amount:x.gross; }
+function mtSum(L,label,cls){ return `<div class="mr ${cls}"><span><b>${label}</b></span><span>${L.reduce((a,x)=>a+x.md.length,0)}회</span><span>${man(L.reduce((a,x)=>a+x.salesAmt,0))}</span><span>${man(L.reduce((a,x)=>a+x.lessonRev,0))}</span><span><b>${man(L.reduce((a,x)=>a+mtVal(x),0))}</b></span><span>${L.some(x=>x.st==='unpaid')?`<em class="no">미정산 ${L.filter(x=>x.st==="unpaid").length}</em>`:''}</span></div>`; }
+function mtBody(L,mk){ const years=[...new Set(L.map(x=>x.mk.slice(0,4)))], multi=years.length>1;
+  const row=x=>`<button class="mr ${x.mk===mk?'on':''}" data-act="stGoMonth" data-mk="${x.mk}"><span><b>${+x.mk.slice(5)}월</b></span><span>${x.md.length}회</span><span>${man(x.salesAmt)}</span><span>${man(x.lessonRev)}</span><span><b>${man(mtVal(x))}</b></span><span>${x.st==='paid'?'<em class="ok">완료</em>':x.st==='open'?'<em class="op">진행</em>':x.st==='none'?'<em class="na">—</em>':'<em class="no">미정산</em>'}</span></button>`;
+  return years.map(y=>{ const Y=L.filter(x=>x.mk.startsWith(y)); return `<div class="myr">${y}년</div>${Y.map(row).join('')}${multi?mtSum(Y,y+'년 합계','ysum'):''}`; }).join('')
+    + mtSum(L,`전체 <i>${L[L.length-1].mk.replace('-','.')}~</i>`,'sum'); }
+const SET_MODES=['fixed','rate','tier'], SET_TITLE={fixed:'회당 고정 수당',rate:'매출 비율 (%)',tier:'구간별 비율 (수업 수에 따라)'};
+function radOpt(c,k,help){ const on=c.mode===k; return `<button class="radopt ${on?'on':''}" role="radio" aria-checked="${on}" data-act="stMode" data-v="${k}"><span class="rad" aria-hidden="true"></span><span class="sp"><b>${SET_TITLE[k]}</b><small>${help[k]}</small></span>${on?'<span class="pill p-blue">사용 중</span>':''}</button>`; }
 function stBadge(st){ return st==='paid'?'<span class="pill p-green">지급 완료</span>':st==='open'?'<span class="pill p-blue">진행 중</span>':'<span class="pill p-orange">미정산</span>'; }
 function todayLessons(){ const t=ymd(new Date()); return sched().filter(l=>l.date===t&&!isReq(l)).sort((a,b)=>a.time.localeCompare(b.time)).map(l=>{
   const sg=signs().find(s=>s.mid===l.mid&&s.d===t), ns=noshows().find(x=>x.lessonId===l.id);
@@ -3111,25 +3139,25 @@ function tSettle(){
   const byM={}; md.forEach(x=>{ (byM[x.mid]=byM[x.mid]||{name:x.name,c:0,s:0,ns:0,pay:0}); byM[x.mid].c++; x.kind==='sign'?byM[x.mid].s++:byM[x.mid].ns++; byM[x.mid].pay+=PR.pay[x.id]||0; });
   const help={fixed:'수업 1회를 하면 정해진 금액을 받아요. 회원이 낸 금액과 상관없어요. (예: 회당 3만 원)',rate:'회원이 낸 회당 금액(계약 금액 ÷ 횟수)의 몇 %를 받아요. (예: 7만 원 수업의 50% = 3.5만 원)',tier:'이번 달 수업 수가 많을수록 비율이 올라가요. (예: 40회까지 40%, 80회까지 50%, 그 이상 60%)'};
   const cur=c.tiers.findIndex(t=>t.upto==null||n<=t.upto), nextT=c.tiers[cur];
-  return `<div class="card"><div class="row" style="align-items:center;margin-bottom:10px"><button class="btn sm sec" data-act="stMonth" data-k="-1" aria-label="이전 달">‹</button><h3 class="sp" style="margin:0;text-align:center">${monthLabel(mk)} 정산 요약</h3><button class="btn sm sec" data-act="stMonth" data-k="1" aria-label="다음 달" ${mk>=monthKey()?'disabled':''}>›</button></div>
+  return `<div class="card"><div class="row" style="align-items:center;margin-bottom:10px"><button class="btn sm sec" data-act="stMonth" data-k="-1" aria-label="이전 달" ${mk<=firstMonth()?'disabled':''}>‹</button><h3 class="sp" style="margin:0;text-align:center">${monthLabel(mk)} 정산 요약</h3><button class="btn sm sec" data-act="stMonth" data-k="1" aria-label="다음 달" ${mk>=monthKey()?'disabled':''}>›</button></div>
     ${summaryBlock(SS)}
     <div class="row" style="align-items:center;margin-top:10px;gap:8px">${stBadge(monthStatus(mk))}<span class="sp muted" style="font-size:12.5px">${paidMonths()[mk]?`${paidMonths()[mk].at} 지급 확인 · ${fmt(paidMonths()[mk].amount)}원`:mk===monthKey()?'이 달이 끝나면 지급 완료로 바꿔 주세요':'센터에서 받으면 지급 완료로 바꿔 주세요'}</span>
       <button class="btn sm ${paidMonths()[mk]?'sec':''}" data-act="stPaid" data-mk="${mk}">${paidMonths()[mk]?'취소':'지급 완료'}</button></div>
     <button class="btn sec full" data-act="tilePay" style="margin-top:10px">수업별·등록별 내역 보기 ›</button></div>
   ${statusCards()}
   <div class="card"><h3>${monthLabel(mk)} 등록 내역 <span class="muted" style="font-size:13px;font-weight:600">${fmt(SS.salesAmt)}원</span></h3>${SS.sales.length?salesRows(SS.sales):'<p class="muted" style="margin:0;font-size:13px">이 달 계약일로 등록된 계약이 없어요. 회원 → 계약 추가(재등록)에서 받은 금액을 넣으면 여기에 잡혀요.</p>'}</div>
-  <div class="card"><h3>정산 방식</h3>
-    <div class="seg" role="group"><button class="${c.mode==='fixed'?'on':''}" data-act="stMode" data-v="fixed">회당 고정</button><button class="${c.mode==='rate'?'on':''}" data-act="stMode" data-v="rate">매출 비율</button><button class="${c.mode==='tier'?'on':''}" data-act="stMode" data-v="tier">구간별 비율</button></div>
-    <p class="muted" style="margin:8px 0 10px;font-size:12.5px;line-height:1.55">${help[c.mode]}</p>
+  <div class="card"><h3>정산 방식 <span class="muted" style="font-size:13px;font-weight:600">센터 방식 하나를 고르세요</span></h3><div class="radlist" role="radiogroup" aria-label="정산 방식">
+    ${SET_MODES.slice(0,SET_MODES.indexOf(c.mode)+1).map(k=>radOpt(c,k,help)).join('')}<div class="radbody">
+
     ${c.mode==='fixed'?`<label class="field"><span>회당 수당 (원)</span><input type="number" inputmode="numeric" id="stFixed" value="${c.fixed}"></label>`:''}
-    ${c.mode!=='fixed'?`<label class="field"><span>기본 회당 매출 (원) · 계약 금액이 없는 회원에 적용</span><input type="number" inputmode="numeric" id="stPrice2" value="${c.price}"></label>`:''}
+    ${c.mode!=='fixed'?`<label class="field"><span>계약 금액이 없는 회원의 회당 매출 (원)</span><input type="number" inputmode="numeric" id="stPrice2" value="${c.price}"></label>`:''}
     ${c.mode==='rate'?`<label class="field"><span>내 몫 비율 (%)</span><input type="number" inputmode="numeric" id="stRate2" value="${c.rate}"></label>`:''}
     ${c.mode==='tier'?`<div class="secttl">구간 (이번 달 완료 수업 수 기준)</div>
       ${c.tiers.map((t,i)=>`<div class="tierrow"><span>${i===0?1:(+c.tiers[i-1].upto||0)+1}회 ~</span>${t.upto==null?'<b>그 이상</b>':`<input type="number" inputmode="numeric" data-tier="${i}" data-k="upto" value="${t.upto}" aria-label="구간 ${i+1} 끝 횟수"><span>회</span>`}<input type="number" inputmode="numeric" data-tier="${i}" data-k="pct" value="${t.pct}" aria-label="구간 ${i+1} 비율"><span>%</span>${c.tiers.length>1&&t.upto!=null?`<button class="btn sm sec" data-act="tierDel" data-i="${i}" aria-label="구간 삭제" style="padding:2px 8px">×</button>`:''}</div>`).join('')}
       <button class="btn sm sec full" data-act="tierAdd" style="margin:4px 0 10px">${I.plus} 구간 추가</button>
       <div class="seg" role="group"><button class="${c.tierMode==='all'?'on':''}" data-act="tierMode" data-v="all">도달한 구간 비율을 전체에</button><button class="${c.tierMode==='progressive'?'on':''}" data-act="tierMode" data-v="progressive">구간별로 나눠 적용</button></div>
       <p class="muted" style="margin:6px 0 0;font-size:12px">${c.tierMode==='all'?'예: 45회 하면 1~45회 모두 50%':'예: 45회 하면 1~40회는 40%, 41~45회는 50%'}</p>
-      <div class="alert b" style="margin:10px 0 0"><div>이번 달 <b>${n}회</b> · 지금 <b>${tierPct(c,n)}%</b> 구간${nextT&&nextT.upto!=null?` · 다음 구간까지 ${nextT.upto-n+1}회`:''}</div></div>`:''}
+      <div class="alert b" style="margin:10px 0 0"><div>이번 달 <b>${n}회</b> · 지금 <b>${tierPct(c,n)}%</b> 구간${nextT&&nextT.upto!=null?` · 다음 구간까지 ${nextT.upto-n+1}회`:''}</div></div>`:''}</div>${SET_MODES.slice(SET_MODES.indexOf(c.mode)+1).map(k=>radOpt(c,k,help)).join('')}</div>
     <div class="secttl" style="margin-top:12px">보너스(서비스) 수업 수당</div>
     <div class="seg" role="group"><button class="${c.bonusPay==='none'?'on':''}" data-act="bonusPay" data-v="none">지급 안 함</button><button class="${c.bonusPay==='unit'?'on':''}" data-act="bonusPay" data-v="unit">회당 단가로 지급</button></div>
     <p class="muted" style="margin:6px 0 0;font-size:12px">회원마다 회당 단가는 ‘받은 금액 ÷ 유료 횟수’예요. 보너스 회차는 매출에 넣지 않아요.</p>
@@ -3154,9 +3182,9 @@ function readSettleForm(){ const c=settleCfg(), v=id=>{ const e=$('#'+id); retur
   return c; }
 function settleAct(act,a){
   switch(act){
-    case 'stMode': { const c=readSettleForm(); c.mode=a.dataset.v; saveSettle(c); keepScroll(render); return true; }
+    case 'stMode': { const c=readSettleForm(); if(c.mode===a.dataset.v) return true; c.mode=a.dataset.v; saveSettle(c); keepScroll(render); toast(`정산 방식: ${SET_TITLE[c.mode]}(으)로 계산해요`); return true; }
     case 'tierMode': { const c=readSettleForm(); c.tierMode=a.dataset.v; saveSettle(c); keepScroll(render); return true; }
-    case 'stMonth': { const k=+a.dataset.k, nx=shiftMonth(stMonth(),k); S.stMonth=nx>=monthKey()?null:nx; keepScroll(render); return true; }
+    case 'stMonth': { const k=+a.dataset.k, nx=shiftMonth(stMonth(),k); if(nx<firstMonth()) return true; S.stMonth=nx>=monthKey()?null:nx; keepScroll(render); return true; }
     case 'stGoMonth': { const k=a.dataset.mk; S.stMonth=k===monthKey()?null:k; render(); return true; }
     case 'stPaid': { const k=a.dataset.mk, P=paidMonths();
       if(P[k]){ if(!confirm(`${monthLabel(k)} 지급 완료를 취소할까요?`)) return true; delete P[k]; }

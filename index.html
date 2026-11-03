@@ -387,6 +387,58 @@ input.nm{font:inherit;font-weight:800;font-size:16px;border:none;border-bottom:1
 .memres-it{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:9px 12px;border:1px solid var(--line,#E5E7EB);border-radius:10px;background:#fff;font:inherit;color:inherit;cursor:pointer}
 .memres-it .muted{font-size:12.5px;flex:1}
 .linkbtn{border:0;background:none;padding:0;font:inherit;font-weight:700;color:var(--blue,#2563EB);cursor:pointer;text-align:right}
+.wlog{max-height:92vh}
+.wl-list{margin-top:10px}
+.wl-ex{display:flex;gap:10px;padding:12px 0;border-top:1px solid var(--line,#E5E7EB)}
+.wl-main{flex:1;min-width:0}
+.wl-name{display:block;font-size:16px;letter-spacing:-.01em}
+.wl-meta{font-size:12px;color:var(--muted,#6B7280);margin:2px 0 8px}
+.wl-sets{display:flex;flex-wrap:wrap;gap:6px}
+.wl-set{width:52px;height:52px;border-radius:50%;border:0;background:#F97316;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font:inherit;cursor:pointer;line-height:1.05;padding:0}
+.wl-set b{font-size:16px;font-weight:800}
+.wl-set span{font-size:10.5px;opacity:.95;margin-top:2px}
+.wl-set.on{outline:3px solid #FED7AA;outline-offset:2px}
+.wl-set.add{background:#fff;color:#F97316;border:2px dashed #FDBA74;font-size:22px;font-weight:700}
+.wl-edit{display:flex;align-items:flex-end;gap:6px;margin-top:8px;padding:8px;background:#FFF7ED;border-radius:12px}
+.wl-edit label{flex:1}
+.wl-edit label span{display:block;font-size:11px;color:var(--muted,#6B7280)}
+.wl-edit input{width:100%;font:inherit;font-size:15px;border:1px solid #FED7AA;border-radius:8px;padding:6px 8px;background:#fff}
+.wl-memo{width:100%;margin-top:8px;font:inherit;font-size:13px;border:0;border-bottom:1px dashed #D1D5DB;padding:4px 0;background:transparent;color:var(--ink2,#374151)}
+.wl-fig{flex:none;width:96px;align-self:flex-start;border:0;background:#F1F5F9;border-radius:14px;padding:4px;cursor:pointer;position:relative;display:flex;flex-direction:column;align-items:center;gap:2px}
+.wl-fig .figsvg{width:88px;height:88px;display:block}
+.wl-fig .wl-thumb{width:88px;height:66px;object-fit:cover;border-radius:10px;display:block}
+.wl-fig.hasimg .figsvg{width:56px;height:56px;margin-top:-2px}
+.wl-play{font-size:11px;font-weight:700;color:var(--blue,#2563EB);padding:0 0 4px}
+.wl-mini{flex:none;width:44px;height:44px;background:#F1F5F9;border-radius:10px;margin-right:4px}
+.wl-mini .figsvg{width:44px;height:44px;display:block}
+.wl-bigfig{background:#F1F5F9;border-radius:14px;display:flex;justify-content:center}
+.wl-bigfig .figsvg{width:200px;height:200px}
+.wl-set{width:46px;height:46px}
+.wl-set b{font-size:14.5px}
+.wl-set span{font-size:10px}
+.wl-ana{margin-top:8px;padding:8px 10px;border-radius:12px;font-size:13px}
+.wl-ana.o{background:#FFF7ED}
+.wl-ana.g{background:#ECFDF5}
+.wl-fb{display:flex;gap:8px;margin-top:6px;line-height:1.45}
+.wl-fb>span{flex:none;width:18px;height:18px;border-radius:50%;background:#F97316;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.wl-uprow{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:8px}
+.wl-up{margin-top:8px}
+.wl-addex{display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line,#E5E7EB)}
+.wl-addex input{flex:1;min-width:0;font:inherit;font-size:14px;border:1px solid var(--line,#E5E7EB);border-radius:10px;padding:8px 10px}
+.figwrap{position:relative;display:block;width:100%;aspect-ratio:1}
+.figwrap .figsvg{width:100%!important;height:100%!important}
+.figwrap .eximg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:inherit;border-radius:10px}
+.wl-fig .figwrap{width:88px}
+.wl-fig.hasimg .figwrap{width:56px}
+.wl-mini .figwrap{width:44px}
+.wl-bigrow{display:flex;gap:8px}
+.wl-bigrow .wl-bigfig{flex:1;flex-direction:column;align-items:center;padding:6px}
+.wl-bigfig .figwrap{width:100%;max-width:200px}
+.wl-bigfig.dark{background:#0F172A}
+.wl-bigfig.dark .figsvg line{stroke:#7DD3FC}
+.wl-bigfig .cap{font-size:11.5px;color:var(--muted,#6B7280);align-self:flex-start}
+.wl-bigfig.dark .cap{color:#94A3B8}
+.wl-bigrow .wl-bigfig{flex:1 1 0;min-width:0}
 
 .realbtn{display:flex;align-items:center;justify-content:center;gap:8px}
 </style>
@@ -1445,6 +1497,7 @@ function tMemberDetail(id){
   ${parqTrainerCard('hw')}
   <div class="card" style="display:none"><h3>PAR-Q+ · 건강 확인</h3>${needMedical()?'<span class="pill p-red">의료 확인 필요</span><p class="muted" style="margin:8px 0 0">추가 문항 ‘예’. 혼자 연습·루틴 추천 잠김. 의사 소견서를 올리면 풀립니다.</p>':parqYes()&&!S.parqFollow?'<span class="pill p-orange">추가 문항 확인 중</span>':'<span class="pill p-green">통과 · 10월 1일 작성</span>'}</div>
   ${focusCard('hw')}
+  ${wlogListCard('hw')}
   <div class="card"><h3>혼자 해도 됨 (승인)</h3>${Object.keys(S.soloOk).map(k=>`<div class="row" style="padding:4px 0"><span class="sp">${k}</span><button class="toggle ${S.soloOk[k]?'on':''}" data-act="soloToggle" data-k="${k}" aria-label="${k} 혼자 연습 승인" aria-pressed="${S.soloOk[k]}"></button></div>`).join('')}<p class="muted" style="margin:8px 0 0">승인한 운동만, 지난 수업 중량 범위 안에서 회원에게 추천합니다.</p></div>
   <div class="card"><h3>식단 확인</h3>
     <div class="kcal-row"><div class="thumb">${meal.img?`<img src="${meal.img}" alt="">`:I.food}</div><div class="sp"><b style="font-size:13.5px">${meal.time} · ${meal.name}</b><div class="muted">AI 추정 ${fmt(meal.ai)}kcal</div></div><input class="small-input" id="trKcal" type="number" value="${meal.tr??meal.ai}" aria-label="트레이너 수정 칼로리"><button class="btn sm" data-act="saveKcal" data-id="${meal.id}">수정</button></div>
@@ -1587,7 +1640,7 @@ function lockCard(reason){
 }
 function mNotes(){
   renderTop('운동 노트',false);
-  return `<div class="card"><h3>스쿼트<span class="r">배운 운동 · 13회 기록</span></h3><p class="muted" style="margin:0 0 10px">처음보다 가동범위가 ${romGain().total}% 늘었어요 · 스쿼트 스킬 ${skillOf('hw')?skillOf('hw').label:''}</p>${memberFocusView('hw')}
+  return `${wlogListCard('hw','운동일지',true)}<div class="card"><h3>스쿼트<span class="r">배운 운동 · 13회 기록</span></h3><p class="muted" style="margin:0 0 10px">처음보다 가동범위가 ${romGain().total}% 늘었어요 · 스쿼트 스킬 ${skillOf('hw')?skillOf('hw').label:''}</p>${memberFocusView('hw')}
     <div class="timeline">${squatNotes.map(n=>`<div class="it"><b>${n.s}</b><span class="muted">${n.t}</span></div>`).join('')}</div></div>
   <div class="card"><h3>벤치프레스<span class="r">배운 운동</span></h3><div class="timeline"><div class="it"><b>3회차</b><span class="muted">견갑(어깨뼈)을 모으고 내린 채 고정</span></div><div class="it"><b>7회차</b><span class="muted">발로 바닥을 밀고 엉덩이는 벤치에</span></div><div class="it"><b>11회차</b><span class="muted">흉추를 조금 더 들어 가슴으로 받기</span></div></div></div>
   <div class="card"><h3>수업 리포트</h3>${['11월 1일 · 16회차','10월 30일 · 15회차','10월 27일 · 14회차'].map(t=>`<div class="list-item"><span class="sp">${t}</span><span class="muted">보기</span></div>`).join('')}</div>`;
@@ -1595,6 +1648,9 @@ function mNotes(){
 function mPractice(){
   renderTop('오늘 운동',false);
   if(needMedical()) return lockCard('med');
+  return wlogListCard('hw','오늘 운동 기록',true)+mPracticeBody();
+}
+function mPracticeBody(){
   const learned=[['스쿼트','하체 · 맨몸 15회 × 3'],['루마니안 데드리프트','후면 · 20kg 10회 × 3'],['덤벨 로우','등 · 10kg 12회 × 3'],['오버헤드 프레스','어깨 · 승인 전']];
   const extra=S.addedEx;
   return `<div class="card"><h3>오늘 추천 루틴<span class="r">배운 운동 · 수업 동작과 비교</span></h3>
@@ -1893,7 +1949,7 @@ function realReview(){
     : ai.state==='done' ? `<div class="alert ${(R.captions||[]).length?'g':'o'}"><div><b>정리 완료</b><br>운동 ${R.segs.length}개 · 반복 ${total}회 · 자막 ${(R.captions||[]).length}줄${(R.captions||[]).length?'':'<br>들린 말이 없었어요. 마이크 권한과 휴대폰과의 거리를 확인해 주세요.'}${ai.warn?`<br><span style="font-size:12px">${esc(ai.warn)}</span>`:''}${R.speechOnly?'<br><span style="font-size:12px">동작 반복을 잡지 못해 말한 운동 이름으로 구간을 나눴어요.</span>':''}</div>${(R.captions||[]).length?'':'<button class="btn sm sec" data-act="realAI" style="align-self:center">다시 정리</button>'}</div>` : '';
   const dl = R.videoURL?`<a class="btn sec full" style="margin-top:8px;text-align:center;text-decoration:none" href="${R.videoURL}" download="수업영상_${(R.date||'').replace(/[^0-9]/g,'')}.${(R.mime||'').includes('mp4')?'mp4':'webm'}">전체 영상 저장</a>`:'';
   if(!R.segs.length) return status+`<div class="card"><h3>인식된 반복이 없어요</h3><div class="muted" style="line-height:1.7">· 기기를 옆쪽 2~3m에 세워 전신(머리~발)이 나오게 해 주세요.<br>· 밝은 곳에서, 한 명만 화면 중앙에 서면 더 잘 잡혀요.<br>· 반복은 천천히 끝까지 움직여야 1회로 셉니다.</div>${dl}</div><button class="btn full" data-act="realAgain">다시 촬영</button>`;
-  return status+R.segs.map((g,i)=>{
+  return status+(R.id&&LS.get('aiwm_sessions',[]).some(x=>x.id===R.id)?`<button class="btn full" data-act="wlogOpen" data-id="${R.id}" style="margin-bottom:10px">운동일지로 보기 · 세트·무게·내 영상</button>`:'')+R.segs.map((g,i)=>{
     const [t0,t1]=segRange(R,i), caps=capsOf(R,i), best=bestRep(g), lm=g.best||(best&&best.lm), saved=refs[g.cls];
     const kws=(g.aiKws||g.kws||[]);
     const okN=g.reps.filter(r=>r.ok).length;
@@ -1953,7 +2009,7 @@ async function openSession(id){
 function savedSessionsCard(){
   const list=LS.get('aiwm_sessions',[]); if(!list.length) return '';
   const all=S.sessAll;
-  return `<div class="card"><h3>저장된 수업 <span class="r muted" id="storeUse">이 기기</span></h3>${(all?list:list.slice(0,5)).map(x=>{ const d=new Date(x.ts); return `<div class="row" style="align-items:center;border-bottom:1px solid var(--line)"><button class="list-item" data-act="openSession" data-id="${x.id}" style="flex:1;border:none"><div class="sp"><b style="font-size:14px">${d.getMonth()+1}월 ${d.getDate()}일 ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}${x.noVideo?' <span class="pill p-gray" style="font-size:10.5px">영상 지움</span>':''}</b><div class="muted">${x.segs.map(segTitle).join(' · ')||'반복 없음'}</div></div></button><button class="btn sm sec" data-act="sessDel" data-id="${x.id}" aria-label="이 수업 기록 삭제" style="padding:6px 10px;color:var(--red)">삭제</button></div>`; }).join('')}
+  return `<div class="card"><h3>저장된 수업 <span class="r muted" id="storeUse">이 기기</span></h3>${(all?list:list.slice(0,5)).map(x=>{ const d=new Date(x.ts); return `<div class="row" style="align-items:center;border-bottom:1px solid var(--line)"><button class="list-item" data-act="openSession" data-id="${x.id}" style="flex:1;border:none"><div class="sp"><b style="font-size:14px">${d.getMonth()+1}월 ${d.getDate()}일 ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}${x.noVideo?' <span class="pill p-gray" style="font-size:10.5px">영상 지움</span>':''}</b><div class="muted">${x.segs.map(segTitle).join(' · ')||'반복 없음'}</div></div></button><button class="btn sm sec" data-act="wlogOpen" data-id="${x.id}" style="padding:6px 10px">일지</button><button class="btn sm sec" data-act="sessDel" data-id="${x.id}" aria-label="이 수업 기록 삭제" style="padding:6px 10px;color:var(--red)">삭제</button></div>`; }).join('')}
     <div class="row" style="margin-top:10px">${list.length>5&&!all?`<button class="btn sm sec" data-act="sessAll" style="flex:1">전체 ${list.length}개 보기</button>`:''}<button class="btn sm sec" data-act="sessVidAll" style="flex:1">영상만 모두 지우기</button></div>
     <p class="muted" style="margin:8px 0 0;font-size:12px">영상만 지우면 자막·키워드·분석 기록은 남아요.</p></div>`;
 }
@@ -2425,7 +2481,7 @@ function memberCard(m){
   ${contractCard(m)}
   <div class="card"><h3>예정된 수업<span class="r">${up.length}개</span></h3>${up.length?up.map(x=>`<button class="list-item" data-act="schedEdit" data-id="${x.id}"><b style="width:96px">${mdLabel(x.date)}</b><span class="sp">${x.time} · ${x.dur}분${x.note?' · '+esc(x.note):''}</span><span class="muted">›</span></button>`).join(''):'<p class="muted" style="margin:0">예정된 수업이 없어요.</p>'}</div>
   ${parqTrainerCard(m.id)}
-  ${focusCard(m.id)}<button class="btn sec full" data-act="reReport" data-m="${m.id}" style="margin-bottom:12px">재등록 리포트 보기·고치기</button>
+  ${focusCard(m.id)}${wlogListCard(m.id)}<button class="btn sec full" data-act="reReport" data-m="${m.id}" style="margin-bottom:12px">재등록 리포트 보기·고치기</button>
   ${signCard(m.id)}${signHistory(m.id)}
   ${m.custom?`<button class="btn ghost full" data-act="memDel" data-id="${m.id}" style="color:var(--red)">회원 삭제</button>`:'<p class="foot">예시 회원입니다 · 혜원 회원에서 전체 상세 화면을 볼 수 있어요</p>'}`;
 }
@@ -3341,7 +3397,7 @@ const JOINT_LABEL=[['ankle','발목 (정강이 기울기)','°'],['knee','무릎
 function refFor(cls){
   const r=LS.get('aiwm_refs',{})[cls];
   if(r&&r.lm){ const a=r.ang||(window.LiveCamAngles?window.LiveCamAngles(r.lm,r.aspect||4/3):null); if(a) return {ang:a,lm:r.lm,src:`${r.date||''} 수업 · 트레이너가 저장한 기준`,trainer:true}; }
-  return DEFAULT_REF[cls]?{ang:DEFAULT_REF[cls],lm:null,src:'트레이너 기준이 없어 일반 기준으로 비교',trainer:false}:null;
+  return DEFAULT_REF[cls]?{ang:DEFAULT_REF[cls],lm:null,src:'일반적인 '+(cls==='squat'?'스쿼트':'힙힌지')+' 기준(골드 스탠다드)',trainer:false,gold:true}:null;
 }
 function feedbackFor(cls,me,ref){
   const out=[], d=k=>me[k]-ref[k], deg=x=>Math.round(Math.abs(x));
@@ -3379,13 +3435,13 @@ function uploadCard(name){
 function uploadResultHTML(res,cls,ref){
   const reps=res.reps.filter(r=>r.cls===cls||cls==='hinge'&&r.cls==='squat'||cls==='squat'&&r.cls==='hinge');
   if(!reps.length) return `<div class="feedback warn">${res.reps.length?'수업 때 배운 동작과 다른 동작으로 보여요.':'반복을 찾지 못했어요.'}</div><p class="muted" style="font-size:12.5px;margin:8px 0">옆에서 머리부터 발까지 보이게, 2~3m 떨어져 찍어 주세요. 반복은 끝까지 앉았다 일어나야 1회로 셉니다.${res.seenRatio<0.5?' (사람이 잘 보이지 않는 장면이 많았어요)':''}</p><button class="btn sm sec full" data-act="upReset">다시 올리기</button>`;
-  const me=avgAng(reps.map(r=>r.ang)), R=ref.ang, fb=feedbackFor(cls,me,R);
-  const perRep=reps.map(r=>feedbackFor(cls,r.ang,R)), good=perRep.filter(f=>!f.length).length;
-  const best=reps.slice().sort((a,b)=>feedbackFor(cls,a.ang,R).length-feedbackFor(cls,b.ang,R).length)[0];
-  return `<div class="alert ${fb.length?'o':'g'}" style="margin:0 0 10px"><div><b>${reps.length}회 중 ${good}회가 수업 동작과 비슷해요</b><br>${fb.length?'아래 순서대로 고쳐 보세요':'수업 때 배운 대로 잘 하고 있어요'}</div></div>
+  const me=avgAng(reps.map(r=>r.ang)), R=ref.ang, FB=(x)=>ref.gold?goldFeedback(cls,x):feedbackFor(cls,x,R), fb=FB(me);
+  const perRep=reps.map(r=>FB(r.ang)), good=perRep.filter(f=>!f.length).length;
+  const best=reps.slice().sort((a,b)=>FB(a.ang).length-FB(b.ang).length)[0];
+  return `<div class="alert ${fb.length?'o':'g'}" style="margin:0 0 10px"><div><b>${reps.length}회 중 ${good}회가 ${ref.gold?'일반 기준에 맞아요':'수업 동작과 비슷해요'}</b><br>${fb.length?'아래 순서대로 고쳐 보세요':ref.gold?'좋은 자세로 하고 있어요':'수업 때 배운 대로 잘 하고 있어요'}</div></div>
     ${fb.length?`<div class="fblist">${fb.map((f,i)=>`<div class="fbi"><span class="n">${i+1}</span><div><b>${f.t}</b><div class="muted" style="font-size:12.5px">${f.s}</div></div></div>`).join('')}</div>`:''}
     <div class="anal" style="margin-top:10px"><div class="clip" style="aspect-ratio:auto">${lmSVG(best.lm, ref.lm)}<span>${ref.lm?'점선: 수업 때 기준':'가장 깊이 앉은 순간'}</span></div>
-    <div><table class="t" style="font-size:12.5px"><tr><th>관절</th><th>수업</th><th>나</th></tr>${JOINT_LABEL.map(([k,l])=>{ const df=me[k]-R[k], big=k==='hipBack'?Math.abs(df)>0.06:Math.abs(df)>8; return `<tr><td>${l.split(' ')[0]}</td><td>${fmtJ(k,R[k])}</td><td><b style="color:${big?'var(--orange)':'var(--green)'}">${fmtJ(k,me[k])}</b></td></tr>`; }).join('')}</table></div></div>
+    <div>${ref.gold?goldTable(cls,me):`<table class="t" style="font-size:12.5px"><tr><th>관절</th><th>수업</th><th>나</th></tr>${JOINT_LABEL.map(([k,l])=>{ const df=me[k]-R[k], big=k==='hipBack'?Math.abs(df)>0.06:Math.abs(df)>8; return `<tr><td>${l.split(' ')[0]}</td><td>${fmtJ(k,R[k])}</td><td><b style="color:${big?'var(--orange)':'var(--green)'}">${fmtJ(k,me[k])}</b></td></tr>`; }).join('')}</table>`}</div></div>
     <div class="muted" style="font-size:12px;margin:8px 0 4px">반복별</div><div>${perRep.map((f,i)=>`<span class="kw" style="${f.length?'background:var(--orange-soft);color:var(--orange)':''}">${i+1}회 ${f.length?f.map(x=>({depth:'더 앉기',trunk:'상체',hip:'엉덩이',ankle:'발목',knee:'무릎'})[x.k]).join('·'):'좋음'}</span>`).join('')}</div>
     <p class="muted" style="font-size:12px;margin:8px 0">비교 기준: ${ref.src} · 수업 때 동작과 비교한 안내이며 의학적 판단이 아니에요</p>
     <div class="row"><button class="btn sm sec" data-act="upReset" style="flex:1">다른 영상 올리기</button><button class="btn sm sec" data-act="upShare" style="flex:1">트레이너에게 보내기</button></div>`;
@@ -3399,7 +3455,7 @@ async function runUpload(file,name){
     const res=await window.LiveCam.analyzeVideo(file,{canvas:$('#upCanvas'),fps:15,onStatus:t=>set(0,t),onProgress:p=>set(p,`영상 분석 중… ${Math.round(p*100)}%`),onRep:(r,n)=>set(null,`반복 ${n}회 찾음`)});
     S.up={name,status:'done',res};
     const log=LS.get('aiwm_uploads',[]); const me=res.reps.length?avgAng(res.reps.map(r=>r.ang)):null, ref=refFor(cls);
-    log.unshift({name,cls,date:ymd(new Date()),t:min2hm(new Date().getHours()*60+new Date().getMinutes()),reps:res.reps.length,fb:me&&ref?feedbackFor(cls,me,ref.ang).map(f=>f.t):[],me}); LS.set('aiwm_uploads',log.slice(0,100));
+    log.unshift({name,cls,date:ymd(new Date()),t:min2hm(new Date().getHours()*60+new Date().getMinutes()),reps:res.reps.length,fb:me&&ref?(ref.gold?goldFeedback(cls,me):feedbackFor(cls,me,ref.ang)).map(f=>f.t):[],me}); LS.set('aiwm_uploads',log.slice(0,100));
   }catch(e){ S.up={name,status:'error',err:e.message||'분석하지 못했어요'}; }
   if(S.sub==='solo') keepScroll(render);
 }
@@ -3411,6 +3467,20 @@ function uploadAct(act,a){
   return false;
 }
 function bindUpload(){ document.querySelectorAll('.upFile').forEach(inp=>inp.addEventListener('change',e=>{ const f=e.target.files[0]; if(f) runUpload(f,inp.dataset.n); })); }
+// ---------- 트레이너 기준이 없을 때: 일반적인 동작 기준(골드 스탠다드)으로 평가 ----------
+// 옆모습 최저점 기준. 스쿼트: 허벅지 수평 이하 · 상체와 정강이 기울기 비슷(±15°) · 정강이 20~40° · 상체 55° 이하
+// 힙힌지(루마니안 데드리프트): 무릎 살짝(10~35°) · 상체 충분히 숙임(50° 이상) · 엉덩이 뒤로
+const GOLD={squat:[
+    {k:'thigh',l:'앉은 깊이',range:'허벅지 수평 이하',ok:a=>a.thigh<=5,t:a=>'허벅지가 바닥과 평행할 때까지 더 앉으세요',s:a=>`지금은 수평보다 약 ${Math.round(a.thigh)}° 덜 앉았어요`},
+    {k:'trunk',l:'상체 숙임',range:'정강이 기울기 ±15°',ok:a=>a.trunk-a.ankle<=15,t:a=>`상체가 정강이보다 약 ${Math.round(a.trunk-a.ankle)}° 더 숙여졌어요`,s:a=>'가슴을 세우고, 무릎을 발끝 방향으로 조금 더 보내며 앉으세요'},
+    {k:'trunk2',l:'상체 각도',range:'55° 이하',ok:a=>a.trunk<=55,t:a=>`상체가 약 ${Math.round(a.trunk)}° 숙여졌어요`,s:a=>'허리에 부담이 커요 · 무게를 줄이고 가슴을 세워 보세요'},
+    {k:'ankle',l:'정강이 기울기',range:'20~40°',ok:a=>a.ankle>=20&&a.ankle<=40,t:a=>a.ankle<20?'무릎을 발끝 방향으로 조금 더 보내도 돼요':'무릎이 앞으로 많이 나가요',s:a=>a.ankle<20?`정강이가 ${Math.round(a.ankle)}° · 발목이 뻣뻣하면 뒤꿈치 아래 원판을 대 보세요`:`정강이가 ${Math.round(a.ankle)}° · 엉덩이를 먼저 뒤로 빼며 앉으세요 · 뒤꿈치 들림 주의`}],
+  hinge:[
+    {k:'knee',l:'무릎 굽힘',range:'10~35°',ok:a=>a.knee<=35,t:a=>`무릎이 약 ${Math.round(a.knee)}° 굽었어요`,s:a=>'스쿼트처럼 앉지 말고 무릎은 살짝만, 엉덩이로 접으세요'},
+    {k:'trunk',l:'상체 숙임',range:'50° 이상',ok:a=>a.trunk>=50,t:a=>'상체를 더 숙이세요',s:a=>`지금 ${Math.round(a.trunk)}° · 엉덩이를 뒤로 밀며 허벅지 뒤가 당길 때까지`},
+    {k:'hipBack',l:'엉덩이 뒤로',range:'발목보다 충분히 뒤',ok:a=>a.hipBack>=0.2,t:a=>'엉덩이를 더 뒤로 빼세요',s:a=>'벽을 엉덩이로 민다는 느낌'}]};
+function goldFeedback(cls,a){ return (GOLD[cls]||[]).filter(r=>!r.ok(a)).map(r=>({k:r.k,t:r.t(a),s:r.s(a)})); }
+function goldTable(cls,me){ return `<table class="t" style="font-size:12.5px"><tr><th>항목</th><th>일반 기준</th><th>나</th></tr>${(GOLD[cls]||[]).map(r=>{ const ok=r.ok(me), v=r.k==='hipBack'?Math.round(me.hipBack*100)+'%':cls==='squat'&&r.k==='trunk'?`${Math.round(me.trunk)}° <span style="font-weight:500;color:var(--muted)">/ 정강이 ${Math.round(me.ankle)}°</span>`:Math.round(me[r.k.replace('2','')])+'°'; return `<tr><td>${r.l}</td><td>${r.range}</td><td><b style="color:${ok?'var(--green)':'var(--orange)'}">${v}</b></td></tr>`; }).join('')}</table>`; }
 
 // ---------- 기본 운동 라이브러리 (헬스장에서 흔히 하는 운동 전체) ----------
 // [이름, 도구, 주로 쓰는 부위]
@@ -3452,6 +3522,191 @@ function bindExSheet(){
 }
 
 if(window.APP_BUILD){ const _mx=LS.get('aiwm_myex',null); if(_mx) S.addedEx=_mx; }
+// ---------- 운동일지: 운동별 세트(무게·횟수) · 최고 무게 · 추정 1RM · 동작 그림 · 내 영상 ----------
+// 동작 그림은 앱이 직접 그리는 막대 인형(옆모습). 실제 수업 영상이 있으면 그 수업의 내 골격으로 그림.
+const POSE_T={
+  squat:{he:[.60,.19],sh:[.52,.30],el:[.43,.35],wr:[.50,.28],hp:[.35,.60],kn:[.62,.60],an:[.56,.86],to:[.68,.88],bar:[[.44,.27],[.60,.27]]},
+  hinge:{he:[.80,.40],sh:[.70,.42],el:[.69,.58],wr:[.67,.72],hp:[.36,.46],kn:[.43,.68],an:[.40,.88],to:[.52,.89],bar:[[.58,.72],[.76,.72]]},
+  lunge:{he:[.50,.13],sh:[.50,.25],el:[.50,.39],wr:[.50,.51],hp:[.50,.52],kn:[.68,.66],an:[.68,.88],to:[.78,.89],kn2:[.38,.80],an2:[.24,.84],to2:[.17,.90]},
+  bench:{he:[.13,.52],sh:[.25,.54],el:[.27,.40],wr:[.25,.24],hp:[.60,.56],kn:[.77,.48],an:[.84,.80],to:[.92,.80],bar:[[.25,.24],[.25,.24]],eq:[[.08,.60,.70,.60],[.18,.60,.18,.86],[.60,.60,.60,.86]]},
+  row:{he:[.82,.38],sh:[.70,.42],el:[.58,.36],wr:[.62,.56],hp:[.36,.46],kn:[.43,.68],an:[.40,.88],to:[.52,.89]},
+  pull:{he:[.50,.24],sh:[.50,.36],el:[.36,.24],wr:[.42,.08],hp:[.48,.64],kn:[.72,.64],an:[.72,.88],to:[.80,.89],eq:[[.30,.08,.70,.08],[.36,.68,.62,.68]]},
+  ohp:{he:[.52,.21],sh:[.50,.32],el:[.38,.22],wr:[.44,.07],hp:[.50,.60],kn:[.51,.76],an:[.50,.92],to:[.60,.93],bar:[[.34,.07],[.58,.07]]},
+  curl:{he:[.50,.17],sh:[.50,.29],el:[.50,.46],wr:[.63,.35],hp:[.50,.60],kn:[.51,.76],an:[.50,.92],to:[.60,.93]},
+  plank:{he:[.86,.46],sh:[.75,.52],el:[.75,.70],wr:[.84,.70],hp:[.47,.56],kn:[.29,.60],an:[.13,.64],to:[.10,.70]},
+  seat:{he:[.30,.17],sh:[.32,.30],el:[.40,.44],wr:[.47,.52],hp:[.37,.60],kn:[.62,.56],an:[.66,.82],to:[.75,.84],eq:[[.24,.64,.56,.64],[.22,.12,.26,.64]]},
+  bridge:{he:[.12,.60],sh:[.24,.58],el:[.24,.72],wr:[.32,.74],hp:[.55,.43],kn:[.73,.47],an:[.76,.80],to:[.85,.80],eq:[[.06,.64,.30,.64]]},
+  stand:{he:[.50,.15],sh:[.50,.27],el:[.47,.44],wr:[.48,.58],hp:[.50,.58],kn:[.51,.75],an:[.50,.92],to:[.60,.93]}};
+function poseKind(n){ n=String(n||'');
+  if(/레그\s?프레스|레그\s?익스텐션|레그\s?컬|어브덕|어덕|글루트\s?머신|킥백\s?머신|힙\s?어브|힙\s?어덕/.test(n)) return 'seat';
+  if(/런지|스플릿|스텝\s?업/.test(n)) return 'lunge';
+  if(/스쿼트|핵|고블릿|월\s?싯/.test(n)) return 'squat';
+  if(/힙\s?쓰러스트|브릿지/.test(n)) return 'bridge';
+  if(/데드|힌지|굿모닝|RDL|백\s?익스텐션|스윙/.test(n)) return 'hinge';
+  if(/벤치|체스트\s?프레스|플라이|딥스|푸시\s?업|팔굽/.test(n)) return 'bench';
+  if(/로우/.test(n)) return 'row';
+  if(/풀업|친업|풀\s?다운|랫/.test(n)) return 'pull';
+  if(/오버헤드|숄더|밀리터리|레이즈|프레스/.test(n)) return 'ohp';
+  if(/컬|익스텐션|킥백|푸시\s?다운|삼두|이두/.test(n)) return 'curl';
+  if(/플랭크|데드\s?버그|크런치|코어|싯업|레그\s?레이즈/.test(n)) return 'plank';
+  return 'stand'; }
+function figHi(kind){ return ['squat','seat','lunge','hinge','bridge'].includes(kind)?'leg':kind==='plank'?'core':kind==='stand'?'':'arm'; }
+const FIG_INK='#334155', FIG_FAR='#CBD5E1', FIG_HI='#F97316';
+// 운동 그림: ex/ 폴더에 '운동 이름.png' 를 넣으면 그 그림을 쓰고, 없으면 앱이 그린 막대 인형
+const EX_IMG_DIR=(window.APP_CONFIG&&window.APP_CONFIG.exImgDir)||'ex/';
+function exImgName(n){ return String(n||'').trim().replace(/[\\/:*?"<>|]/g,''); }
+function figHTML(name,lm){ const n=exImgName(name); return `<span class="figwrap">${figSVG(name,null)}${n?`<img class="eximg" src="${EX_IMG_DIR}${encodeURIComponent(n)}.png" alt="" loading="lazy" onerror="this.remove()">`:''}</span>`; }
+function figSVG(name,lm,label){
+  const kind=poseKind(name), hi=figHi(kind);
+  const ln=(a,b,c,w)=>`<line x1="${a[0].toFixed(3)}" y1="${a[1].toFixed(3)}" x2="${b[0].toFixed(3)}" y2="${b[1].toFixed(3)}" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>`;
+  let body='', vb='0 0 1 1';
+  if(lm&&lm.length>=33&&typeof normLm==='function'){ // 내 수업 영상 골격
+    const P=normLm(lm).map(p=>[p.x,p.y]); let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; [0,11,12,13,14,15,16,23,24,25,26,27,28,31,32].forEach(i=>{ x0=Math.min(x0,P[i][0]); x1=Math.max(x1,P[i][0]); y0=Math.min(y0,P[i][1]); y1=Math.max(y1,P[i][1]); });
+    const s=Math.max(x1-x0,y1-y0)*1.25||1, cx=(x0+x1)/2, cy=(y0+y1)/2; vb=`${(cx-s/2).toFixed(3)} ${(cy-s/2).toFixed(3)} ${s.toFixed(3)} ${s.toFixed(3)}`; const w=(s*0.045).toFixed(3);
+    const legs=[[23,25],[25,27],[24,26],[26,28],[27,31],[28,32]], arms=[[11,13],[13,15],[12,14],[14,16]], torso=[[11,12],[11,23],[12,24],[23,24]];
+    const col=e=>hi==='leg'&&legs.some(x=>x+''==e+'')||hi==='arm'&&arms.some(x=>x+''==e+'')||hi==='core'&&torso.some(x=>x+''==e+'')?FIG_HI:FIG_INK;
+    body=EDG.map(e=>ln(P[e[0]],P[e[1]],col(e),w)).join('')+`<circle cx="${P[0][0].toFixed(3)}" cy="${P[0][1].toFixed(3)}" r="${(s*0.055).toFixed(3)}" fill="#fff" stroke="${FIG_INK}" stroke-width="${w}"/>`;
+  } else {
+    const T=POSE_T[kind], off=[-0.035,-0.012], f=p=>[p[0]+off[0],p[1]+off[1]];
+    const far2=k=>T[k+'2']||f(T[k]);
+    const cL=hi==='leg'?FIG_HI:FIG_INK, cA=hi==='arm'?FIG_HI:FIG_INK, cT=hi==='core'?FIG_HI:FIG_INK;
+    (T.eq||[]).forEach(e=>{ body+=ln([e[0],e[1]],[e[2],e[3]],'#94A3B8',.035); });
+    // 먼 쪽 팔다리(옅게)
+    body+=ln(far2('hp'),far2('kn'),FIG_FAR,.05)+ln(far2('kn'),far2('an'),FIG_FAR,.05)+ln(far2('an'),far2('to'),FIG_FAR,.04);
+    body+=ln(f(T.sh),f(T.el),FIG_FAR,.045)+ln(f(T.el),f(T.wr),FIG_FAR,.045);
+    // 몸통 · 가까운 쪽
+    body+=ln(T.sh,T.hp,cT,.075)+ln(T.hp,T.kn,cL,.06)+ln(T.kn,T.an,cL,.055)+ln(T.an,T.to,cL,.045)+ln(T.sh,T.el,cA,.05)+ln(T.el,T.wr,cA,.045);
+    if(T.bar) body+=ln(T.bar[0],T.bar[1],'#0F172A',.03)+(T.bar[0][0]===T.bar[1][0]?'':'')+`<circle cx="${T.bar[0][0]}" cy="${T.bar[0][1]}" r=".045" fill="#0F172A"/><circle cx="${T.bar[1][0]}" cy="${T.bar[1][1]}" r=".045" fill="#0F172A"/>`;
+    body+=`<circle cx="${T.he[0]}" cy="${T.he[1]}" r=".065" fill="#fff" stroke="${FIG_INK}" stroke-width=".04"/>`;
+  }
+  return `<svg viewBox="${vb}" role="img" aria-label="${esc(label||name)} 동작 그림" class="figsvg">${body}</svg>`;
+}
+// ---- 기록 ----
+function parseW(s){ if(s==null) return null; if(typeof s==='number') return s; const m=String(s).match(/(\d+(?:\.\d+)?)/); return m?+m[1]:(/맨몸|BW/i.test(s)?0:null); }
+function segSets(g){ if(Array.isArray(g.log)) return g.log;
+  const w=parseW(g.w!=null&&g.w!==''?g.w:(g.setup&&g.setup.weight)); const by={};
+  (g.reps||[]).forEach(r=>{ const k=r.set||1; by[k]=(by[k]||0)+1; });
+  const ks=Object.keys(by).sort((a,b)=>a-b); if(ks.length) return ks.map(k=>({w,r:by[k]}));
+  const n=+g.sets||0; return n?[...Array(n)].map(()=>({w,r:null})):[]; }
+function est1RM(L){ let b=0; L.forEach(x=>{ if(+x.w>0&&+x.r>0) b=Math.max(b,x.w*(1+x.r/30)); }); return b?Math.round(b*2)/2:0; }
+function fmtKg(v){ return v==null?'':(Math.round(v*10)/10).toLocaleString('ko-KR'); }
+const SKIP_LOG=/평가|몸풀기|스트레칭|휴식|쿨다운|말로 나눈/;
+const DEMO_WLOG={id:'demo-hw-16',mid:'hw',demo:true,date:'2026-11-01',n:16,segs:[
+  {title:'스쿼트',log:[{w:40,r:12},{w:50,r:10},{w:55,r:8},{w:60,r:6}],point:'흉추 펴고 앉기 · 무릎은 발끝 방향'},
+  {title:'루마니안 데드리프트',log:[{w:20,r:12},{w:20,r:12},{w:30,r:10},{w:30,r:10}],point:'바를 허벅지에 붙여서 내리기'},
+  {title:'레그 프레스',log:[{w:60,r:15},{w:80,r:12},{w:80,r:12}],point:'발은 어깨너비 · 무릎 안으로 모이지 않게',setup:{seat:'등받이 3칸'}},
+  {title:'힙 어브덕션',log:[{w:25,r:12},{w:25,r:15},{w:25,r:15},{w:25,r:15}],point:'상체 살짝 숙여 엉덩이 바깥쪽에 집중'},
+  {title:'덤벨 로우',log:[{w:10,r:12},{w:12,r:10},{w:12,r:10}],point:'팔꿈치를 엉덩이 쪽으로 당기기'}]};
+function wlogAll(mid){ const saved=LS.get('aiwm_sessions',[]).filter(x=>(x.mid||'hw')===mid).map(x=>Object.assign({},x,{date:x.date||ymd(new Date(x.ts))}));
+  const L=saved.concat(soloLogs().filter(x=>(x.mid||'hw')===mid)); if(mid==='hw'){ const d=JSON.parse(JSON.stringify(DEMO_WLOG)), ed=(LS.get('aiwm_demolog',{})||{})[d.id]; if(ed) d.segs=ed; L.push(d); }
+  return L.sort((a,b)=>String(b.date).localeCompare(String(a.date))||(b.ts||0)-(a.ts||0)); }
+function wlogGet(id){ const so=soloLogs().find(x=>x.id===id); if(so) return so; if(id===DEMO_WLOG.id) return wlogAll('hw').find(x=>x.id===id); const r=LS.get('aiwm_sessions',[]).find(x=>x.id===id); return r?Object.assign({},r,{date:r.date||ymd(new Date(r.ts))}):null; }
+function wlogSave(rec){ if(rec.solo){ const L=soloLogs(), i=L.findIndex(x=>x.id===rec.id); if(i>=0) L[i]=rec; else L.unshift(rec); LS.set('aiwm_sololog',L.slice(0,200)); return; } if(rec.demo){ const all=LS.get('aiwm_demolog',{})||{}; all[rec.id]=rec.segs; LS.set('aiwm_demolog',all); return; }
+  const list=LS.get('aiwm_sessions',[]), i=list.findIndex(x=>x.id===rec.id); if(i<0) return; list[i].segs=rec.segs; LS.set('aiwm_sessions',list); }
+function wlogSegs(rec){ return (rec.segs||[]).map((g,i)=>({g,i,name:segTitle(g)||'운동'})).filter(x=>!SKIP_LOG.test(x.name)&&(rec.solo||segSets(x.g).length||x.g.best||x.g.point)); }
+function wlogStats(rec){ const S2=wlogSegs(rec); let vol=0,sets=0; S2.forEach(x=>segSets(x.g).forEach(s=>{ sets++; if(+s.w>0&&+s.r>0) vol+=s.w*s.r; })); return {n:S2.length,vol,sets}; }
+function wlogListCard(mid,title,solo){ const L=wlogAll(mid); if(!L.length&&!solo) return '';
+  return `<div class="card"><h3>${title||'운동일지'}<span class="r">${L.length}개</span></h3>${solo?`<button class="btn full" data-act="soloNew" style="margin-bottom:8px">${I.plus} 오늘 운동 기록하기 · 혼자 운동</button><p class="muted" style="font-size:12px;margin:-2px 0 8px">PT 없이 운동한 날도 세트·무게를 적고 내 영상을 올리면 일반 동작 기준으로 평가해 드려요.</p>`:''}${L.slice(0,S.wlAll?99:4).map(r=>{ const st=wlogStats(r);
+    return `<button class="list-item" data-act="wlogOpen" data-id="${r.id}"><div class="wl-mini">${figHTML(wlogSegs(r)[0]?wlogSegs(r)[0].name:'')}</div><div class="sp"><b style="font-size:14px">${mdLabel(r.date)}${r.n?` · ${r.n}회차`:''}${r.demo?' <span class="pill p-gray" style="font-size:10.5px">예시</span>':''}${r.solo?' <span class="pill p-blue" style="font-size:10.5px">혼자 운동</span>':''}</b><div class="muted">${wlogSegs(r).map(x=>esc(x.name)).join(' · ')}</div><div class="muted" style="font-size:12px">${st.sets}세트${st.vol?` · 총 ${fmtKg(st.vol)}kg`:''}${r.solo?(r.segs.some(g=>g.vid)?' · 내 영상 있음':''):r.noVideo||r.demo?'':' · 영상 있음'}</div></div><span class="muted">›</span></button>`; }).join('')}
+    ${L.length>4&&!S.wlAll?`<button class="btn sm sec full" data-act="wlAll" style="margin-top:8px">전체 ${L.length}개 보기</button>`:''}</div>`; }
+const WL={url:null,id:null,thumbs:{}};
+function wlogSheet(id){ const rec=wlogGet(id); if(!rec) return '';
+  const st=wlogStats(rec), ed=S.wlEdit&&S.wlEdit.id===id?S.wlEdit:null, hasVid0=!rec.demo&&!rec.noVideo&&!rec.solo;
+  return `<div class="modal"><div class="sheet wlog" role="dialog" aria-label="운동일지">
+    <div class="row" style="align-items:flex-start"><div class="sp"><h2 style="margin:0">${mdLabel(rec.date)}${rec.n?` · ${rec.n}회차`:''}</h2><p class="muted" style="margin:2px 0 0">운동 ${st.n}가지 · ${st.sets}세트${st.vol?` · 총 볼륨 ${fmtKg(st.vol)}kg`:''}</p></div><button class="btn sm sec" data-act="wlShare" data-id="${id}">보내기</button>${rec.solo?`<button class="btn sm ghost" data-act="soloDel" data-id="${id}" style="color:var(--red);margin-left:4px">삭제</button>`:''}</div>
+    ${rec.solo?'<p class="muted" style="font-size:12px;margin:6px 0 0">혼자 운동 기록 · 운동마다 내 영상을 올리면 자세를 평가해요</p>':''}
+    ${rec.demo?'<p class="muted" style="font-size:12px;margin:6px 0 0">예시 기록이에요 · 수업을 촬영하면 실제 기록과 내 영상이 여기에 쌓여요</p>':''}
+    <div class="wl-list">${wlogSegs(rec).map(({g,i,name})=>{ const L=segSets(g), mx=L.reduce((a,x)=>Math.max(a,+x.w||0),0), rm=est1RM(L), hasVid=hasVid0||rec.solo&&g.vid;
+      return `<div class="wl-ex"><div class="wl-main"><b class="wl-name">${esc(name)}</b>
+        <div class="wl-meta">${mx?`최고 ${fmtKg(mx)}kg`:''}${rm?` · 추정 1RM ${fmtKg(rm)}kg`:''}${g.setup&&g.setup.seat?` · ${esc(g.setup.seat)}`:''}${g.setup&&g.setup.pin?` · ${esc(g.setup.pin)}`:''}</div>
+        <div class="wl-sets">${L.map((x,k)=>`<button class="wl-set ${ed&&ed.i===i&&ed.k===k?'on':''}" data-act="wlSet" data-id="${id}" data-i="${i}" data-k="${k}" aria-label="${k+1}세트 ${x.w!=null?x.w+'kg':''} ${x.r||''}회 고치기"><b>${x.w==null?'–':+x.w===0?'맨몸':fmtKg(x.w)}</b><span>${x.r?x.r+'회':'–'}</span></button>`).join('')}<button class="wl-set add" data-act="wlAdd" data-id="${id}" data-i="${i}" aria-label="세트 추가">+</button></div>
+        ${ed&&ed.i===i?`<div class="wl-edit"><label><span>무게 kg</span><input type="number" inputmode="decimal" id="wlW" value="${L[ed.k]&&L[ed.k].w!=null?L[ed.k].w:''}" placeholder="맨몸 0"></label><label><span>횟수</span><input type="number" inputmode="numeric" id="wlR" value="${L[ed.k]&&L[ed.k].r!=null?L[ed.k].r:''}"></label><button class="btn sm" data-act="wlSetSave" data-id="${id}">저장</button><button class="btn sm ghost" data-act="wlSetDel" data-id="${id}" style="color:var(--red)">삭제</button></div>`:''}
+        ${rec.solo?soloSegHTML(rec,g,i):''}
+        <input class="wl-memo" data-wlmemo="${i}" data-id="${id}" value="${esc(g.memo!=null?g.memo:(g.point||''))}" placeholder="메모 (예: 외전할 때 엉덩이 자극 좋음)">
+      </div>
+      <button class="wl-fig" data-act="wlClip" data-id="${id}" data-i="${i}" aria-label="${esc(name)} ${hasVid?'내 영상 보기':'동작 그림 크게 보기'}">${hasVid?`<img class="wl-thumb" data-th="${i}" alt="" hidden>`:''}${figHTML(name)}${hasVid?'<span class="wl-play">▶ 내 영상</span>':''}</button></div>`; }).join('')||`<p class="muted">${rec.solo?'아래에서 오늘 한 운동을 추가하세요.':'이 수업에서 정리된 운동이 없어요.'}</p>`}</div>
+    ${rec.solo?`<div class="wl-addex"><input id="soloEx" list="soloExList" placeholder="운동 이름 (예: 스쿼트, 힙 어브덕션)" autocomplete="off"><datalist id="soloExList">${(window.EX_LIBRARY||[]).map(n=>`<option value="${esc(n)}">`).join('')}</datalist><button class="btn sm" data-act="soloAddEx" data-id="${id}">${I.plus} 운동 추가</button></div>`:''}
+    <p class="muted" style="font-size:12px;margin:10px 0 0">동그라미를 누르면 무게·횟수를 고칠 수 있어요 · 추정 1RM은 무게 × (1 + 횟수 ÷ 30)</p>
+    <button class="btn sec full" data-act="wlClose" style="margin-top:10px">닫기</button></div></div>`; }
+async function wlVideoURL(id){ if(String(id).includes(':')){ try{ const b=await IDB.get(id); return b?URL.createObjectURL(b):null; }catch(e){ return null; } } if(WL.id===id&&WL.url) return WL.url; try{ const b=await IDB.get(id); if(!b) return null; if(WL.url) URL.revokeObjectURL(WL.url); WL.url=URL.createObjectURL(b); WL.id=id; return WL.url; }catch(e){ return null; } }
+function wlRange(rec,i){ try{ if(typeof segRange==='function') return segRange(rec,i); }catch(e){} const g=rec.segs[i]; return [+g.start||0,+g.end||((+g.start||0)+30)]; }
+// 수업 영상에서 운동마다 한 장면을 뽑아 썸네일로
+async function wlThumbs(id){ const rec=wlogGet(id); if(!rec||rec.demo||rec.noVideo) return; if(rec.solo){ for(const {g,i} of wlogSegs(rec)) if(g.vid) await wlThumbOne(id,i,id+':'+i); return; } const url=await wlVideoURL(id); if(!url) return;
+  const v=document.createElement('video'); v.muted=true; v.playsInline=true; v.preload='auto'; v.src=url;
+  await new Promise(r=>{ v.onloadeddata=r; v.onerror=r; setTimeout(r,4000); });
+  for(const {i} of wlogSegs(rec)){ const img=document.querySelector(`.wl-thumb[data-th="${i}"]`); if(!img) continue;
+    if(WL.thumbs[id+':'+i]){ img.src=WL.thumbs[id+':'+i]; img.hidden=false; img.parentElement.classList.add('hasimg'); continue; }
+    const [t0,t1]=wlRange(rec,i); try{ await new Promise((r,j)=>{ v.onseeked=r; v.onerror=j; v.currentTime=Math.max(0,(t0+t1)/2); setTimeout(r,2500); });
+      const c=document.createElement('canvas'), W=240, H=Math.round(W*(v.videoHeight||3)/(v.videoWidth||4)); c.width=W; c.height=H; c.getContext('2d').drawImage(v,0,0,W,H);
+      const u=c.toDataURL('image/jpeg',.7); WL.thumbs[id+':'+i]=u; img.src=u; img.hidden=false; img.parentElement.classList.add('hasimg'); }catch(e){} } }
+async function wlClip(id,i){ const rec=wlogGet(id); if(!rec) return; const g=rec.segs[i], name=segTitle(g)||'운동', L=segSets(g);
+  const url=rec.solo?(g.vid?await wlVideoURL(id+':'+i):null):rec.demo||rec.noVideo?null:await wlVideoURL(id), [t0,t1]=rec.solo?[0,9999]:wlRange(rec,i);
+  $('#modalRoot').innerHTML=`<div class="modal"><div class="sheet" role="dialog" aria-label="${esc(name)} 영상"><h2>${esc(name)}</h2><p class="muted" style="margin:0 0 10px">${mdLabel(rec.date)} · ${L.map(x=>`${x.w==null?'':+x.w===0?'맨몸 ':fmtKg(x.w)+'kg '}${x.r?x.r+'회':''}`).join(' / ')}</p>
+    ${url?`<video src="${url}#t=${t0.toFixed(1)},${t1.toFixed(1)}" controls autoplay playsinline muted style="width:100%;border-radius:12px;background:#000;display:block;max-height:52vh"></video><p class="muted" style="font-size:12px;margin:6px 0 10px">${rec.solo?'내가 올린 영상이에요':`이 수업에서 ${esc(name)} 하던 부분만 재생돼요`}</p>`:`<p class="muted" style="font-size:13px;margin:0 0 10px">${rec.solo?'아직 올린 영상이 없어요.':rec.demo?'예시 기록이라 영상이 없어요.':'영상을 지운 기록이에요.'} 수업을 촬영하면 이 자리에 내 영상이 나와요.</p>`}
+    <div class="wl-bigrow"><div class="wl-bigfig"><div class="cap">동작</div>${figHTML(name)}</div>${g.best?`<div class="wl-bigfig dark"><div class="cap">내 골격 (마커리스)</div>${figSVG(name,g.best)}</div>`:''}</div>${g.ana?anaHTML(g.ana,true):''}${g.point||g.memo?`<div class="alert b" style="margin-top:10px"><div>${esc(g.memo!=null?g.memo:g.point)}</div></div>`:''}
+    <button class="btn sec full" data-act="wlogOpen" data-id="${id}" style="margin-top:10px">← 일지로</button></div></div>`; }
+function wlText(rec){ return `[운동일지] ${mdLabel(rec.date)}${rec.n?' · '+rec.n+'회차':''}\n`+wlogSegs(rec).map(({g,name})=>{ const L=segSets(g), rm=est1RM(L); return `\n${name}${rm?` (추정 1RM ${fmtKg(rm)}kg)`:''}\n`+L.map((x,k)=>`${k+1}세트 ${x.w==null?'':+x.w===0?'맨몸 ':fmtKg(x.w)+'kg × '}${x.r||'-'}회`).join('\n')+((g.memo!=null?g.memo:g.point)?`\n· ${g.memo!=null?g.memo:g.point}`:''); }).join('\n'); }
+function wlOpen(id){ $('#modalRoot').innerHTML=wlogSheet(id); wlThumbs(id); }
+function wlogAct(act,a){
+  if(soloAct(act,a)) return true;
+  const id=a.dataset.id;
+  switch(act){
+    case 'wlogOpen': S.wlEdit=null; wlOpen(id); return true;
+    case 'wlAll': S.wlAll=true; keepScroll(render); return true;
+    case 'wlClose': S.wlEdit=null; $('#modalRoot').innerHTML=''; keepScroll(render); return true;
+    case 'wlClip': wlClip(id,+a.dataset.i); return true;
+    case 'wlSet': { const i=+a.dataset.i,k=+a.dataset.k; S.wlEdit=S.wlEdit&&S.wlEdit.id===id&&S.wlEdit.i===i&&S.wlEdit.k===k?null:{id,i,k}; wlOpen(id); const w=$('#wlW'); w&&w.focus(); return true; }
+    case 'wlAdd': { const rec=wlogGet(id), i=+a.dataset.i, g=rec.segs[i], L=segSets(g).map(x=>Object.assign({},x)); const last=L[L.length-1]||{w:null,r:10}; L.push({w:last.w,r:last.r}); g.log=L; wlogSave(rec); S.wlEdit={id,i,k:L.length-1}; wlOpen(id); const w=$('#wlW'); w&&w.focus(); return true; }
+    case 'wlSetSave': { const e=S.wlEdit; if(!e) return true; const rec=wlogGet(id), g=rec.segs[e.i], L=segSets(g).map(x=>Object.assign({},x)); const w=$('#wlW').value, r=$('#wlR').value;
+      L[e.k]={w:w===''?null:Math.max(0,+w),r:r===''?null:Math.max(0,Math.round(+r))}; g.log=L; wlogSave(rec); S.wlEdit=null; wlOpen(id); toast('저장했어요'); return true; }
+    case 'wlSetDel': { const e=S.wlEdit; if(!e) return true; const rec=wlogGet(id), g=rec.segs[e.i], L=segSets(g).map(x=>Object.assign({},x)); L.splice(e.k,1); g.log=L; wlogSave(rec); S.wlEdit=null; wlOpen(id); return true; }
+    case 'wlShare': { const rec=wlogGet(id); if(!rec) return true; const t=wlText(rec); if(navigator.share) navigator.share({text:t}).catch(()=>{}); else { try{ navigator.clipboard.writeText(t).then(()=>toast('운동일지를 복사했어요'),()=>toast('복사가 막혀 있어요')); }catch(e){} } return true; }
+  }
+  return false; }
+document.addEventListener('change',e=>{ const t=e.target; if(!t||!t.dataset||t.dataset.wlmemo==null) return; const rec=wlogGet(t.dataset.id); if(!rec) return; rec.segs[+t.dataset.wlmemo].memo=t.value.trim(); wlogSave(rec); toast('메모를 저장했어요'); });
+
+// ---------- 혼자 운동 기록 (PT 없이) : 세트·무게 + 내 영상 → 일반 기준(골드 스탠다드)으로 자세 평가 ----------
+function soloLogs(){ return LS.get('aiwm_sololog',[]); }
+function anaCls(name){ const k=poseKind(name); return k==='squat'||k==='lunge'?'squat':k==='hinge'?'hinge':null; }
+function anaHTML(A,full){ if(!A) return ''; if(A.err) return `<div class="feedback warn" style="margin-top:8px">${esc(A.err)}</div>`;
+  return `<div class="wl-ana ${A.fb.length?'o':'g'}"><b>${A.reps}회 분석 · ${A.fb.length?`고칠 점 ${A.fb.length}가지`:'좋은 자세예요'}</b>${A.fb.map((f,k)=>`<div class="wl-fb"><span>${k+1}</span><div>${esc(f.t)}<div class="muted" style="font-size:12px">${esc(f.s)}</div></div></div>`).join('')}${full&&A.me&&A.cls&&/골드|일반/.test(A.src||'')&&typeof goldTable==='function'?`<div style="margin-top:8px">${goldTable(A.cls,A.me)}</div>`:''}<div class="muted" style="font-size:11.5px;margin-top:4px">기준: ${esc(A.src)} · 의학적 판단이 아니에요</div></div>`; }
+function soloSegHTML(rec,g,i){ const up=S.wlUp&&S.wlUp.id===rec.id&&S.wlUp.i===i?S.wlUp:null, cls=anaCls(segTitle(g));
+  if(up) return `<div class="wl-up"><div class="upbar"><i id="wlUpBar" style="width:${Math.round((up.pct||0)*100)}%"></i></div><div class="muted" id="wlUpMsg" style="font-size:12px;margin-top:4px">${esc(up.msg||'영상 준비 중…')}</div></div>`;
+  return `${g.ana?anaHTML(g.ana):''}<div class="wl-uprow"><label class="btn sm sec">${g.vid?'영상 다시 올리기':'내 영상 올리기'}${cls?' · 자세 평가':''}<input type="file" accept="video/*" class="wlFile" data-id="${rec.id}" data-i="${i}" hidden></label>${!cls?'<span class="muted" style="font-size:11.5px">자세 평가는 스쿼트·런지·데드리프트류부터 · 이 운동은 영상만 저장</span>':'<span class="muted" style="font-size:11.5px">옆모습 · 전신이 나오게</span>'}</div>`; }
+async function soloAnalyze(id,i,file){ const rec=wlogGet(id); if(!rec) return; const g=rec.segs[i], cls=anaCls(segTitle(g));
+  try{ await IDB.put(id+':'+i,file); g.vid=true; delete WL.thumbs[id+':'+i]; }catch(e){ toast('영상을 저장하지 못했어요 · 저장 공간을 확인해 주세요'); }
+  if(!cls||!window.LiveCam||!window.LiveCam.analyzeVideo){ if(cls) g.ana={err:'분석 모듈을 불러오는 중이에요. 잠시 뒤 다시 올려 주세요'}; wlogSave(rec); wlOpen(id); return; }
+  S.wlUp={id,i,pct:0,msg:'골격 모델 준비 중…'}; wlogSave(rec); wlOpen(id);
+  const set=(p,m)=>{ if(!S.wlUp) return; if(p!=null) S.wlUp.pct=p; if(m) S.wlUp.msg=m; const b=$('#wlUpBar'), t=$('#wlUpMsg'); if(b&&p!=null) b.style.width=Math.round(p*100)+'%'; if(t&&m) t.textContent=m; };
+  try{ const cv=document.createElement('canvas');
+    const res=await window.LiveCam.analyzeVideo(file,{canvas:cv,fps:15,onStatus:t=>set(null,t),onProgress:p=>set(p,`영상 분석 중… ${Math.round(p*100)}%`),onRep:(r,n)=>set(null,`반복 ${n}회 찾음`)});
+    const reps=res.reps.filter(r=>r.cls===cls||r.cls==='squat'||r.cls==='hinge');
+    if(!reps.length) g.ana={err:res.reps.length?'이 운동과 다른 동작으로 보여요. 옆모습 전신이 나오게 다시 찍어 주세요.':'반복을 찾지 못했어요. 옆에서 2~3m 떨어져 머리부터 발까지 나오게 찍어 주세요.'};
+    else { const ref=refFor(cls), FB=a=>ref.gold?goldFeedback(cls,a):feedbackFor(cls,a,ref.ang), me=avgAng(reps.map(r=>r.ang)), fb=FB(me);
+      const best=reps.slice().sort((a,b)=>FB(a.ang).length-FB(b.ang).length)[0];
+      g.ana={reps:reps.length,fb:fb.map(f=>({t:f.t,s:f.s})),src:ref.src,cls,me,good:reps.filter(r=>!FB(r.ang).length).length}; g.best=best&&best.lm||null;
+      if(!segSets(g).length||segSets(g).every(x=>x.r==null)) g.log=[{w:(segSets(g)[0]||{}).w??null,r:reps.length}]; }
+  }catch(e){ const m=String(e&&e.message||''); g.ana={err:/fetch|import|network|load/i.test(m)?'골격 모델을 불러오지 못했어요 · 인터넷 연결을 확인하고 다시 올려 주세요':(m||'분석하지 못했어요')}; }
+  S.wlUp=null; wlogSave(rec); if(document.querySelector('.wlog')) wlOpen(id); toast(g.ana&&!g.ana.err?'자세 평가를 마쳤어요':'영상을 저장했어요'); }
+async function wlThumbOne(id,i,key){ const img=document.querySelector(`.wl-thumb[data-th="${i}"]`); if(!img) return;
+  if(WL.thumbs[key]){ img.src=WL.thumbs[key]; img.hidden=false; img.parentElement.classList.add('hasimg'); return; }
+  const url=await wlVideoURL(key); if(!url) return; const v=document.createElement('video'); v.muted=true; v.playsInline=true; v.preload='auto'; v.src=url;
+  await new Promise(r=>{ v.onloadeddata=r; v.onerror=r; setTimeout(r,4000); });
+  try{ await new Promise(r=>{ v.onseeked=r; v.currentTime=Math.min(1,(v.duration||2)/2); setTimeout(r,2500); }); const c=document.createElement('canvas'), W=240, H=Math.round(W*(v.videoHeight||3)/(v.videoWidth||4)); c.width=W; c.height=H; c.getContext('2d').drawImage(v,0,0,W,H);
+    const u=c.toDataURL('image/jpeg',.7); WL.thumbs[key]=u; img.src=u; img.hidden=false; img.parentElement.classList.add('hasimg'); }catch(e){}
+  URL.revokeObjectURL(url); }
+function soloAct(act,a){
+  switch(act){
+    case 'soloNew': { const today=ymd(new Date()); let rec=soloLogs().find(x=>x.date===today&&x.mid==='hw');
+      if(!rec){ rec={id:'solo'+Date.now().toString(36),mid:'hw',solo:true,date:today,ts:Date.now(),segs:[]}; wlogSave(rec); }
+      S.wlEdit=null; wlOpen(rec.id); setTimeout(()=>{ const e=$('#soloEx'); e&&e.focus(); },60); return true; }
+    case 'soloAddEx': { const id=a.dataset.id, n=(($('#soloEx')||{}).value||'').trim(); if(!n){ toast('운동 이름을 넣어 주세요'); return true; }
+      const rec=wlogGet(id); rec.segs.push({title:n,log:[{w:null,r:10}]}); wlogSave(rec); S.wlEdit={id,i:rec.segs.length-1,k:0}; wlOpen(id); const w=$('#wlW'); w&&w.focus(); return true; }
+    case 'soloDel': { if(!confirm('이 혼자 운동 기록을 지울까요?')) return true; const id=a.dataset.id, rec=wlogGet(id); (rec&&rec.segs||[]).forEach((g,i)=>{ try{ IDB.del(id+':'+i); }catch(e){} }); LS.set('aiwm_sololog',soloLogs().filter(x=>x.id!==id)); $('#modalRoot').innerHTML=''; keepScroll(render); return true; }
+  }
+  return false; }
+document.addEventListener('change',e=>{ const t=e.target; if(!t||!t.classList||!t.classList.contains('wlFile')) return; const f=t.files&&t.files[0]; if(f) soloAnalyze(t.dataset.id,+t.dataset.i,f); });
+
 // ---------- render ----------
 let modal=null;
 function render(){
@@ -3526,6 +3781,7 @@ document.addEventListener('click',e=>{
   if(uploadAct(act,a)) return;
   if(settleAct(act,a)) return;
   if(noteAct(act,a)) return;
+  if(wlogAct(act,a)) return;
   switch(act){
     case 'back':
       if(S.role==='trainer'){ if(S.sub==='kakao') go('review'); else if(S.sub==='review') go(null); else go(null);} else go(null); break;

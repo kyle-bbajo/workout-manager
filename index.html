@@ -242,6 +242,33 @@ input.nm{font:inherit;font-weight:800;font-size:16px;border:none;border-bottom:1
 .portion .cut{position:absolute;top:0;bottom:0;border-left:3px dashed #22C55E}
 .portion .cut span{position:absolute;top:8px;left:6px;white-space:nowrap;background:#16A34A;color:#fff;font-size:12px;font-weight:800;padding:3px 8px;border-radius:999px}
 .portion .cut.r span{left:auto;right:6px}
+.monthbtn{display:flex;align-items:center;gap:6px;font-size:15px;padding:6px 10px;border-radius:10px}
+.monthbtn:hover{background:var(--bg)}
+.monthbox{border:1px solid var(--line);border-radius:14px;padding:10px 6px;margin:0 0 10px}
+.monthbox .cd{height:46px;position:relative}
+.monthbox .mc{position:absolute;right:4px;top:2px;font-size:9.5px;color:var(--blue);font-weight:800}
+.wkh{display:grid;grid-template-columns:30px repeat(7,1fr);gap:2px;margin-bottom:6px}
+.wkd{display:flex;flex-direction:column;align-items:center;padding:5px 0 3px;border-radius:12px;line-height:1.15}
+.wkd small{font-size:11px;color:var(--ink3);font-weight:600}.wkd b{font-size:15px}
+.wkd i{font-style:normal;font-size:10px;color:var(--blue);font-weight:800;min-height:12px}
+.wkd.today b{color:var(--blue)}
+.wkd.on{background:var(--blue)}.wkd.on small,.wkd.on b,.wkd.on i{color:#fff}
+.wkg{position:relative;border-top:1px solid var(--line);cursor:pointer;user-select:none}
+.wkl{position:absolute;left:0;right:0;border-top:1px dashed #EDF0F4}
+.wkl span{position:absolute;left:0;top:-7px;font-size:10.5px;color:var(--ink3);background:#fff;padding-right:4px}
+.wkc{position:absolute;top:0;bottom:0;width:calc((100% - 30px) / 7);border-left:1px solid #F1F3F6}
+.wkc.on{background:rgba(29,78,216,.05)}
+.wkb{position:absolute;width:calc((100% - 30px) / 7 - 3px);border-radius:8px;background:#DBEAFE;border-left:3px solid var(--blue);color:#1E3A8A;padding:2px 3px;text-align:left;overflow:hidden;display:flex;flex-direction:column;z-index:2}
+.wkb b{font-size:11px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.wkb span{font-size:9.5px;opacity:.8}
+.wkb.c1{background:#E0F2FE;border-color:#0284C7;color:#075985}.wkb.c2{background:#FEF3C7;border-color:#D97706;color:#92400E}.wkb.c3{background:#DCFCE7;border-color:#16A34A;color:#166534}
+.wknow{position:absolute;width:calc((100% - 30px) / 7);border-top:2px solid #EF4444;z-index:3}
+.wknow:before{content:'';position:absolute;left:-4px;top:-5px;width:8px;height:8px;border-radius:50%;background:#EF4444}
+.nextbar{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin:10px 0;font-size:13.5px}
+.nextbar span{flex:1}
+.camph{min-height:260px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#CBD5E1;text-align:center;padding:20px;background:radial-gradient(circle at 50% 40%,#1E293B,#0B1220)}
+.camph svg{width:34px;height:34px;opacity:.8}.camph b{color:#fff;font-size:15px}.camph span{font-size:12.5px}
+.hud .flipbtn{margin-left:auto;color:#fff;border:none;cursor:pointer}
+
 .realbtn{display:flex;align-items:center;justify-content:center;gap:8px}
 </style>
 </head>
@@ -442,6 +469,37 @@ function alignGhost(g, lm, W, H){
   const A = frame(g), B = frame(lm), k = B.L / A.L, flip = A.f !== B.f ? -1 : 1;
   return g.map(p => ({ x: B.h.x + (p.x * W - A.h.x) * k * flip, y: B.h.y + (p.y * H - A.h.y) * k }));
 }
+// 골격 그리기: 왼쪽 하늘색 · 오른쪽 주황 · 몸통 흰색, 은은한 빛, 무릎·고관절 각도 표시
+const LEFT = new Set([11, 13, 15, 23, 25, 27, 29, 31]);
+function drawSkeleton(ctx, lm, W, H, bad){
+  const P = i => [lm[i].x * W, lm[i].y * H], v = i => (lm[i].visibility ?? 1) >= 0.35;
+  const lw = Math.max(4, W / 105), r = Math.max(4, W / 150);
+  const RIGHT = new Set([12, 14, 16, 24, 26, 28, 30, 32]);
+  const col = (a, b) => bad ? '#FBBF24' : (LEFT.has(a) && LEFT.has(b)) ? '#38BDF8' : (RIGHT.has(a) && RIGHT.has(b)) ? '#FB923C' : '#F1F5F9';
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  // 바깥 테두리(어두운 선)로 밝은 배경에서도 잘 보이게
+  EDGES.forEach(([a, b]) => { if (!v(a) || !v(b)) return; ctx.beginPath(); ctx.moveTo(...P(a)); ctx.lineTo(...P(b)); ctx.strokeStyle = 'rgba(15,23,42,.55)'; ctx.lineWidth = lw + 4; ctx.stroke(); });
+  ctx.shadowBlur = lw * 1.6;
+  EDGES.forEach(([a, b]) => { if (!v(a) || !v(b)) return; const c = col(a, b); ctx.shadowColor = c; ctx.strokeStyle = c; ctx.lineWidth = lw; ctx.beginPath(); ctx.moveTo(...P(a)); ctx.lineTo(...P(b)); ctx.stroke(); });
+  ctx.shadowBlur = 0;
+  [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28].forEach(i => { if (!v(i)) return; const [x, y] = P(i); ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = Math.max(2, r / 2); ctx.strokeStyle = bad ? '#F59E0B' : LEFT.has(i) ? '#0EA5E9' : '#F97316'; ctx.stroke(); });
+  // 잘 보이는 쪽의 무릎·고관절 각도
+  const vis = s => s.reduce((a, i) => a + (lm[i].visibility ?? 1), 0);
+  const sd = vis([11, 23, 25, 27]) >= vis([12, 24, 26, 28]) ? { sh: 11, hip: 23, kn: 25, an: 27 } : { sh: 12, hip: 24, kn: 26, an: 28 };
+  if ([sd.sh, sd.hip, sd.kn, sd.an].every(v)){
+    const flex = (a, b, c) => Math.round(180 - ang({ x: P(a)[0], y: P(a)[1] }, { x: P(b)[0], y: P(b)[1] }, { x: P(c)[0], y: P(c)[1] }));
+    badge(ctx, P(sd.kn), '무릎 ' + flex(sd.hip, sd.kn, sd.an) + '°', W);
+    badge(ctx, P(sd.hip), '고관절 ' + flex(sd.sh, sd.hip, sd.kn) + '°', W);
+  }
+  ctx.restore();
+}
+function badge(ctx, [x, y], text, W){
+  const fs = Math.max(12, Math.round(W / 40)); ctx.font = `700 ${fs}px "Pretendard Variable", Pretendard, system-ui, sans-serif`;
+  const tw = ctx.measureText(text).width, ph = fs * 0.5, bw = tw + ph * 2, bh = fs + ph * 1.2;
+  let bx = x + fs * 0.9, by = y - bh / 2; if (bx + bw > W - 4) bx = x - fs * 0.9 - bw;
+  ctx.fillStyle = 'rgba(15,23,42,.72)'; ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, bh / 2); else ctx.rect(bx, by, bw, bh); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.fillText(text, bx + ph, by + bh / 2 + 1);
+}
 const ALL = Array.from({ length: 33 }, (_, i) => i);
 
 // ---------- session ----------
@@ -459,11 +517,7 @@ const LiveCam = {
     o.onStatus && o.onStatus('카메라를 켜는 중…');
     S.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 960 }, height: { ideal: 720 } }, audio: false });
     if (!S.running){ S.stream.getTracks().forEach(t => t.stop()); return; }
-    if (o.record){ // 자막을 뽑기 위해 소리도 녹음
-      try { S.audio = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } }); }
-      catch (e) { S.audio = null; this._emit('voice', { txt: '마이크 권한이 없어 소리 없이 촬영해요 (자막 추출 불가)', kws: [] }); }
-      if (!S.running){ [S.stream, S.audio].forEach(st => st && st.getTracks().forEach(t => t.stop())); return; }
-    }
+    if (o.record){ await this._audio(); if (!S.running){ [S.stream, S.audio].forEach(st => st && st.getTracks().forEach(t => t.stop())); return; } }
     video.srcObject = S.stream; await video.play();
     await loadModel(o.onStatus);
     if (!S.running) return;
@@ -477,6 +531,25 @@ const LiveCam = {
     const loop = () => { if (!S.running) return; this._frame(); S.raf = requestAnimationFrame(loop); };
     S.raf = requestAnimationFrame(loop);
   },
+  async _audio(){ // 자막을 뽑기 위해 소리도 녹음
+    const S = this.s; if (!S || S.audio) return;
+    try { S.audio = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } }); }
+    catch (e) { S.audio = null; this._emit('voice', { txt: '마이크 권한이 없어 소리 없이 촬영해요 (자막 추출 불가)', kws: [] }); }
+  },
+  // 미리보기 중인 카메라를 끄지 않고 새 화면에 옮겨 붙임
+  attach(box){ const S = this.s; if (!S || !box) return false; box.innerHTML = ''; box.appendChild(S.canvas); return true; },
+  // 미리보기 → 측정 촬영 시작 (카메라를 다시 켜지 않음)
+  async begin(o2){
+    const S = this.s; if (!S || !S.running) return false;
+    Object.assign(S.o, o2, { mode: 'class', record: true, voice: true });
+    S.crit = Object.assign({ depth: 5 }, o2.criteria || {});
+    Object.assign(S, { reps: [], segs: [], buf: [], transcript: [], pending: [], pendingName: null, lastRep: null, lastRepT: 0, cur: null });
+    S.det = { hip: makeDetector(30), elbow: makeDetector(40) };
+    await this._audio(); if (!S.running) return false;
+    S.t0 = performance.now(); this._record(); this._voice();
+    return true;
+  },
+  isPreview(){ return !!(this.s && this.s.running && this.s.o.mode === 'preview'); },
   _frame(){
     const S = this.s, v = S.video, ctx = S.ctx, W = S.canvas.width, H = S.canvas.height;
     if (v.readyState < 2) return;
@@ -502,16 +575,19 @@ const LiveCam = {
     const lm = ps[0];
     // skeleton
     const bad = S.lastRep && !S.lastRep.ok && now - S.lastRepT < 1500;
-    ctx.lineWidth = Math.max(3, W / 160); ctx.lineCap = 'round'; ctx.strokeStyle = bad ? '#FBBF24' : '#7DD3FC';
-    EDGES.forEach(([a, b]) => { if ((lm[a].visibility ?? 1) < 0.3 || (lm[b].visibility ?? 1) < 0.3) return; ctx.beginPath(); ctx.moveTo(lm[a].x * W, lm[a].y * H); ctx.lineTo(lm[b].x * W, lm[b].y * H); ctx.stroke(); });
-    ctx.fillStyle = '#fff';
-    [11,12,13,14,15,16,23,24,25,26,27,28].forEach(i => { if ((lm[i].visibility ?? 1) < 0.3) return; ctx.beginPath(); ctx.arc(lm[i].x * W, lm[i].y * H, Math.max(3, W / 200), 0, 7); ctx.fill(); });
+    drawSkeleton(ctx, lm, W, H, bad);
     // reference ghost for solo practice
     if (S.o.ghost && S.o.ghost.length){ const g = alignGhost(S.o.ghost, lm, W, H); ctx.save(); ctx.setLineDash([8, 8]); ctx.strokeStyle = 'rgba(253,230,138,.85)'; ctx.lineWidth = Math.max(2, W / 260);
       EDGES.forEach(([a, b]) => { ctx.beginPath(); ctx.moveTo(g[a].x, g[a].y); ctx.lineTo(g[b].x, g[b].y); ctx.stroke(); }); ctx.restore(); }
     const m = metrics(lm, W, H);
+    if (!S.chkT || now - S.chkT > 400){ S.chkT = now;
+      const body = [0, 27, 28].some(i => (lm[i].visibility ?? 1) > 0.5) && (lm[27].visibility ?? 1) + (lm[28].visibility ?? 1) > 0.8 && lm[0].y > 0.02 && Math.max(lm[27].y, lm[28].y) < 0.99;
+      const torso = Math.hypot((lm[11].x + lm[12].x - lm[23].x - lm[24].x) / 2 * W, (lm[11].y + lm[12].y - lm[23].y - lm[24].y) / 2 * H) || 1;
+      const side = Math.abs(lm[11].x - lm[12].x) * W < torso * 0.45;
+      this._emit('checks', { body, side }); }
     if (m.vis < 0.4){ this._emit('status', '측면에서 전신이 다 보이게 세워 주세요'); return; }
     this._emit('status', '');
+    if (S.o.mode === 'preview') return; // 미리보기: 골격만 보여 주고 기록은 안 함
     S.buf.push({ h: m.hip, k: m.knee, e: m.elbow }); if (S.buf.length > 160) S.buf.shift();
     // rep tracking
     if (!S.cur) S.cur = { kneePk: 0, hipPk: 0, elbowPk: 0, shoulderPk: 0, thighMin: 99, trunkMax: -99, trunkMin: 99, hipMin: m.hip, elbowMin: m.elbow, t0: now, lm: null };
@@ -1139,7 +1215,7 @@ function mHome(){
     <div class="bar" style="margin-top:6px"><i style="width:${Math.min(100,120/g.exTarget*100)}%"></i></div></div>
   <button class="card list-item" data-act="goGoal" style="padding:14px 16px"><div class="sp"><b>인바디 · ${ib.date}</b><div class="muted">체중 ${ib.w.toFixed(1)}kg · 골격근 ${ib.smm.toFixed(1)}kg · 체지방률 ${ib.pbf.toFixed(1)}% → 목표 ${S.goal.target}%</div></div><span class="muted">›</span></button>`;
 }
-function tSchedule(){
+function tScheduleDemo(){
   renderTop('스케줄',false);
   const days=[['11/3 (화)',[['10:00','혜원','17회차'],['14:00','민준','9회차'],['19:30','서연','3회차']]],['11/4 (수)',[['09:00','지훈','5회차'],['18:00','혜원','18회차']]],['11/5 (목)',[['11:00','민준','10회차']]]];
   return `
@@ -1200,6 +1276,7 @@ function tLive(){
   renderTop('수업 · 혜원 17회차',true);
   const recording=!!sim&&sim.mode==='class' || S.recOn;
   if(!S.recOn){
+    if(window.APP_BUILD) return livePreview();
     return `
     <div class="segs" id="segStrip"><span class="segc">운동을 바꾸면 자동으로 나눠 기록해요</span></div>
     <div class="cam"><div id="simFig">${drawFig(pose(0),{})}</div>
@@ -1223,6 +1300,7 @@ function tLive(){
     <div id="kwBox"><span class="muted">코칭 키워드가 여기에 쌓여요</span></div>
     <div id="voiceTxt" class="muted" style="margin-top:8px;font-size:12px"></div>
   </div>
+  ${nextLessonBar()}
   <div class="row"><button class="btn sec" data-act="skipSim" style="flex:1">빨리 넘기기</button><button class="btn" data-act="endClass" style="flex:1;background:#B42318">촬영 종료</button></div>
   <p class="foot">시연용 동작 재현 · 실제 앱은 카메라로 실시간 분석</p>`;
 }
@@ -1268,6 +1346,7 @@ function tReview(){
     <div class="row" style="margin-top:10px" id="confirmRow"><button class="btn sm" data-act="conf" data-v="in">자세 주의로 표시</button><button class="btn sm sec" data-act="conf" data-v="out">기록에서 제외</button></div>
   </div>
   <div class="card"><h3>숙제</h3><div><span class="kw">#맨몸 스쿼트 15×3</span><span class="kw">#깊이 수평 아래</span><span class="kw">#힙힌지 벽 터치 10×3</span></div>
+  ${nextLessonBar()}
   <button class="btn full" data-act="toKakao">회원에게 보낼 메시지 보기</button>
   <p class="foot" id="reviewTimer"></p>`;
 }
@@ -1542,7 +1621,8 @@ function realLive(){
   <div class="card" style="padding:12px"><h3 style="margin-bottom:8px">${I.mic.replace('class="mic"','class="mic" style="width:18px;height:18px;color:var(--blue)"')} 코칭 키워드</h3>
     <div id="kwBox"><span class="muted">운동 이름을 말하면 그 이름으로 나눠요 (예: “스쿼트 60킬로”, “다음은 데드리프트”)</span></div>
     <div id="voiceTxt" class="muted" style="margin-top:8px;font-size:12px"></div></div>
-  <div class="row"><button class="btn sec" data-act="camFlip" style="flex:1">카메라 전환</button><button class="btn" data-act="realEnd" style="flex:1;background:#B42318">촬영 종료</button></div>
+  ${nextLessonBar()}
+  <div class="row"><button class="btn" data-act="realEnd" style="flex:1;background:#B42318">촬영 종료</button></div>
   <p class="foot">얼굴과 다른 사람은 촬영 중에 모자이크 처리됩니다 · 영상은 이 기기에만 남아요</p>`;
 }
 function miniChart(buf){
@@ -1558,7 +1638,7 @@ function startRealClass(){
   let lastChart=0;
   const set=(id,h)=>{const e=$('#'+id); if(e) e.innerHTML=h;};
   const segHTML=segs=>segs.map((g,i)=>`<span class="segc${i===segs.length-1?' on':''}">${i+1}. ${g.label||g.name} · ${g.reps.length}회</span>`).join('');
-  window.LiveCam.start({ box, facing:REAL.facing, record:true, voice:true, mode:'class',
+  const opts={ box, facing:REAL.facing, record:true, voice:true, mode:'class',
     criteria:{depth:(refs.squat&&refs.squat.crit&&refs.squat.crit.depth)||S.criteria.depth},
     onStatus:t=>set('camStatus',t),
     on:(type,d)=>{
@@ -1582,7 +1662,32 @@ function startRealClass(){
         else if(d.kws.length||d.w) set('kwBox',(d.w?`<span class="kw w">${d.w}</span>`:'')+d.kws.map(k=>`<span class="kw">#${k}</span>`).join(''));
       }
     }
-  }).catch(err=>{ stopReal(); set('camStatus',''); const fb=$('#fb'); if(fb){fb.className='feedback warn';fb.textContent=camFail(err);} set('repList','<button class="btn sec full" data-act="recStart" style="margin-top:4px">카메라 없이 시연 보기</button>'); });
+  };
+  const fail=err=>{ stopReal(); set('camStatus',''); const fb=$('#fb'); if(fb){fb.className='feedback warn';fb.textContent=camFail(err);} set('repList','<button class="btn sec full" data-act="recStart" style="margin-top:4px">카메라 없이 시연 보기</button>'); };
+  // 미리보기로 켜 둔 카메라가 있으면 그대로 이어서 촬영 (다시 켜지 않음)
+  if(window.LiveCam.isPreview&&window.LiveCam.isPreview()){ window.LiveCam.attach(box); set('camStatus',''); window.LiveCam.begin(opts).then(ok=>{ if(!ok) window.LiveCam.start(opts).catch(fail); }).catch(fail); }
+  else window.LiveCam.start(opts).catch(fail);
+}
+// 촬영 전 첫 화면: 실제 카메라 미리보기 + 골격 + 촬영 준비 확인
+function livePreview(){
+  return `<div class="segs"><span class="segc">운동 이름을 말하면 그 이름으로 나눠 기록해요 (예: “스쿼트 60킬로”)</span></div>
+  <div class="cam" style="min-height:260px"><div id="camBox"><div class="camph">${I.cam}<b>카메라 미리보기</b><span>옆에서 2~3m, 머리부터 발까지 보이게 세워 주세요</span></div></div>
+    <div class="hud"><span class="chip" id="chkBody">전신 확인 중</span><span class="chip" id="chkSide">측면 확인 중</span><button class="chip flipbtn" data-act="camFlip" aria-label="앞뒤 카메라 전환">카메라 전환</button></div>
+    <div id="camStatus" class="camst"></div></div>
+  <button class="recbtn" data-act="realStart" aria-label="측정 촬영 시작"><i></i><span>촬영 시작</span></button>
+  <button class="btn ghost full" data-act="recStart" style="margin-top:6px">카메라 없이 시연 보기</button>
+  ${poseSettingHTML()}`;
+}
+function startPreview(){
+  const box=$('#camBox'); if(!box||!camReady()) return;
+  if(window.LiveCam.isPreview&&window.LiveCam.isPreview()){ window.LiveCam.attach(box); return; }
+  if(window.LiveCam.s) return;
+  const set=(id,h)=>{const e=$('#'+id); if(e) e.innerHTML=h;};
+  const chip=(id,ok,t1,t2)=>{ const e=$('#'+id); if(e){ e.className='chip '+(ok?'ok':'warn'); e.textContent=ok?t1:t2; } };
+  window.LiveCam.start({ box, facing:REAL.facing, mode:'preview', record:false, voice:false,
+    onStatus:t=>set('camStatus',t),
+    on:(type,d)=>{ if(type==='status') set('camStatus',d); else if(type==='checks'){ chip('chkBody',d.body,'전신 인식 OK','전신이 다 안 보여요'); chip('chkSide',d.side,'측면 각도 OK','옆으로 서 주세요'); } }
+  }).catch(err=>{ stopReal(); set('camStatus',camFail(err)); });
 }
 function segTitle(g){ return g.title||g.label||g.name; }
 function segRange(R,i){ const g=R.segs[i]; const from=i===0?0:R.segs[i-1].end; const to=i===R.segs.length-1?Math.max(g.end,R.duration||0):g.end; return [Math.max(0,from),Math.max(to,from+1)]; }
@@ -1621,6 +1726,7 @@ function realReview(){
       ${lm?`<button class="btn ${saved?'sec':''} full" data-act="saveRef" data-seg="${i}" style="margin-top:10px">${saved?'기준 동작 다시 저장':'좋은 반복을 회원 기준 동작으로 저장'}</button>`:''}
     </div>`;}).join('')+
   `<div class="card"><h3>전체 영상 <span class="r muted">얼굴 모자이크</span></h3>${R.videoURL?`<video src="${R.videoURL}" controls playsinline preload="metadata" style="width:100%;border-radius:12px;background:#000">${R.vttURL?`<track kind="captions" srclang="ko" label="자막" src="${R.vttURL}" default>`:''}</video>`:''}${dl}</div>
+  ${nextLessonBar()}
   <button class="btn full" data-act="realShare">카카오톡으로 보낼 요약 복사</button><button class="btn sec full" data-act="realAgain" style="margin-top:8px">새 수업 촬영</button>`;
 }
 function realSummary(){
@@ -2000,6 +2106,147 @@ async function processSession(R){
 }catch(e){} })();
 
 if(window.APP_BUILD){ S.meals=loadMeals(); const _ib=LS.get('aiwm_inbody',null); if(_ib) S.inbody=_ib; const _g=LS.get('aiwm_goal',null); if(_g) Object.assign(S.goal,_g); }
+// ---------- 트레이너 스케줄 (주간 · 월간 드롭다운 · 수업 중 예약) ----------
+const DOW='일월화수목금토';
+const pad2=n=>String(n).padStart(2,'0');
+function ymd(d){ return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
+function parseYmd(s){ const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); }
+function addDays(s,n){ const d=parseYmd(s); d.setDate(d.getDate()+n); return ymd(d); }
+function mondayOf(s){ const d=parseYmd(s); const k=(d.getDay()+6)%7; d.setDate(d.getDate()-k); return ymd(d); }
+function hm2min(t){ const [h,m]=String(t||'0:0').split(':').map(Number); return h*60+(m||0); }
+function min2hm(x){ return pad2(Math.floor(x/60))+':'+pad2(x%60); }
+function mdLabel(s){ const d=parseYmd(s); return (d.getMonth()+1)+'/'+d.getDate()+' ('+DOW[d.getDay()]+')'; }
+function loadSched(){
+  let L=LS.get('aiwm_sched',null);
+  if(!L){ // 처음 열면 이번 주 예시 수업을 넣어 둠
+    const t=ymd(new Date()), mk=(o,time,id,name,note)=>({id:'e'+Math.random().toString(36).slice(2,8),date:addDays(t,o),time,dur:60,mid:id,name,note:note||''});
+    L=[mk(0,'10:00','hw','혜원'),mk(0,'14:00','mj','민준'),mk(0,'19:30','sy','서연'),mk(1,'09:00',null,'지훈'),mk(1,'18:00','hw','혜원'),mk(2,'11:00','mj','민준'),mk(3,'19:30','sy','서연'),mk(4,'18:00','hw','혜원')];
+    LS.set('aiwm_sched',L);
+  }
+  return L;
+}
+let SCHED=null;
+function sched(){ return SCHED||(SCHED=loadSched()); }
+function saveSched(){ SCHED.sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time)); LS.set('aiwm_sched',SCHED); }
+function lessonsOn(ds){ return sched().filter(x=>x.date===ds).sort((a,b)=>a.time.localeCompare(b.time)); }
+function nextOf(mid){ const now=ymd(new Date())+' '+min2hm(new Date().getHours()*60+new Date().getMinutes()); const x=sched().find(l=>l.mid===mid&&(l.date+' '+l.time)>=now); return x?(x.date===ymd(new Date())?'오늘 ':mdLabel(x.date)+' ')+x.time:'예약 없음'; }
+// 회원 목록의 '다음 수업'을 스케줄에서 계산
+members.forEach(m=>{ try{ Object.defineProperty(m,'next',{get(){ return nextOf(m.id); },configurable:true}); }catch(e){} });
+function conflicts(f){ const a=hm2min(f.time), b=a+(+f.dur||60); return sched().filter(x=>x.id!==f.id&&x.date===f.date&&hm2min(x.time)<b&&hm2min(x.time)+x.dur>a); }
+
+function tSchedule(){
+  renderTop('스케줄',false);
+  const today=ymd(new Date());
+  const wk=S.wkStart||(S.wkStart=mondayOf(today));
+  const sel=S.wkSel||(S.wkSel=(mondayOf(today)===wk?today:wk));
+  const days=Array.from({length:7},(_,i)=>addDays(wk,i));
+  const all=days.flatMap(d=>lessonsOn(d));
+  const H0=Math.min(7,...all.map(x=>Math.floor(hm2min(x.time)/60))), H1=Math.max(22,...all.map(x=>Math.ceil((hm2min(x.time)+x.dur)/60)));
+  const ROW=32, end=addDays(wk,6);
+  const wkLabel=`${parseYmd(wk).getMonth()+1}월 ${parseYmd(wk).getDate()}일 – ${parseYmd(end).getMonth()+1!==parseYmd(wk).getMonth()+1?(parseYmd(end).getMonth()+1)+'월 ':''}${parseYmd(end).getDate()}일`;
+  const selList=lessonsOn(sel);
+  return `
+  ${S.scheduleReqAccepted?'':`<div class="alert b"><div><b>예약 요청 1건</b><br>서연 · ${mdLabel(addDays(today,2))} 20:00</div><div style="margin-left:auto;display:flex;gap:6px;align-self:center"><button class="btn sm" data-act="acceptReq">승인</button></div></div>`}
+  <div class="card" style="padding:12px 10px">
+    <div class="calh" style="margin-bottom:6px"><button class="back" data-act="wkPrev" aria-label="이전 주">${I.back||'‹'}</button><button class="monthbtn" data-act="monthToggle" aria-expanded="${!!S.monthOpen}"><b>${wkLabel}</b> <span aria-hidden="true">${S.monthOpen?'▴':'▾'}</span></button><button class="back" data-act="wkNext" aria-label="다음 주" style="transform:scaleX(-1)">${I.back||'›'}</button></div>
+    ${S.monthOpen?monthGrid(sel):''}
+    <div class="wkh"><span></span>${days.map(d=>{ const dd=parseYmd(d), n=lessonsOn(d).length; return `<button class="wkd${d===sel?' on':''}${d===today?' today':''}" data-act="wkDay" data-d="${d}"><small>${DOW[dd.getDay()]}</small><b>${dd.getDate()}</b><i>${n?n:''}</i></button>`; }).join('')}</div>
+    <div class="wkg" id="wkGrid" data-h0="${H0}" data-row="${ROW}" data-wk="${wk}" style="height:${(H1-H0)*ROW}px">
+      ${Array.from({length:H1-H0},(_,h)=>`<div class="wkl" style="top:${h*ROW}px"><span>${H0+h}</span></div>`).join('')}
+      ${days.map((d,i)=>`<div class="wkc${d===sel?' on':''}" style="left:calc(30px + ${i} * (100% - 30px) / 7)" data-col="${d}"></div>`).join('')}
+      ${days.map((d,i)=>lessonsOn(d).map(x=>{ const top=(hm2min(x.time)-H0*60)/60*ROW, h=Math.max(18,x.dur/60*ROW-2); return `<button class="wkb${x.mid==='hw'?' c1':x.mid==='mj'?' c2':x.mid==='sy'?' c3':''}" data-act="schedEdit" data-id="${x.id}" style="left:calc(30px + ${i} * (100% - 30px) / 7 + 1px);top:${top}px;height:${h}px" aria-label="${mdLabel(d)} ${x.time} ${x.name}"><b>${x.name}</b><span>${x.time}</span></button>`; }).join('')).join('')}
+      ${days.includes(today)?(()=>{ const nm=new Date().getHours()*60+new Date().getMinutes(); const i=days.indexOf(today); return nm>=H0*60&&nm<=H1*60?`<div class="wknow" style="left:calc(30px + ${i} * (100% - 30px) / 7);top:${(nm-H0*60)/60*ROW}px"></div>`:''; })():''}
+    </div>
+    <p class="muted" style="margin:8px 2px 0;font-size:12px">빈 칸을 누르면 그 시간에 수업을 잡고, 수업을 누르면 바꾸거나 취소할 수 있어요.</p>
+  </div>
+  <div class="card"><h3>${mdLabel(sel)}${sel===today?' · 오늘':''}<span class="r">${selList.length}개</span></h3>
+    ${selList.length?selList.map(x=>`<button class="list-item" data-act="schedEdit" data-id="${x.id}"><b style="width:52px">${x.time}</b><div class="av" style="width:30px;height:30px;font-size:13px">${x.name[0]}</div><div class="sp"><b style="font-size:14px">${x.name}</b><div class="muted">${x.dur}분${x.note?' · '+x.note:''}</div></div><span class="muted">›</span></button>`).join(''):'<p class="muted" style="margin:0">수업이 없어요.</p>'}
+  </div>
+  <button class="btn full" data-act="schedNew" data-d="${sel}">${I.plus} 수업 잡기</button>
+  <div class="card" style="margin-top:12px"><h3>수업 가능 시간</h3><div class="muted">평일 09:00–21:00 · 토 10:00–14:00 · 회원은 이 시간 안에서만 예약 요청할 수 있습니다.</div></div>`;
+}
+function monthGrid(sel){
+  const cur=S.monthCur||sel.slice(0,7), [y,m]=cur.split('-').map(Number);
+  const first=new Date(y,m-1,1), start=(first.getDay()+6)%7, n=new Date(y,m,0).getDate(), today=ymd(new Date());
+  const cells=[]; for(let i=0;i<start;i++) cells.push('<span></span>');
+  for(let d=1;d<=n;d++){ const ds=y+'-'+pad2(m)+'-'+pad2(d), k=lessonsOn(ds).length;
+    cells.push(`<button class="cd${ds===sel?' sel':''}${ds===today?' today':''}" data-act="monthDay" data-d="${ds}" aria-label="${m}월 ${d}일 수업 ${k}개"><span>${d}</span><i style="background:${k?'var(--blue)':'transparent'}"></i><small class="mc">${k||''}</small></button>`); }
+  return `<div class="monthbox"><div class="calh"><button class="back" data-act="monthPrev" aria-label="이전 달">${I.back||'‹'}</button><b>${y}년 ${m}월</b><button class="back" data-act="monthNext" aria-label="다음 달" style="transform:scaleX(-1)">${I.back||'›'}</button></div>
+    <div class="calw">${'월화수목금토일'.split('').map(c=>`<span>${c}</span>`).join('')}</div><div class="calg">${cells.join('')}</div>
+    <p class="muted" style="margin:6px 0 0;font-size:12px;text-align:center">날짜를 누르면 그 주로 이동해요 · 이번 달 수업 ${sched().filter(x=>x.date.startsWith(cur)).length}개</p></div>`;
+}
+// 수업 잡기 시트 (수업 촬영 중에도 화면을 다시 그리지 않고 위에 띄움)
+function schedSheet(f){
+  const cf=conflicts(f), mem=members.find(m=>m.id===f.mid);
+  const left=mem?Math.max(0,mem.total-mem.done-sched().filter(x=>x.mid===mem.id&&x.date>=ymd(new Date())&&x.id!==f.id).length):null;
+  return `<div class="modal" id="schedModal"><div class="sheet" role="dialog" aria-label="수업 잡기">
+    <h2>${f.id?'수업 바꾸기':'수업 잡기'}</h2><p class="muted" style="margin:0 0 12px">${S.sub==='live'||S.sub==='review'||S.sub==='realReview'?'수업 중에 다음 수업을 바로 잡아요':'날짜·시간을 고르세요'}</p>
+    <label class="field"><span>회원</span><select id="sfM">${members.map(m=>`<option value="${m.id}" ${f.mid===m.id?'selected':''}>${m.name} · 남은 ${m.total-m.done}회</option>`).join('')}<option value="_" ${!f.mid?'selected':''}>직접 입력</option></select></label>
+    <label class="field" id="sfNameWrap" style="${f.mid?'display:none':''}"><span>이름</span><input type="text" id="sfName" value="${f.mid?'':(f.name||'')}" placeholder="회원 이름"></label>
+    <div class="grid2"><label class="field"><span>날짜</span><input type="date" id="sfD" value="${f.date}"></label><label class="field"><span>시간</span><input type="time" id="sfT" step="1800" value="${f.time}"></label></div>
+    <div class="grid2"><label class="field"><span>수업 길이</span><select id="sfDur">${[30,50,60,90].map(v=>`<option value="${v}" ${+f.dur===v?'selected':''}>${v}분</option>`).join('')}</select></label>
+      ${f.id?'<div></div>':`<label class="field"><span>반복</span><select id="sfRep"><option value="1">한 번</option><option value="4">매주 4회</option><option value="8">매주 8회</option>${left?`<option value="${left}">남은 횟수만큼 (${left}회)</option>`:''}</select></label>`}</div>
+    <label class="field"><span>메모 (선택)</span><input type="text" id="sfNote" value="${f.note||''}" placeholder="예: 하체 · 스쿼트 무게 올리기"></label>
+    <div id="sfWarn">${cf.length?`<div class="alert o" style="margin:0 0 10px"><div><b>시간이 겹쳐요</b><br>${cf.map(x=>x.time+' '+x.name).join(', ')}</div></div>`:''}</div>
+    ${mem?`<p class="muted" style="margin:0 0 10px;font-size:12.5px">${mem.name} 다음 수업: ${nextOf(mem.id)}${left!=null?` · 남은 수강권 ${left}회 (예약 제외)`:''}</p>`:''}
+    <div class="row"><button class="btn" data-act="schedSave" style="flex:1">${f.id?'저장':'잡기'}</button>${f.id?'<button class="btn sec" data-act="schedDel" style="background:var(--red-soft);color:var(--red)">취소하기</button>':''}<button class="btn sec" data-act="schedClose">닫기</button></div>
+  </div></div>`;
+}
+function openSched(f){
+  S.schedForm=Object.assign({date:ymd(new Date()),time:'18:00',dur:60,mid:'hw',name:'혜원',note:''},f);
+  const root=$('#modalRoot'); root.innerHTML=schedSheet(S.schedForm); bindSchedForm();
+}
+function readSchedForm(){
+  const f=S.schedForm, mid=$('#sfM').value;
+  f.mid=mid==='_'?null:mid; f.name=f.mid?(members.find(m=>m.id===f.mid)||{}).name:($('#sfName').value||'').trim();
+  f.date=$('#sfD').value; f.time=$('#sfT').value; f.dur=+$('#sfDur').value; f.note=($('#sfNote').value||'').trim(); f.rep=$('#sfRep')?+$('#sfRep').value:1;
+  return f;
+}
+function bindSchedForm(){
+  const upd=()=>{ const f=readSchedForm(); $('#sfNameWrap').style.display=f.mid?'none':''; const cf=f.date&&f.time?conflicts(f):[]; $('#sfWarn').innerHTML=cf.length?`<div class="alert o" style="margin:0 0 10px"><div><b>시간이 겹쳐요</b><br>${cf.map(x=>x.time+' '+x.name).join(', ')}</div></div>`:''; };
+  ['sfM','sfD','sfT','sfDur'].forEach(id=>{ const e=$('#'+id); if(e) e.addEventListener('change',upd); });
+}
+function closeSched(){ S.schedForm=null; $('#modalRoot').innerHTML=''; }
+function afterSchedChange(msg){
+  closeSched(); toast(msg);
+  if(S.sub==='live'||S.sub==='realReview'||S.sub==='review'){ const n=$('#nextLesson'); if(n) n.innerHTML=nextLessonHTML(); return; } // 촬영·정리 화면은 다시 그리지 않음
+  keepScroll(render);
+}
+function nextLessonHTML(){ return `다음 수업 <b>${nextOf('hw')}</b>`; }
+function nextLessonBar(){ return `<div class="nextbar"><span id="nextLesson">${nextLessonHTML()}</span><button class="btn sm sec" data-act="schedNew" data-m="hw">다음 수업 잡기</button></div>`; }
+function schedAct(act,a){
+  switch(act){
+    case 'wkPrev': S.wkStart=addDays(S.wkStart,-7); S.wkSel=S.wkStart; S.monthCur=null; keepScroll(render); return true;
+    case 'wkNext': S.wkStart=addDays(S.wkStart,7); S.wkSel=S.wkStart; S.monthCur=null; keepScroll(render); return true;
+    case 'wkDay': S.wkSel=a.dataset.d; keepScroll(render); return true;
+    case 'monthToggle': S.monthOpen=!S.monthOpen; S.monthCur=null; keepScroll(render); return true;
+    case 'monthPrev': case 'monthNext': { const cur=S.monthCur||S.wkSel.slice(0,7); const [y,m]=cur.split('-').map(Number); const d=new Date(y,m-1+(act==='monthNext'?1:-1),1); S.monthCur=d.getFullYear()+'-'+pad2(d.getMonth()+1); keepScroll(render); return true; }
+    case 'monthDay': S.wkSel=a.dataset.d; S.wkStart=mondayOf(a.dataset.d); S.monthOpen=false; S.monthCur=null; keepScroll(render); return true;
+    case 'schedNew': openSched({date:a.dataset.d||(S.sub==='live'||S.sub==='realReview'||S.sub==='review'?addDays(ymd(new Date()),2):ymd(new Date())),time:a.dataset.t||(S.sub==='live'||S.sub==='realReview'||S.sub==='review'?min2hm(Math.min(21*60,Math.round((new Date().getHours()*60+new Date().getMinutes())/30)*30)):'18:00'),mid:a.dataset.m||'hw'}); return true;
+    case 'schedEdit': { const x=sched().find(l=>l.id===a.dataset.id); if(x) openSched(Object.assign({},x)); return true; }
+    case 'schedClose': closeSched(); return true;
+    case 'schedSave': { const f=readSchedForm(); if(!f.date||!f.time){ toast('날짜와 시간을 골라 주세요'); return true; } if(!f.name){ toast('회원 이름을 넣어 주세요'); return true; }
+      if(f.id){ const x=sched().find(l=>l.id===f.id); Object.assign(x,{date:f.date,time:f.time,dur:f.dur,mid:f.mid,name:f.name,note:f.note}); saveSched(); afterSchedChange('수업을 바꿨어요'); return true; }
+      const n=Math.max(1,f.rep||1); let clash=0;
+      for(let i=0;i<n;i++){ const it={id:'l'+Date.now().toString(36)+i,date:addDays(f.date,7*i),time:f.time,dur:f.dur,mid:f.mid,name:f.name,note:f.note}; if(conflicts(it).length) clash++; sched().push(it); }
+      saveSched(); S.wkSel=f.date; S.wkStart=mondayOf(f.date);
+      afterSchedChange(`${f.name} ${mdLabel(f.date)} ${f.time}${n>1?` 부터 매주 ${n}회`:''} 수업을 잡았어요${clash?` · 겹치는 시간 ${clash}건 확인`:''}`); return true; }
+    case 'schedDel': { const f=S.schedForm; if(f&&f.id){ SCHED=sched().filter(l=>l.id!==f.id); saveSched(); afterSchedChange('수업을 취소했어요'); } return true; }
+    case 'acceptReq': { S.scheduleReqAccepted=true; sched().push({id:'r'+Date.now().toString(36),date:addDays(ymd(new Date()),2),time:'20:00',dur:60,mid:'sy',name:'서연',note:'회원 예약 요청'}); saveSched(); keepScroll(render); toast('예약 승인 · 회원에게 알림이 갑니다'); return true; }
+  }
+  return false;
+}
+function bindWeekGrid(){
+  const g=$('#wkGrid'); if(!g) return;
+  g.addEventListener('click',e=>{
+    if(e.target.closest('.wkb')) return;
+    const r=g.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top; if(x<30) return;
+    const i=Math.min(6,Math.floor((x-30)/((r.width-30)/7))), H0=+g.dataset.h0, ROW=+g.dataset.row;
+    const mins=Math.round((H0*60+y/ROW*60)/30)*30;
+    openSched({date:addDays(g.dataset.wk,i),time:min2hm(Math.min(23*60,mins))});
+  });
+}
+
 // ---------- render ----------
 let modal=null;
 function render(){
@@ -2026,6 +2273,8 @@ function render(){
 function afterRender(){
   if(S.role==='trainer' && S.sub==='live' && S.recOn) startClassSim();
   if(S.role==='trainer' && S.sub==='live' && S.realOn) startRealClass();
+  else if(window.APP_BUILD && S.role==='trainer' && S.sub==='live' && !S.recOn) startPreview();
+  bindWeekGrid();
   if(S.role==='member' && S.sub==='solo' && S.soloReal) startRealSolo(S.subArg);
   if(S.role==='trainer' && S.sub==='review'){
     const el=$('#reviewTimer');
@@ -2061,6 +2310,7 @@ document.addEventListener('click',e=>{
   const act=a.dataset.act;
   if(realAct(act,a)) return;
   if(aiAct(act,a)) return;
+  if(schedAct(act,a)) return;
   switch(act){
     case 'back':
       if(S.role==='trainer'){ if(S.sub==='kakao') go('review'); else if(S.sub==='review') go(null); else go(null);} else go(null); break;
